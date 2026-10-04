@@ -1,0 +1,1257 @@
+/* app.css — al stil til Matematikspillet («Lystårnet»).
+   Temafarverne (--farve-1, --farve-2, --baggrund-1 …) sættes KUN i skallerne.
+   Her står kun faste, temauafhængige farver (guld, tællebrikker, rigtig-grøn). */
+
+:root {
+  --hvid: #fffdf8;
+  --papir: #fffaf0;
+  --guld: #ffc83d;
+  --guld-moerk: #d99100;
+  --himmel: #6ec6ff;
+  --rod-brik: #e5484d;
+  --blaa-brik: #2f7de1;
+  --rigtig: #1e8449;      /* hvid tekst på den: kontrast 4,7:1 */
+  --rigtig-moerk: #135c32;
+  --slukket: #cfc6bb;
+  --skygge: rgba(70, 45, 20, 0.18);
+  --skygge-stor: rgba(70, 45, 20, 0.28);
+  /* Figurernes farver i Formbyen (faste, så «den røde trekant» altid er rød) */
+  --form-0: #e5484d; --form-1: #2f7de1; --form-2: #f5b82e; --form-3: #2fae66; --form-4: #9b59d0; --form-5: #f08a3c;
+
+  --tryk: 52px;                                 /* mindste trykflade (1 cm på iPad) */
+  --ikon: clamp(56px, 8vmin, 68px);             /* runde ikonknapper i toppen */
+  --tast: clamp(60px, 12.4vh, 108px);           /* taltaster (ca. 2 cm på iPad) */
+  --radius: 26px;
+  --skrift: ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", "Nunito", "Trebuchet MS", system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+body {
+  font-family: var(--skrift);
+  font-size: 20px;
+  color: var(--tekst);
+  background: var(--baggrund-1);
+  background-image:
+    radial-gradient(circle at 12% 18%, var(--baggrund-2) 0 18%, transparent 19%),
+    radial-gradient(circle at 88% 82%, var(--baggrund-2) 0 22%, transparent 23%),
+    linear-gradient(165deg, var(--baggrund-1), var(--baggrund-2));
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+button, a.ikon-knap {
+  font-family: inherit;
+  color: inherit;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+button { cursor: pointer; }
+button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-offset: 3px; }
+
+.skjult { display: none !important; } /* NB: «?»-feltet i talstreg/mønster hedder .hul — ikke .skjult */
+
+.skaerm {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  animation: ind 0.25s ease-out;
+}
+@keyframes ind { from { opacity: 0; transform: scale(0.985); } to { opacity: 1; transform: none; } }
+
+/* ---------- Topbar ---------- */
+.topbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px 6px;
+  min-height: calc(var(--ikon) + 18px);
+}
+.topbar-titel {
+  font-size: clamp(22px, 3.6vmin, 32px);
+  font-weight: 800;
+  color: var(--farve-1-moerk);
+  text-align: center;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.topbar-hoejre { display: flex; gap: 12px; }
+/* Tom plads i stedet for en knap, så titlen står i midten. Den giver sig først, hvis titlen ellers ikke kan være der. */
+.topbar-plads { flex: 0 1 var(--ikon); min-width: 0; }
+.kort .topbar-titel { flex: 1 0 auto; } /* barnets navn og perlerne skæres aldrig af — pladsen giver sig i stedet */
+
+.ikon-knap {
+  width: var(--ikon);
+  height: var(--ikon);
+  min-width: var(--tryk);
+  min-height: var(--tryk);
+  flex: 0 0 auto;
+  border: none;
+  border-radius: 50%;
+  background: var(--hvid);
+  box-shadow: 0 4px 0 var(--skygge), 0 6px 14px var(--skygge);
+  font-size: calc(var(--ikon) * 0.5);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  transition: transform 0.08s;
+}
+.ikon-knap:active { transform: translateY(3px) scale(0.96); box-shadow: 0 1px 0 var(--skygge); }
+
+/* ---------- Store runde knapper (▶ ✔ 🗺️) ---------- */
+.stor-knap {
+  width: clamp(104px, 17vmin, 150px);
+  height: clamp(104px, 17vmin, 150px);
+  flex-shrink: 0; /* ellers bliver ▶ klemt til en oval på telefonen på langs */
+  border: none;
+  border-radius: 50%;
+  font-size: clamp(48px, 8vmin, 70px);
+  color: var(--hvid);
+  background: radial-gradient(circle at 35% 30%, var(--farve-2-lys), var(--farve-2) 60%, var(--farve-2-moerk));
+  box-shadow: 0 7px 0 var(--farve-2-moerk), 0 12px 24px var(--skygge-stor);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0 0 0.12em;
+  transition: transform 0.08s;
+}
+.stor-knap:active { transform: translateY(5px) scale(0.97); box-shadow: 0 2px 0 var(--farve-2-moerk), 0 4px 10px var(--skygge); }
+.puls { animation: puls 1.6s ease-in-out infinite; }
+@keyframes puls { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.07); } }
+
+/* ---------- Startside (index) ---------- */
+.index { align-items: center; justify-content: center; gap: 4vmin; padding: 16px; }
+.index-titel {
+  font-size: clamp(34px, 7vmin, 64px);
+  font-weight: 900;
+  color: var(--farve-1-moerk);
+  letter-spacing: 0.02em;
+}
+.spiller-liste {
+  display: flex;
+  gap: 4vmin;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.spiller-kort {
+  width: clamp(200px, 30vmin, 300px);
+  aspect-ratio: 3 / 4;
+  border-radius: 36px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2vmin;
+  text-decoration: none;
+  color: var(--hvid);
+  box-shadow: 0 9px 0 var(--skygge-stor), 0 16px 30px var(--skygge);
+  transition: transform 0.1s;
+}
+.spiller-kort:active { transform: translateY(6px) scale(0.98); }
+.spiller-alma { background: linear-gradient(160deg, var(--alma-1), var(--alma-2)); }
+.spiller-ella { background: linear-gradient(160deg, var(--ella-1), var(--ella-2)); }
+.spiller-voksen { background: linear-gradient(160deg, var(--voksen-1), var(--voksen-2)); width: clamp(150px, 20vmin, 210px); }
+.spiller-figur { font-size: clamp(90px, 15vmin, 150px); filter: drop-shadow(0 6px 6px rgba(0, 0, 0, 0.2)); }
+.spiller-voksen .spiller-figur { font-size: clamp(60px, 10vmin, 100px); }
+.spiller-navn { font-size: clamp(30px, 5vmin, 46px); font-weight: 900; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.18); }
+.spiller-voksen .spiller-navn { font-size: clamp(22px, 3.6vmin, 34px); }
+@media (orientation: portrait) and (max-width: 600px) {
+  .spiller-kort { width: 40vw; }
+  .spiller-voksen { width: 30vw; }
+}
+
+/* ---------- Startskærm (barn) ---------- */
+.start { align-items: center; justify-content: center; gap: 2vmin; }
+.start .hjem { position: absolute; top: 14px; left: 16px; }
+/* ⚠️ til en voksen, når spillet ikke kan gemme */
+.advarsel-knap { background: #ffe08a; }
+.start .advarsel-knap { position: absolute; top: 14px; right: 16px; }
+.fyrtaarn { display: inline-block; width: 1em; height: 1.2em; vertical-align: -0.2em; }
+.fyrtaarn svg { width: 100%; height: 100%; display: block; }
+.index-titel .fyrtaarn { margin-right: 0.2em; }
+.start-taarn { font-size: clamp(50px, 9vmin, 90px); }
+.station-ikon.fyrtaarn { width: calc(var(--s) * 0.5); height: calc(var(--s) * 0.6); }
+.station.laast .station-ikon.fyrtaarn { filter: grayscale(1); opacity: 0.55; }
+.start-figur {
+  font-size: clamp(130px, 28vmin, 240px);
+  line-height: 1;
+  animation: svaev 3s ease-in-out infinite;
+  filter: drop-shadow(0 12px 10px var(--skygge));
+}
+@keyframes svaev { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
+.start-navn {
+  font-size: clamp(40px, 8vmin, 72px);
+  font-weight: 900;
+  color: var(--farve-1-moerk);
+  margin-bottom: 2vmin;
+}
+.spil-knap { width: clamp(130px, 22vmin, 190px); height: clamp(130px, 22vmin, 190px); font-size: clamp(64px, 11vmin, 96px); }
+
+/* ---------- Vælg ven ---------- */
+.figur-liste {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: center;
+  justify-content: center;
+  gap: 3vmin;
+  padding: 2vmin;
+}
+.figur-knap {
+  width: clamp(130px, 21vmin, 220px);
+  aspect-ratio: 1 / 1.12;
+  border: 6px solid transparent;
+  border-radius: 34px;
+  background: var(--hvid);
+  box-shadow: 0 6px 0 var(--skygge), 0 10px 20px var(--skygge);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.figur-knap.valgt { border-color: var(--farve-2); background: var(--papir); }
+.figur-emoji { font-size: clamp(70px, 12vmin, 120px); line-height: 1.1; }
+.figur-navn { font-size: clamp(20px, 3vmin, 28px); font-weight: 800; color: var(--farve-1-moerk); }
+.figur-knap.hop .figur-emoji { animation: hop 0.5s; }
+.ok-knap { position: absolute; right: 4vmin; bottom: 4vmin; background: radial-gradient(circle at 35% 30%, #4fbf7c, var(--rigtig) 55%, var(--rigtig-moerk)); box-shadow: 0 7px 0 var(--rigtig-moerk), 0 12px 24px var(--skygge-stor); }
+@media (orientation: portrait) {
+  .ok-knap { position: static; align-self: center; margin-bottom: 5vmin; }
+}
+
+/* ---------- Verdenskort ---------- */
+.kort-flade { position: relative; flex: 1; margin: 0 8px 8px; }
+.kort-sti { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.kort-sti .sti-kant { fill: none; stroke: var(--sti-kant); stroke-width: 34; stroke-linecap: round; stroke-linejoin: round; opacity: 0.55; }
+.kort-sti .sti-midte { fill: none; stroke: var(--sti); stroke-width: 7; stroke-dasharray: 2 18; stroke-linecap: round; }
+
+.station {
+  --s: clamp(78px, 12.5vmin, 128px);
+  position: absolute;
+  width: var(--s);
+  height: var(--s);
+  margin: calc(var(--s) / -2) 0 0 calc(var(--s) / -2);
+  border: 6px solid var(--hvid);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--farve-1-lys), var(--farve-1) 70%);
+  box-shadow: 0 6px 0 var(--farve-1-moerk), 0 10px 18px var(--skygge-stor);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: transform 0.1s;
+  z-index: 2;
+}
+.station:active { transform: translateY(4px) scale(0.96); }
+.station-ikon { font-size: calc(var(--s) * 0.5); line-height: 1; }
+.station.laast { background: var(--slukket); box-shadow: 0 5px 0 #a99d90, 0 8px 14px var(--skygge); --s: clamp(64px, 9.5vmin, 96px); }
+.station.laast .station-ikon { filter: grayscale(1); opacity: 0.55; }
+.station-laas { position: absolute; right: -6px; bottom: -6px; font-size: calc(var(--s) * 0.32); }
+.station.anbefalet { border-color: var(--guld); box-shadow: 0 6px 0 var(--farve-1-moerk), 0 0 0 8px rgba(255, 200, 61, 0.45), 0 12px 22px var(--skygge-stor); }
+.station-navn {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: clamp(17px, 2.4vmin, 21px);
+  font-weight: 800;
+  color: var(--tekst);
+  background: rgba(255, 253, 248, 0.85);
+  padding: 2px 10px;
+  border-radius: 12px;
+}
+.station.laast .station-navn { opacity: 0.6; }
+.station-navn { z-index: 2; }
+@media (orientation: portrait) and (max-width: 600px) {
+  .station-stjerner { top: -12px; font-size: 18px; padding: 1px 5px; }
+}
+.station-stjerner {
+  position: absolute;
+  top: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 1px;
+  font-size: clamp(22px, 3.4vmin, 30px);
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(255, 253, 248, 0.95);
+  box-shadow: 0 2px 6px var(--skygge);
+}
+/* Tomme stjerner er grå, fyldte er guld med mørk kant — så man kan se forskel på afstand */
+.station-stjerner i { font-style: normal; color: #d9d0c6; }
+.station-stjerner i.fuld { color: var(--guld); -webkit-text-stroke: 1.5px var(--guld-moerk); text-shadow: 0 1px 0 var(--guld-moerk); }
+
+.kort-ven {
+  --v: clamp(64px, 10vmin, 100px);
+  position: absolute;
+  z-index: 3;
+  width: var(--v);
+  height: var(--v);
+  margin: calc(var(--v) / -2) 0 0 calc(var(--v) / -2);
+  border: none;
+  background: transparent;
+  font-size: calc(var(--v) * 0.86);
+  line-height: 1;
+  padding: 0;
+  animation: svaev 2.4s ease-in-out infinite;
+  filter: drop-shadow(0 6px 5px var(--skygge));
+}
+.kort-spil {
+  position: absolute;
+  right: 2vmin;
+  bottom: 2vmin;
+  z-index: 4;
+}
+.kort-spil-ikon {
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  font-size: clamp(30px, 5vmin, 44px);
+  background: var(--hvid);
+  border-radius: 50%;
+  width: 1.5em;
+  height: 1.5em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 0 var(--skygge);
+}
+@media (orientation: portrait) {
+  .kort-spil { right: 3vmin; bottom: 2vmin; }
+}
+
+/* ---------- Runde ---------- */
+.fremdrift { display: flex; gap: clamp(8px, 1.6vmin, 16px); }
+.prik {
+  width: clamp(30px, 5.4vmin, 48px);
+  height: clamp(30px, 5.4vmin, 48px);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.75);
+  border: 3px solid var(--farve-1-lys);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(22px, 3.6vmin, 34px);
+  line-height: 1;
+  color: var(--guld);
+}
+.prik.nu { border-color: var(--farve-2); transform: scale(1.15); }
+.prik.fuld { background: var(--guld); border-color: var(--guld); box-shadow: 0 2px 0 var(--skygge); }
+.prik.fuld::after { content: '🐾'; font-size: 0.66em; } /* fyldt fodspor — tydeligt på afstand */
+.prik.pop { animation: pop 0.45s; }
+
+.runde-krop {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(260px, 30vw, 380px);
+  gap: 16px;
+  padding: 4px 16px 16px;
+}
+.visning-panel {
+  position: relative;
+  min-height: 0;
+  border-radius: var(--radius);
+  background: rgba(255, 253, 248, 0.88);
+  box-shadow: inset 0 0 0 4px rgba(255, 255, 255, 0.9), 0 8px 20px var(--skygge);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+}
+.spoerg-tekst {
+  flex: 0 0 auto;
+  font-size: clamp(22px, 3.4vmin, 30px);
+  font-weight: 800;
+  color: var(--farve-1-moerk);
+  padding: 14px 18px 0;
+  text-align: center;
+}
+.visning {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2vmin;
+  padding: 10px 16px 16px;
+  container-type: size;   /* størrelser herunder følger feltet (cqw/cqh) — ældre iPads bruger vmin-værdierne (variabler: se @supports nederst) */
+}
+.runde-ven {
+  position: absolute;
+  left: 10px;
+  bottom: 6px;
+  font-size: clamp(46px, 8vmin, 80px);
+  line-height: 1;
+  pointer-events: none;
+  filter: drop-shadow(0 4px 4px var(--skygge));
+}
+.runde-ven.glad { animation: hop 0.6s; }
+.visning-panel.med-hjaelp .runde-ven { display: none; }
+.runde-ven.taenk { animation: vip 0.7s; }
+
+@media (orientation: portrait) {
+  .runde-krop { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
+  :root { --tast: clamp(56px, 8.6vh, 104px); }
+}
+
+/* Tre svarknapper */
+.svar-panel { min-height: 0; display: flex; flex-direction: column; justify-content: center; }
+.valg { display: flex; flex-direction: column; gap: clamp(12px, 2.2vmin, 22px); height: 100%; justify-content: center; }
+.valg-knap {
+  flex: 0 1 clamp(104px, 20vh, 170px);
+  min-height: 104px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--hvid);
+  color: var(--tekst);
+  font-size: clamp(56px, 10vmin, 96px);
+  font-weight: 900;
+  box-shadow: 0 7px 0 var(--farve-1-lys), 0 10px 20px var(--skygge);
+  transition: transform 0.08s, opacity 0.3s, background 0.2s;
+}
+.valg-knap:active { transform: translateY(5px); box-shadow: 0 2px 0 var(--farve-1-lys); }
+.valg-knap.vis-svar { background: var(--guld); box-shadow: 0 7px 0 var(--guld-moerk), 0 0 0 8px rgba(255, 200, 61, 0.4); animation: puls 1.2s ease-in-out infinite; }
+/* .rigtig står efter .vis-svar, så det viste svar bliver grønt (ikke hvidt på guld), når barnet trykker på det */
+.valg-knap.rigtig { background: var(--rigtig); color: var(--hvid); text-shadow: 0 2px 0 var(--rigtig-moerk); box-shadow: 0 7px 0 var(--rigtig-moerk); animation: pop 0.45s; }
+.valg-knap.forkert { opacity: 0.35; animation: ryst 0.4s; box-shadow: none; }
+@media (orientation: portrait) {
+  .valg { flex-direction: row; height: auto; }
+  .valg-knap { flex: 1 1 0; min-height: clamp(104px, 15vh, 170px); }
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  .valg-knap { min-height: 72px; font-size: 48px; }
+}
+
+/* Taltastatur (intet <input>) */
+.taltastatur { display: flex; flex-direction: column; gap: clamp(8px, 1.4vmin, 14px); align-items: center; justify-content: center; height: 100%; }
+.tast-display {
+  width: calc(var(--tast) * 3 + 24px);
+  max-width: 100%;
+  height: calc(var(--tast) * 0.8);
+  border-radius: 20px;
+  background: var(--hvid);
+  box-shadow: inset 0 3px 8px var(--skygge);
+  font-size: calc(var(--tast) * 0.6);
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--tekst);
+}
+.tast-display.ryst { animation: ryst 0.4s; }
+.taster { display: grid; grid-template-columns: repeat(3, var(--tast)); grid-auto-rows: var(--tast); gap: 12px; }
+.tast {
+  border: none;
+  border-radius: 22px;
+  background: var(--hvid);
+  font-size: calc(var(--tast) * 0.46);
+  font-weight: 900;
+  color: var(--tekst);
+  box-shadow: 0 5px 0 var(--farve-1-lys), 0 7px 14px var(--skygge);
+  transition: transform 0.06s;
+  padding: 0;
+}
+.tast:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--farve-1-lys); }
+.tast-slet { background: var(--papir); font-size: calc(var(--tast) * 0.36); }
+.tast-ok { background: var(--rigtig); color: var(--hvid); box-shadow: 0 5px 0 var(--rigtig-moerk), 0 7px 14px var(--skygge); }
+.tast-ok:disabled { background: var(--slukket); box-shadow: 0 5px 0 #a99d90; cursor: default; }
+@media (orientation: portrait) {
+  .taltastatur { flex-direction: row; flex-wrap: wrap; }
+}
+@media (orientation: portrait) and (max-width: 600px) {
+  .tast-display { width: 100%; height: 56px; font-size: 42px; }
+}
+
+/* ---------- Visninger ---------- */
+.ting-gruppe { display: flex; gap: 3vmin; align-items: center; justify-content: center; flex-wrap: wrap; }
+.ting-blok { display: flex; flex-direction: column; gap: 1vmin; padding: 1vmin; }
+.ting-raekke { display: flex; gap: 0.6vmin; }
+.ting { line-height: 1.15; position: relative; display: inline-block; transition: transform 0.2s; }
+.ting-gruppe.stor .ting { font-size: clamp(50px, 11vmin, 110px); font-size: min(128px, 14cqw, 42cqh); }
+.ting-gruppe.mellem .ting { font-size: clamp(40px, 8.5vmin, 90px); font-size: min(100px, 14cqw, 28cqh); }
+.ting-gruppe.lille .ting { font-size: clamp(28px, 6vmin, 60px); font-size: min(66px, 13cqw, 16cqh); }
+.plus-ting .ting-gruppe.stor .ting { font-size: clamp(44px, 9vmin, 96px); font-size: min(104px, 10cqw, 40cqh); }
+.plus-ting .ting-gruppe.mellem .ting { font-size: clamp(32px, 6vmin, 66px); font-size: min(90px, 7.5cqw, 28cqh); }
+.plus-ting .ting-gruppe.lille .ting { font-size: clamp(30px, 5.6vmin, 60px); font-size: min(84px, 7cqw, 26cqh); }
+/* Brede felter: bredden deles med antallet af kolonner (--kol, rækker af 5) og højden med rækkerne (--raek) */
+@container (min-aspect-ratio: 4/5) {
+  .plus-ting { flex-wrap: nowrap; }
+  .plus-ting .ting-gruppe.stor .ting, .plus-ting .ting-gruppe.mellem .ting, .plus-ting .ting-gruppe.lille .ting { font-size: min(112px, calc(68cqw / (var(--kol, 10) + 1.4)), calc(58cqh / var(--raek, 1))); }
+  .plus-ting .ting-gruppe { flex-wrap: nowrap; gap: 2vmin; }
+}
+/* Mange ting i et højt felt (iPad): grupperne under hinanden med + imellem — så kan tingene være større */
+@container (min-aspect-ratio: 4/5) and (max-aspect-ratio: 9/5) {
+  .plus-ting.mange { flex-direction: column; gap: 0; }
+  .plus-ting.mange .plus-tegn { line-height: 1; font-size: min(80px, 14cqh); }
+  .plus-ting.mange .ting-gruppe.stor .ting, .plus-ting.mange .ting-gruppe.mellem .ting, .plus-ting.mange .ting-gruppe.lille .ting { font-size: min(112px, calc(66cqw / (var(--kol2, 5) + 0.8)), calc(68cqh / (var(--raek2, 2) * 1.25 + 0.9))); }
+}
+/* Mere end 10: to blokke side om side i brede felter */
+@container (min-aspect-ratio: 6/5) {
+  .ting-gruppe.lille { flex-wrap: nowrap; }
+  .ting-gruppe.lille .ting { font-size: min(66px, 7cqw, 32cqh); }
+}
+/* Smalle felter (telefon på højkant): plus-grupperne under hinanden */
+@container (max-aspect-ratio: 4/5) {
+  .plus-ting { flex-direction: column; gap: 0; }
+  .plus-tegn { line-height: 1; }
+  .plus-ting .ting-gruppe.stor .ting,
+  .plus-ting .ting-gruppe.mellem .ting,
+  .plus-ting .ting-gruppe.lille .ting { font-size: min(80px, 15cqw, 13cqh); }
+}
+.plus-ting { display: flex; align-items: center; justify-content: center; gap: 2vmin; flex-wrap: wrap; }
+.plus-tegn { font-size: clamp(56px, 10vmin, 96px); font-weight: 900; color: var(--farve-2-moerk); }
+
+
+/* Talt i hjælpen: lille tal-mærke ovenpå */
+.taelbar.talt { transform: scale(1.12); }
+.taelbar.talt[data-n]::after {
+  content: attr(data-n);
+  position: absolute;
+  top: -0.2em;
+  right: -0.2em;
+  min-width: 1.5em;
+  height: 1.5em;
+  padding: 0 0.25em;
+  border-radius: 0.75em;
+  background: var(--farve-2-moerk);
+  color: var(--hvid);
+  font-family: var(--skrift);
+  font-weight: 900;
+  font-size: clamp(17px, 2.6vmin, 24px);
+  line-height: 1.5em;
+  text-align: center;
+  font-style: normal;
+  box-shadow: 0 2px 0 var(--farve-2-moerk);
+}
+.ting.talt { filter: drop-shadow(0 0 8px var(--guld)); }
+/* Klodser i en række: mærket står over klodsen, så det ikke dækker den (eller naboen) */
+.stang-raekke .klods.talt[data-n]::after { top: auto; right: 50%; bottom: calc(100% + 4px); transform: translateX(50%); }
+.stang-raekke + .stang-raekke .klods.talt[data-n]::after { bottom: auto; top: calc(100% + 4px); }
+
+/* Terning */
+.terning {
+  width: clamp(170px, 34vmin, 290px);
+  width: min(290px, 70cqw, 70cqh);
+  aspect-ratio: 1;
+  background: var(--hvid);
+  border-radius: 22%;
+  box-shadow: inset 0 -8px 0 rgba(0, 0, 0, 0.08), 0 10px 22px var(--skygge-stor);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  padding: 9%;
+}
+.terning-felt { display: flex; align-items: center; justify-content: center; }
+.pip { width: 72%; aspect-ratio: 1; border-radius: 50%; background: var(--tekst); position: relative; transition: transform 0.2s, background 0.2s; }
+.pip.talt { background: var(--farve-2); }
+
+/* Talstreg: en lige række felter (som et brætspil) */
+.talstreg-ramme { position: relative; max-width: 100%; }
+.talstreg { display: flex; gap: clamp(4px, 1vmin, 10px); position: relative; z-index: 1; flex-wrap: nowrap; }
+.talstreg-linje { position: absolute; left: 0; right: 0; top: 50%; height: 8px; margin-top: -4px; border-radius: 4px; background: var(--farve-1-lys); }
+.tal-celle {
+  width: clamp(42px, 8vmin, 92px);
+  height: clamp(54px, 10vmin, 110px);
+  width: min(120px, 17cqw);
+  height: min(140px, 22cqw, 36cqh);
+  border-radius: 16px;
+  background: var(--hvid);
+  border: 4px solid var(--farve-1-lys);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(26px, 5vmin, 54px);
+  font-size: min(68px, 10cqw);
+  font-weight: 900;
+  position: relative;
+  transition: transform 0.2s, background 0.2s;
+}
+.tal-celle.hul { border: 4px dashed var(--farve-2); color: var(--farve-2-moerk); background: var(--papir); }
+.tal-celle.talt { background: var(--farve-1-lys); transform: translateY(-8px); }
+.tal-celle.pop { animation: pop 0.6s; }
+
+/* Regnestykke */
+.regnestykke { display: flex; align-items: center; gap: clamp(8px, 2vmin, 22px); font-size: clamp(56px, 12vmin, 130px); font-size: min(130px, 14cqw, 36cqh); font-weight: 900; line-height: 1; }
+.regnestykke .tegn { color: var(--farve-2-moerk); }
+.regnestykke .ukendt {
+  min-width: 1.2em;
+  padding: 0.05em 0.15em;
+  border: 6px dashed var(--farve-2);
+  border-radius: 20px;
+  text-align: center;
+  color: var(--farve-2-moerk);
+  background: var(--papir);
+}
+
+/* «Find tallet» */
+.lyt-knap {
+  width: clamp(150px, 28vmin, 240px);
+  height: clamp(150px, 28vmin, 240px);
+  width: min(240px, 50cqw, 60cqh);
+  height: min(240px, 50cqw, 60cqh);
+  border: none;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--farve-1-lys), var(--farve-1));
+  box-shadow: 0 8px 0 var(--farve-1-moerk), 0 14px 26px var(--skygge-stor);
+  font-size: clamp(80px, 14vmin, 130px);
+  font-size: min(130px, 27cqw, 32cqh);
+  animation: puls 2s ease-in-out infinite;
+}
+.lyt-knap:active { transform: translateY(5px); }
+.vis-tal { display: flex; flex-direction: column; align-items: center; gap: 2vmin; }
+.vis-tal-tal { font-size: clamp(80px, 16vmin, 170px); font-size: min(170px, 34cqh, 40cqw); font-weight: 900; line-height: 1; color: var(--farve-1-moerk); }
+.pop { animation: pop 0.5s; }
+/* I hjælpefeltet: tallet ved siden af klodserne, så det ikke fylder i højden */
+.hjaelp-felt .vis-tal { flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 3vmin; align-items: center; max-width: 100%; }
+.hjaelp-felt .vis-tal-tal { font-size: clamp(50px, 9vmin, 110px); font-size: min(110px, 20cqw, 12vh); }
+.hjaelp-felt .vis-tal .klodser { --kl: min(40px, 4.4vmin, 5.5vh); }
+.hjaelp-felt .staenger { --k: min(20px, 2.4vmin, 2.3vh); }
+
+/* ---------- Fase 2: nye visninger ---------- */
+.krokodille { font-size: clamp(110px, 22vmin, 220px); font-size: min(220px, 40cqw, 50cqh); line-height: 1; animation: svaev 2.6s ease-in-out infinite; }
+
+/* Minus: det, der forsvinder, bliver gennemsigtigt med et kryds */
+.vaek { position: relative; opacity: 0.35; filter: grayscale(0.6); transition: opacity 0.4s, transform 0.4s; }
+.vaek::before {
+  content: '✕';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1em;
+  font-style: normal;
+  color: var(--tekst);
+  opacity: 0.9;
+}
+.vaek-helt { opacity: 0.3; transform: translateY(6px) scale(0.9); }
+.klods.vaek { background: transparent; border: 2px dashed var(--tekst); box-shadow: none; }
+.vaek::before { font-weight: 900; font-size: 1.2em; }
+
+/* Tierstænger og enere */
+.staenger { display: flex; align-items: flex-end; gap: clamp(6px, 1.4vmin, 14px); --k: clamp(14px, 3vmin, 30px); }
+.stang { position: relative; display: flex; flex-direction: column-reverse; gap: 2px; padding: 3px; border-radius: 8px; background: var(--farve-1-moerk); transition: transform 0.2s; }
+.stang .klods, .enere .klods { display: block; width: var(--k); height: var(--k); border-radius: 4px; background: var(--guld); box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.15); }
+.enere { display: flex; flex-direction: column-reverse; gap: 4px; margin-left: clamp(8px, 2vmin, 20px); }
+.enere .klods { position: relative; background: var(--blaa-brik); }
+.stang.talt { transform: translateY(-8px); box-shadow: 0 0 0 4px var(--guld); }
+
+/* Talrækker med store tal */
+.tal-celle.tre-cifre { font-size: clamp(22px, 4vmin, 44px); font-size: min(46px, 7cqw); }
+
+/* Figurer */
+.form-svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.form-figur { stroke: rgba(0, 0, 0, 0.35); stroke-width: 3; stroke-linejoin: round; }
+.form-farve-0 .form-figur { fill: var(--form-0); }
+.form-farve-1 .form-figur { fill: var(--form-1); }
+.form-farve-2 .form-figur { fill: var(--form-2); }
+.form-farve-3 .form-figur { fill: var(--form-3); }
+.form-farve-4 .form-figur { fill: var(--form-4); }
+.form-farve-5 .form-figur { fill: var(--form-5); }
+.hjoerne { fill: var(--hvid); stroke: var(--tekst); stroke-width: 3; transition: r 0.2s; }
+.hjoerne.talt { fill: var(--guld); r: 11px; }
+.form-stor { width: clamp(180px, 36vmin, 320px); height: clamp(180px, 36vmin, 320px); width: min(320px, 60cqw, 62cqh); height: min(320px, 60cqw, 62cqh); }
+.form-scene { display: flex; flex-wrap: wrap; justify-content: center; align-content: center; gap: clamp(10px, 2.4vmin, 24px); max-width: 100%; }
+.scene-form { position: relative; display: block; width: clamp(64px, 12vmin, 120px); height: clamp(64px, 12vmin, 120px); width: min(120px, 20cqw, 26cqh); height: min(120px, 20cqw, 26cqh); transition: transform 0.2s; }
+.scene-form.talt { transform: scale(1.15); filter: drop-shadow(0 0 8px var(--guld)); }
+.valg-knap { min-width: 0; }
+.valg-form .valg-knap { padding: 12px; display: flex; align-items: center; justify-content: center; }
+.valg-form .valg-knap svg { width: 100%; height: 100%; max-width: 120px; max-height: 120px; }
+.valg-brik .valg-knap { font-size: clamp(54px, 9vmin, 90px); }
+
+/* Mønstre */
+.moenster { display: flex; flex-wrap: wrap; justify-content: center; gap: clamp(6px, 1.2vmin, 12px); max-width: 100%; }
+.moenster-enhed { display: flex; flex-wrap: nowrap; gap: inherit; }
+.brik-celle {
+  position: relative;
+  width: clamp(54px, 9vmin, 96px);
+  height: clamp(54px, 9vmin, 96px);
+  width: min(96px, 10.5cqw, 22cqh);
+  height: min(96px, 10.5cqw, 22cqh);
+  border-radius: 18px;
+  background: var(--hvid);
+  border: 3px solid var(--farve-1-lys);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(36px, 6vmin, 64px);
+  font-size: min(64px, 7cqw, 15cqh);
+  transition: transform 0.2s;
+}
+.brik-celle.hul { border: 4px dashed var(--farve-2); color: var(--farve-2-moerk); font-weight: 900; background: var(--papir); }
+.brik-celle.talt { transform: translateY(-8px); background: var(--farve-1-lys); }
+@container (max-aspect-ratio: 4/5) {
+  .brik-celle { width: min(80px, 22cqw, 14cqh); height: min(80px, 22cqw, 14cqh); font-size: min(54px, 14cqw, 9cqh); }
+}
+
+/* ---------- Skolens repræsentationer: klodser, streger, fingre, kugleramme, tallinje ---------- */
+:root {
+  --hud: #ffe3c8; --hud-kant: #d9a77d;     /* tegnede hænder (neutral tegneseriefarve) */
+  --finger-a: #ff9fa3; --finger-b: #9cc8ff;
+}
+.opgave-ikon { margin-right: 2px; }
+.fremdrift-dyr { margin-left: 6px; font-size: clamp(30px, 4.6vmin, 44px); line-height: 1; filter: brightness(0) opacity(0.3); }
+
+/* Hjælpefeltet under opgaven: her kommer fingre, tallinje osv. — opgaven bliver stående */
+.hjaelp-felt { flex: 0 0 auto; width: 100%; max-height: 46%; display: flex; justify-content: center; align-items: center; padding: 0 16px; container-type: inline-size; }
+.hjaelp-felt:empty { display: none; }
+.hjaelp-felt > * { margin-bottom: 14px; }
+.glid-ind { animation: glidInd 0.35s ease-out; }
+@keyframes glidInd { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+
+/* Klikklodser i stænger */
+.klodser { --kl: clamp(26px, 5vmin, 52px); display: flex; flex-direction: column; gap: clamp(8px, 1.6vmin, 16px); align-items: flex-start; }
+.hjaelp-felt .klodser { --kl: min(40px, 5vmin, 5.5vh); }
+.stang-raekke { display: flex; border-radius: 8px; transition: box-shadow 0.3s; }
+.stang-raekke.ti-stang { box-shadow: 0 0 0 4px var(--guld); }
+.klods { position: relative; display: block; width: var(--kl); height: var(--kl); border-radius: 6px; border: 2px solid rgba(0, 0, 0, 0.2); box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.16); background: var(--farve-1); transition: transform 0.2s, opacity 0.3s; }
+.klods.rod { background: var(--rod-brik); }
+.klods.blaa { background: var(--blaa-brik); }
+.klods.tema { background: var(--farve-1); }
+.klods.tema-lys { background: var(--farve-1-lys); }
+.klods.talt { transform: translateY(-5px); }
+.klods.parret { box-shadow: 0 0 0 3px var(--guld); }
+
+/* Tællestreger: bundter af fem */
+.streger { --sh: clamp(70px, 14vmin, 120px); display: flex; flex-wrap: wrap; justify-content: center; gap: clamp(18px, 4vmin, 40px); }
+.bundt { position: relative; display: flex; gap: calc(var(--sh) * 0.13); height: var(--sh); padding: 0 calc(var(--sh) * 0.08); }
+.streg { position: relative; display: block; width: calc(var(--sh) * 0.08); min-width: 6px; height: 100%; border-radius: 6px; background: var(--tekst); }
+.streg.tvaers { position: absolute; left: -4%; right: -4%; top: 46%; width: auto; height: calc(var(--sh) * 0.08); min-height: 6px; transform: rotate(-32deg); }
+.streg.talt { background: var(--farve-2); }
+
+/* Tegnede hænder: fingre oppe eller nede */
+.haender { --hd: clamp(110px, 22vmin, 190px); display: flex; gap: calc(var(--hd) * 0.55); align-items: flex-end; justify-content: center; }
+.hjaelp-felt .haender { --hd: min(150px, 20vmin, 18vh); }
+.haand { position: relative; display: block; width: var(--hd); height: calc(var(--hd) * 1.1); isolation: isolate; }
+.haandflade { position: absolute; z-index: 1; left: 16%; right: 4%; bottom: 0; height: 50%; border-radius: 28% 28% 40% 40%; background: var(--hud); border: 3px solid var(--hud-kant); }
+.haand.venstre .haandflade { left: 4%; right: 16%; }
+.finger { position: absolute; bottom: 42%; width: 15%; border-radius: 999px 999px 10px 10px; background: var(--hud); border: 3px solid var(--hud-kant); transform-origin: bottom center; transition: height 0.25s, background 0.25s; }
+.finger.oppe { height: 50%; }
+.finger.nede { height: 14%; }
+.finger.oppe.gruppe-a { background: var(--finger-a); }
+.finger.oppe.gruppe-b { background: var(--finger-b); }
+.haand .f0 { left: 13%; bottom: 14%; transform: rotate(-38deg); } /* roden gemmer sig bag håndfladen, så tommelfingeren sidder fast */
+.haand .f0.oppe { height: 36%; }
+.haand .f1 { left: 22%; }
+.haand .f2 { left: 41%; }
+.haand .f3 { left: 60%; }
+.haand .f4 { left: 78%; }
+.haand .f4.oppe { height: 40%; }
+.haand.venstre .f0 { left: auto; right: 13%; transform: rotate(38deg); }
+.haand.venstre .f1 { left: auto; right: 22%; }
+.haand.venstre .f2 { left: auto; right: 41%; }
+.haand.venstre .f3 { left: auto; right: 60%; }
+.haand.venstre .f4 { left: auto; right: 78%; }
+
+/* Kugleramme med blad over de gemte kugler */
+.kugleramme { --ku: clamp(22px, 4.4vmin, 52px); padding: calc(var(--ku) * 0.35) calc(var(--ku) * 0.5); border-radius: 18px; background: #d9a066; box-shadow: inset 0 0 0 6px #b97a40, 0 6px 14px var(--skygge); }
+.hjaelp-felt .kugleramme { --ku: min(40px, 4vmin, 6vh); }
+.kugle-stang { position: relative; display: flex; justify-content: space-between; align-items: center; gap: var(--ku); padding: 0 6px; }
+.kugle-stang::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 6px; margin-top: -3px; background: #6b4a2b; border-radius: 3px; }
+.kugle-side { position: relative; display: flex; gap: 2px; }
+.kugle-side.hoejre { min-width: calc(var(--ku) * 2.2); justify-content: flex-end; }
+.kugle { position: relative; z-index: 1; display: block; width: var(--ku); height: var(--ku); border-radius: 50%; box-shadow: inset -4px -5px 0 rgba(0, 0, 0, 0.2); transition: transform 0.2s; }
+.kugle.rod { background: var(--rod-brik); }
+.kugle.blaa { background: var(--blaa-brik); }
+.kugle.talt { transform: translateY(-5px); }
+.kugle-blad { position: absolute; inset: -45% -12%; z-index: 2; display: none; align-items: center; justify-content: center; font-size: calc(var(--ku) * 1.6); border-radius: 45%; background: #7cc576; box-shadow: inset 0 -6px 0 rgba(0, 0, 0, 0.15), 0 4px 10px var(--skygge); }
+.kugleramme.skjul .kugle-blad { display: flex; }
+.kugleramme.skjul .hoejre .kugle { visibility: hidden; }
+
+/* Lige/ulige: klodser to og to */
+.par-klodser { display: flex; gap: clamp(8px, 1.6vmin, 14px); align-items: flex-end; justify-content: center; }
+.par-klodser .klods { --kl: clamp(26px, 5vmin, 50px); }
+.par-soejle { display: flex; flex-direction: column-reverse; gap: 4px; padding: 4px; border-radius: 10px; transition: box-shadow 0.2s; }
+.par-soejle.talt { box-shadow: 0 0 0 3px var(--farve-1-lys); }
+.par-soejle.alene.talt { box-shadow: 0 0 0 4px var(--farve-2); }
+
+/* Tårne af klodser: forskel og sammenligning */
+.taarne { --kl: clamp(24px, 4.4vmin, 50px); display: flex; gap: clamp(18px, 5vmin, 56px); align-items: flex-end; justify-content: center; }
+.taarne.hoeje { --kl: clamp(14px, 2.4vmin, 34px); }
+.taarn-kolonne { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.taarn { display: flex; flex-direction: column-reverse; gap: 2px; }
+.taarn .klods { height: calc(var(--kl) * 0.8); }
+.taarn-tal { font-size: clamp(28px, 5vmin, 54px); font-weight: 900; color: var(--farve-1-moerk); }
+.hjaelp-felt .taarn-tal { font-size: clamp(20px, 3vmin, 32px); }
+
+.terninger { display: flex; align-items: center; gap: clamp(10px, 2vmin, 24px); }
+.terning.lille-terning { width: clamp(120px, 24vmin, 220px); width: min(220px, 36cqw, 60cqh); }
+.vaegt { font-size: clamp(110px, 22vmin, 200px); font-size: min(200px, 36cqw, 50cqh); line-height: 1; opacity: 0.85; }
+.flest-billede { display: flex; flex-direction: column; align-items: center; gap: 2vmin; }
+.flest-billede .vaegt { font-size: clamp(60px, 11vmin, 110px); font-size: min(110px, 30cqw, 22cqh); }
+/* Flest: en lille bunke (1 over 2), færrest: én enkelt — mindst 22 px, også i det lave felt på telefonen */
+.flest-bunke { display: grid; grid-template-columns: repeat(4, auto); justify-items: center; font-size: clamp(30px, 5vmin, 60px); font-size: max(22px, min(64px, 22cqw, 18cqh)); line-height: 1; }
+.flest-bunke i { font-style: normal; }
+.flest-bunke i:nth-child(1) { grid-column: 2 / span 2; }
+.flest-bunke i:nth-child(2) { grid-column: 1 / span 2; grid-row: 2; }
+.flest-bunke i:nth-child(3) { grid-column: 3 / span 2; grid-row: 2; }
+.flest-bunke.faa { display: block; }
+
+/* Tallinje med hop-buer */
+.tallinje { position: relative; width: 100%; max-width: 780px; padding-top: 64px; }
+.tl-skala { position: relative; display: flex; border-top: 6px solid var(--tekst); border-radius: 3px; }
+.tl-tal { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; min-width: 0; }
+.tl-streg { display: block; width: 3px; height: 14px; background: var(--tekst); }
+.tl-tal b { font-size: clamp(17px, 2.8vmin, 28px); font-weight: 900; color: var(--tekst); }
+.tl-tal.talt b { color: var(--farve-2-moerk); }
+.tl-buer { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.tl-bue { fill: none; stroke: var(--farve-2); stroke-width: 4; stroke-linecap: round; }
+.tl-hop-tal { font-family: var(--skrift); font-size: 18px; font-weight: 900; fill: var(--farve-2-moerk); text-anchor: middle; }
+/* Mens hjælpen viser, hviler svarknapperne synligt (tryk gør ingenting) */
+.svar-panel.venter { opacity: 0.55; pointer-events: none; transition: opacity 0.3s; }
+.tl-figur { position: absolute; top: -20px; left: 0; transform: translateX(-50%); font-size: clamp(30px, 5vmin, 46px); line-height: 1; transition: left 0.35s ease-out; }
+
+/* Svarknapper med grupper (flest/færrest) og ord (lige/ulige) */
+/* «Hvor er der flest?»: grupperne er selve opgaven — svarkortene får det meste af pladsen */
+.runde-krop.gruppe-opgave { grid-template-columns: clamp(170px, 24vw, 280px) minmax(0, 1fr); }
+@media (orientation: portrait) {
+  .runde-krop.gruppe-opgave { grid-template-columns: 1fr; grid-template-rows: minmax(0, 0.55fr) minmax(0, 1.45fr); }
+  .runde-krop.gruppe-opgave .valg { height: 100%; } /* svarkortene fylder deres række */
+}
+.valg.valg-gruppe { flex-direction: column; }
+.valg-gruppe .valg-knap { padding: 10px 10px 10px clamp(14px, 4vmin, 44px); display: flex; align-items: center; justify-content: flex-start; container-type: inline-size; flex: 1 1 0; }
+.valg-gruppe .ting-gruppe.knap { justify-content: flex-start; }
+.valg-gruppe .ting-blok { align-items: flex-start; }
+.valg-gruppe .valg-knap.vis-svar { animation-name: pulsRing; }
+@keyframes pulsRing { 0%, 100% { box-shadow: 0 7px 0 var(--guld-moerk), 0 0 0 6px rgba(255, 200, 61, 0.4); } 50% { box-shadow: 0 7px 0 var(--guld-moerk), 0 0 0 14px rgba(255, 200, 61, 0.6); } }
+.ting.overs { opacity: 0.3; filter: grayscale(0.7); }
+.ting-gruppe.knap { gap: 1vmin; }
+.ting-gruppe.knap .ting { font-size: clamp(26px, 5vmin, 50px); font-size: min(84px, 14cqw, 8.5vh); }
+.ting.parret { filter: drop-shadow(0 0 6px var(--farve-1-lys)); opacity: 0.55; }
+.valg-ord .valg-knap { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+.ord-ikon { font-size: clamp(22px, 3.6vmin, 34px); letter-spacing: 1px; color: var(--farve-1-moerk); }
+.ord-tekst { font-size: clamp(30px, 5.4vmin, 50px); }
+.valg-knap.rigtig .ord-ikon { color: var(--hvid); }
+.form-stor.lille { width: min(160px, 32cqw, 20vh); height: min(160px, 32cqw, 20vh); }
+.kant { stroke: transparent; stroke-width: 7; stroke-linecap: round; transition: stroke 0.2s; }
+.kant.talt { stroke: var(--guld); }
+
+/* ---------- Fejring ---------- */
+.fejring { align-items: center; justify-content: space-evenly; padding: 16px; text-align: center; }
+.fejring-top { display: flex; flex-direction: column; align-items: center; gap: 1vmin; }
+.fejring-ven { font-size: clamp(80px, 15vmin, 140px); line-height: 1; }
+.danser { animation: dans 0.9s ease-in-out infinite; }
+@keyframes dans { 0%, 100% { transform: rotate(-8deg) translateY(0); } 50% { transform: rotate(8deg) translateY(-14px); } }
+.fejring-tekst { font-size: clamp(36px, 7vmin, 64px); font-weight: 900; color: var(--farve-1-moerk); }
+.fejring-stjerner { display: flex; align-items: center; gap: 1vmin; font-size: clamp(34px, 6vmin, 56px); color: var(--guld); text-shadow: 0 3px 0 var(--guld-moerk); }
+.fejring-stjerner span { animation: pop 0.5s both; }
+.fejring-stjerner .fejring-spor { text-shadow: none; font-size: 0.8em; }
+.fejring-stjerner .fejring-ny-stjerne { font-size: 1.5em; margin-left: 0.3em; text-shadow: none; animation: pop 0.7s 0.8s both; }
+.fejring-stjerner span:nth-child(2) { animation-delay: 0.1s; }
+.fejring-stjerner span:nth-child(3) { animation-delay: 0.2s; }
+.fejring-stjerner span:nth-child(4) { animation-delay: 0.3s; }
+.fejring-stjerner span:nth-child(5) { animation-delay: 0.4s; }
+.fejring-midte { position: relative; display: flex; align-items: center; justify-content: center; min-height: clamp(170px, 32vmin, 280px); }
+.fund { --dyr: clamp(110px, 22vmin, 200px); position: relative; display: flex; flex-direction: column; align-items: center; }
+.fund-dyr { position: relative; z-index: 1; border: none; background: transparent; padding: 0; font-size: var(--dyr); line-height: 1; transition: filter 0.4s; }
+.fund-dyr.skygge { filter: brightness(0) opacity(0.55); animation: vrik 1.6s ease-in-out infinite; }
+/* Tegnet for «tryk her»: en lys skive med ring bag skyggen (så strålerne ikke bryder omridset op)
+   og en hånd, der peger. Begge kommer frem efter 0,8 s — samtidig med stemmen, der siger det. */
+.fund-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--dyr) * 1.5);
+  height: calc(var(--dyr) * 1.5);
+  margin: calc(var(--dyr) * -0.75) 0 0 calc(var(--dyr) * -0.75);
+  border-radius: 50%;
+  background: rgba(255, 253, 248, 0.82);
+  border: 6px solid var(--farve-2);
+  animation: dukOp 0.4s ease-out 0.8s both;
+}
+.fund-ring::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 6px solid var(--farve-2); opacity: 0; animation: ringUd 1.6s ease-out 1.2s infinite; }
+.fund-haand {
+  position: absolute;
+  z-index: 2;
+  right: calc(var(--dyr) * -0.5);
+  bottom: calc(var(--dyr) * -0.42);
+  font-size: clamp(56px, 9vmin, 84px);
+  line-height: 1;
+  transform: rotate(-30deg);
+  filter: drop-shadow(0 3px 3px var(--skygge-stor));
+  animation: dukOp 0.4s ease-out 0.8s both, peg 1.1s ease-in-out 1.2s infinite;
+}
+@keyframes dukOp { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ringUd { from { transform: scale(1); opacity: 0.8; } to { transform: scale(1.3); opacity: 0; } }
+@keyframes peg { 0%, 100% { transform: rotate(-30deg) translateY(0); } 50% { transform: rotate(-30deg) translateY(-16px); } }
+.fund-dyr.frem { animation: frem 0.6s cubic-bezier(.2, 1.6, .4, 1); }
+@keyframes vrik { 0%, 60%, 100% { transform: rotate(0); } 70% { transform: rotate(-10deg); } 80% { transform: rotate(8deg); } 90% { transform: rotate(-5deg); } }
+.fund-navn { position: relative; z-index: 1; font-size: clamp(26px, 4.4vmin, 40px); font-weight: 900; color: var(--farve-1-moerk); background: rgba(255, 253, 248, 0.9); padding: 4px 18px; border-radius: 18px; margin-top: 8px; }
+.fund-straaler {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  width: clamp(260px, 50vmin, 460px);
+  height: clamp(260px, 50vmin, 460px);
+  margin: calc(clamp(260px, 50vmin, 460px) / -2) 0 0 calc(clamp(260px, 50vmin, 460px) / -2);
+  border-radius: 50%;
+  background: repeating-conic-gradient(var(--farve-2-lys) 0 10deg, transparent 10deg 20deg);
+  opacity: 0.55;
+  animation: drej 8s linear infinite;
+  -webkit-mask: radial-gradient(circle, #000 30%, transparent 70%);
+  mask: radial-gradient(circle, #000 30%, transparent 70%);
+}
+@keyframes drej { to { transform: rotate(360deg); } }
+@keyframes frem { from { transform: scale(0.2) rotate(-30deg); opacity: 0; } to { transform: none; opacity: 1; } }
+.fejring-knapper { display: flex; gap: 6vmin; }
+.kort-knap { background: radial-gradient(circle at 35% 30%, var(--farve-1-lys), var(--farve-1) 60%, var(--farve-1-moerk)); box-shadow: 0 7px 0 var(--farve-1-moerk), 0 12px 24px var(--skygge-stor); padding: 0; }
+@media (orientation: landscape) and (min-width: 700px) {
+  .fejring { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr auto; justify-items: center; align-items: center; }
+  .fejring-top { grid-column: 1; grid-row: 1 / 3; }
+  .fejring-midte { grid-column: 2; grid-row: 1; }
+  .fejring-knapper { grid-column: 2; grid-row: 2; margin-bottom: 3vmin; }
+}
+
+/* ---------- Lystårnet: lysperler og historien ---------- */
+.start-taarn-knap { position: relative; border: none; background: transparent; padding: 6px 10px; border-radius: 22px; }
+.start-taarn-knap .fyrtaarn, .fejring-perle .fyrtaarn { filter: drop-shadow(0 0 calc(var(--lys, 0) * 22px) rgba(255, 214, 90, calc(0.3 + var(--lys, 0) * 0.7))); }
+.perle-tal { font-size: clamp(18px, 2.8vmin, 26px); font-weight: 900; color: var(--guld-moerk); margin-left: 4px; white-space: nowrap; }
+.perle-tal.lille { font-size: clamp(17px, 2.4vmin, 22px); }
+.start-taarn-knap .perle-tal { position: absolute; right: -36px; bottom: 4px; }
+.fejring-perle { font-size: clamp(36px, 7vmin, 64px); display: flex; align-items: center; gap: 4px; }
+.fejring-perle { margin-bottom: 1.5vmin; }
+.fejring-perle .perle-tal { font-size: max(18px, 0.45em); color: var(--farve-1-moerk); }
+.fejring-perle.gloed .fyrtaarn { animation: gloed 1.2s ease-out; }
+@keyframes gloed { 0% { transform: scale(1); } 30% { transform: scale(1.3); filter: drop-shadow(0 0 28px rgba(255, 214, 90, 1)); } 100% { transform: scale(1); } }
+.flyvende-perle { position: fixed; z-index: 50; font-size: 40px; pointer-events: none; transform: translate(-50%, -50%); }
+.station-groede { position: absolute; right: -12px; bottom: -8px; font-size: calc(var(--s) * 0.34); line-height: 1; filter: drop-shadow(0 2px 2px var(--skygge)); }
+
+.historie { align-items: center; justify-content: center; gap: 3vmin; padding: 20px; background: linear-gradient(180deg, #1f2a4d, #3b3f73 60%, #5b4f7a); }
+.historie-top { position: absolute; top: 0; left: 0; right: 0; justify-content: flex-end; } /* uden for flowet: teksten bliver midt på skærmen */
+.historie-himmel { position: relative; width: clamp(160px, 30vmin, 260px); height: clamp(170px, 32vmin, 280px); display: flex; align-items: flex-end; justify-content: center; }
+.historie-taarn { font-size: clamp(120px, 24vmin, 210px); filter: drop-shadow(0 0 calc(8px + var(--lys, 0) * 30px) rgba(255, 214, 90, 0.8)); }
+.historie-perler i { position: absolute; left: 50%; top: 22%; width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fffbe0, var(--guld)); box-shadow: 0 0 14px var(--guld); animation: perleFlyv 3.2s ease-out calc(var(--i) * 0.25s) infinite; }
+@keyframes perleFlyv {
+  0% { transform: translate(-50%, 0) scale(0.6); opacity: 0; }
+  15% { opacity: 1; }
+  100% { transform: translate(calc(-50% + (var(--i) - 3) * 42px), calc(-60px - var(--i) * 6px)) scale(1); opacity: 0; }
+}
+.historie-tekst { max-width: 680px; margin: 0; font-size: clamp(20px, 3.2vmin, 30px); line-height: 1.45; font-weight: 700; color: #fff7e0; text-align: center; }
+
+/* ---------- Bevægelsespause ---------- */
+.pause { background: linear-gradient(165deg, var(--baggrund-1), var(--baggrund-2)); }
+.pause-midte { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3vmin; padding: 16px; }
+.spring-over { opacity: 0.8; }
+.pause-ven { font-size: clamp(110px, 24vmin, 220px); line-height: 1; filter: drop-shadow(0 10px 10px var(--skygge)); }
+.pause-par { display: flex; align-items: center; justify-content: center; gap: clamp(16px, 5vmin, 60px); }
+.pause-par .pause-ven { font-size: clamp(90px, 20vmin, 200px); }
+.pause-valg { display: flex; gap: 5vmin; }
+.pause-knap {
+  width: clamp(150px, 26vmin, 240px); aspect-ratio: 1; border: none; border-radius: 36px; background: var(--hvid);
+  box-shadow: 0 7px 0 var(--farve-1-lys), 0 12px 22px var(--skygge);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+}
+.pause-knap span { font-size: clamp(70px, 13vmin, 120px); line-height: 1.1; }
+.pause-knap b { font-size: clamp(26px, 4.4vmin, 40px); color: var(--farve-1-moerk); }
+.pause-knap:active { transform: translateY(5px); }
+.laeg-ned { position: relative; display: flex; flex-direction: column; align-items: center; }
+.laeg-ned-ipad { font-size: clamp(110px, 22vmin, 200px); line-height: 1; animation: laegNed 2.2s ease-in-out infinite; }
+.laeg-ned-pil { font-size: clamp(50px, 9vmin, 80px); line-height: 1; animation: svaev 1.4s ease-in-out infinite; }
+@keyframes laegNed { 0%, 30% { transform: rotate(0); } 70%, 100% { transform: rotate(90deg) translateX(20px); } }
+.pause-tekst { font-size: clamp(28px, 5vmin, 46px); font-weight: 900; color: var(--farve-1-moerk); }
+.pause-tal { font-size: clamp(90px, 18vmin, 170px); font-weight: 900; line-height: 1; color: var(--farve-2-moerk); min-height: 1em; }
+.pause-prikker { display: flex; gap: 12px; }
+.pause-prikker i { width: clamp(22px, 3.6vmin, 34px); height: clamp(22px, 3.6vmin, 34px); border-radius: 50%; background: rgba(255, 255, 255, 0.8); border: 3px solid var(--farve-1-lys); }
+.pause-prikker i.fuld { background: var(--guld); border-color: var(--guld-moerk); }
+/* Vennen viser bevægelsen — én gang pr. tælling */
+.pause-ven.gentag.anim-hop { animation: hop 0.7s; }
+.pause-ven.gentag.anim-klap { animation: pop 0.5s; }
+.pause-ven.gentag.anim-stamp { animation: ryst 0.5s; }
+.pause-ven.gentag.anim-straek { animation: straek 0.9s; }
+.pause-ven.gentag.anim-knae { animation: knae 0.9s; }
+.pause-ven.gentag.anim-drej { animation: drej 0.9s; }
+.pause-ven.gentag.anim-nik { animation: nik 0.7s; }
+@keyframes straek { 50% { transform: scaleY(1.25) translateY(-14px); } }
+@keyframes knae { 50% { transform: scaleY(0.75) translateY(20px); } }
+@keyframes nik { 30% { transform: rotate(12deg); } 60% { transform: rotate(-4deg); } }
+
+/* ---------- Samlebog ---------- */
+.samlebog-gitter {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(clamp(88px, 13vmin, 130px), 1fr));
+  gap: clamp(10px, 2vmin, 18px);
+  padding: 8px 16px 24px;
+  align-content: start;
+}
+.samle-felt {
+  position: relative;
+  aspect-ratio: 1;
+  border: none;
+  border-radius: 24px;
+  background: var(--hvid);
+  box-shadow: 0 5px 0 var(--skygge), 0 8px 14px var(--skygge);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.samle-felt.mangler { background: rgba(255, 253, 248, 0.5); box-shadow: inset 0 0 0 3px rgba(0, 0, 0, 0.06); }
+.samle-emoji { font-size: clamp(52px, 8vmin, 80px); line-height: 1; }
+.samle-felt.mangler .samle-emoji { filter: brightness(0); opacity: 0.18; }
+.samle-felt.naeste { box-shadow: inset 0 0 0 4px var(--guld); animation: puls 2s ease-in-out infinite; }
+.samle-felt.naeste .samle-emoji { opacity: 0.32; }
+.samle-antal { position: absolute; right: 8px; bottom: 6px; font-size: 18px; font-weight: 900; color: var(--farve-1-moerk); }
+
+/* ---------- Fælles animationer ---------- */
+@keyframes hop { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-26px) scale(1.08); } 70% { transform: translateY(0) scale(0.96); } }
+@keyframes vip { 0%, 100% { transform: rotate(0); } 30% { transform: rotate(-14deg); } 65% { transform: rotate(10deg); } }
+@keyframes pop { 0% { transform: scale(1); } 45% { transform: scale(1.22); } 100% { transform: scale(1); } }
+@keyframes ryst { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01s !important; animation-iteration-count: 1 !important; transition: none !important; }
+}
+
+/* =====================================================================
+   Voksendelen (voksen.html) — rolig og læsbar; voksne kan læse, men trykfladerne er stadig store
+   ===================================================================== */
+.voksen { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.voksen .topbar-titel { font-size: clamp(20px, 3vmin, 28px); }
+.voksen-midte { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3vmin; padding: 16px; text-align: center; }
+.voksen-hjaelp { font-size: 18px; color: var(--tekst); opacity: 0.8; max-width: 640px; margin: 4px auto 12px; padding: 0 16px; text-align: center; line-height: 1.4; }
+.voksen-advarsel { font-size: 17px; background: #fff3cd; color: #5c4400; border-radius: 12px; padding: 10px 14px; line-height: 1.4; overflow-wrap: anywhere; }
+.voksen-tast { height: auto; }
+/* Voksnes taltastatur til svar: fem rækker (minus, 0, brøkstreg; slet og svar) */
+.voksen-svar-tast { --tast: clamp(52px, 8vh, 84px); }
+.voksen-svar-tast .tast-display { font-variant-numeric: tabular-nums; }
+.voksen-svar-tast .tast-display.rigtig { box-shadow: inset 0 0 0 4px var(--rigtig); }
+.voksen-svar-tast .tast-display.forkert { box-shadow: inset 0 0 0 4px var(--rod-brik, #e5484d); }
+.voksen-svar-tast .svar-ok { grid-column: span 2; }
+.tast-tegn { background: var(--papir); }
+/* Isolér med brikker (voksen): byggefeltet øverst, brikkerne under */
+.brik-opgave { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; max-width: 760px; }
+.brik-opgave .voksen-hjaelp { margin: 0; }
+.brik-felt { min-height: 76px; width: 100%; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; padding: 8px 12px; border-radius: 18px; background: var(--hvid); box-shadow: inset 0 3px 8px var(--skygge); }
+.brik-felt.rigtig { box-shadow: inset 0 0 0 4px var(--rigtig); }
+.brik-felt.forkert { box-shadow: inset 0 0 0 4px var(--rod-brik); }
+.brik-x { font: italic 700 28px 'Times New Roman', serif; color: var(--tekst); margin-right: 6px; }
+.brik-tom { font-size: 26px; font-weight: 700; color: var(--tekst); opacity: 0.35; }
+.brik-pulje { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+.brik { min-width: 56px; min-height: 56px; padding: 0 10px; border: none; border-radius: 14px; background: var(--hvid); box-shadow: 0 4px 0 var(--farve-1-lys), 0 6px 12px var(--skygge); font-size: 26px; font-weight: 700; color: var(--tekst); }
+.brik.bogstav { font-family: 'Times New Roman', serif; font-style: italic; font-size: 28px; }
+.brik.valgt { background: var(--farve-1-lys); box-shadow: 0 3px 0 var(--farve-1); }
+.brik:disabled { opacity: 0.3; box-shadow: none; }
+.brik-felt .brik:disabled { opacity: 1; }
+.brik-ok { max-width: 260px; }
+/* Låsens regnestykke: hele tastaturet skal kunne ses uden at rulle — også på iPad på langs, når
+   Safaris værktøjslinjer tager plads. svh = den synlige højde med værktøjslinjerne fremme. */
+.laas .voksen-spoerg.stor { margin: 0; }
+.laas .voksen-tast { --tast: clamp(56px, 10.5vh, 96px); }
+@supports (height: 1svh) { .laas .voksen-tast { --tast: clamp(56px, 10.5svh, 96px); } }
+.stor-laas { font-size: 72px; line-height: 1; }
+.voksen-spoerg { font-size: clamp(20px, 3vmin, 28px); line-height: 1.5; font-weight: 700; text-align: center; max-width: 820px; }
+.voksen-spoerg.stor { font-size: clamp(30px, 6vmin, 52px); }
+.voksen math { font-size: 1.15em; math-style: normal; } /* brøker i fuld størrelse, også inline */
+.voksen-valg-knap math { font-size: 1.3em; }
+.voksen-valg { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; width: 100%; max-width: 760px; }
+.voksen-valg.antal-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.voksen-valg-knap {
+  min-height: 72px; padding: 12px 16px; border: none; border-radius: 20px; background: var(--hvid);
+  font-family: inherit; font-size: clamp(20px, 3vmin, 28px); font-weight: 700; color: var(--tekst);
+  box-shadow: 0 5px 0 var(--farve-1-lys), 0 8px 16px var(--skygge);
+}
+.voksen-valg-knap:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--farve-1-lys); }
+.voksen-valg-knap.rigtig { background: #d7f3e1; box-shadow: 0 5px 0 var(--rigtig); }
+.voksen-valg-knap.forkert { background: #fde6d3; box-shadow: 0 5px 0 var(--farve-2); }
+.voksen-valg-knap:disabled { cursor: default; }
+.voksen-knaprad { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+.voksen-opgave { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 8px 16px 24px; }
+.voksen-forklaring { font-size: 19px; line-height: 1.5; max-width: 760px; background: rgba(255, 253, 248, 0.92); border-radius: 16px; padding: 12px 16px; box-shadow: 0 4px 12px var(--skygge); }
+.naeste-knap { width: 96px; height: 96px; font-size: 44px; }
+.dosis-resultat { font-size: clamp(56px, 12vmin, 110px); font-weight: 900; color: var(--farve-1-moerk); }
+.voksen-figur { width: min(320px, 70vw); height: auto; max-height: 34vh; background: var(--hvid); border-radius: 16px; box-shadow: 0 4px 12px var(--skygge); }
+.fig-gitter { stroke: #dde6e6; stroke-width: 0.04; }
+.fig-akse { stroke: var(--tekst); stroke-width: 0.08; }
+.fig-graf { fill: none; stroke: var(--farve-2); stroke-width: 0.16; stroke-linecap: round; stroke-linejoin: round; }
+.fig-trekant { fill: var(--farve-1-lys); stroke: var(--tekst); stroke-width: 3; stroke-linejoin: round; }
+.fig-ret { fill: none; stroke: var(--tekst); stroke-width: 2; }
+.fig-tekst { font-size: 18px; font-weight: 700; fill: var(--tekst); font-family: var(--skrift); }
+
+/* Menu og kort */
+.menu-gitter { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; padding: 12px 20px 28px; max-width: 1000px; width: 100%; margin: 0 auto; }
+.menu-kort, .verden-kort {
+  position: relative; min-height: 130px; padding: 16px; border: none; border-radius: 24px; background: var(--hvid);
+  box-shadow: 0 6px 0 var(--farve-1-lys), 0 10px 20px var(--skygge);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; font-family: inherit; color: var(--tekst);
+}
+.menu-kort:active, .verden-kort:active { transform: translateY(4px); }
+.menu-kort b, .verden-kort b { font-size: 22px; }
+.menu-kort small { font-size: 17px; opacity: 0.8; text-align: center; }
+.menu-ikon { font-size: 44px; line-height: 1; }
+.verden-kort.valgt { box-shadow: 0 6px 0 var(--farve-2), 0 0 0 4px var(--farve-2-lys), 0 10px 20px var(--skygge); }
+.verden-nr { position: absolute; left: 14px; top: 10px; font-size: 18px; font-weight: 900; opacity: 0.5; }
+.station-stjerner.statisk { position: static; transform: none; }
+
+/* Voksenlås */
+.laas-knap { position: relative; width: 180px; height: 180px; border: none; border-radius: 50%; background: var(--hvid); box-shadow: 0 8px 20px var(--skygge); -webkit-user-select: none; user-select: none; touch-action: none; }
+.laas-ring { --p: 0; position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(var(--farve-1) calc(var(--p) * 360deg), transparent 0); -webkit-mask: radial-gradient(circle, transparent 62%, #000 63%); mask: radial-gradient(circle, transparent 62%, #000 63%); }
+.laas-ikon { font-size: 70px; }
+
+/* Overblik og indstillinger */
+.overblik-indhold { display: flex; flex-direction: column; gap: 18px; padding: 8px 20px 32px; max-width: 980px; width: 100%; margin: 0 auto; }
+.overblik-indhold section { background: rgba(255, 253, 248, 0.92); border-radius: 20px; padding: 14px 18px; box-shadow: 0 4px 12px var(--skygge); font-size: 18px; line-height: 1.45; }
+.overblik-indhold h2 { margin: 0 0 8px; font-size: 22px; color: var(--farve-1-moerk); }
+.overblik-indhold p { margin: 6px 0; }
+.overblik-indhold ul { margin: 6px 0; padding-left: 22px; }
+.overblik-tabel { width: 100%; border-collapse: collapse; font-size: 17px; }
+.overblik-tabel td { padding: 6px 8px; border-top: 1px solid #e6e1d6; vertical-align: top; }
+.tid-soejler { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; height: 150px; align-items: end; margin-top: 8px; }
+.tid-soejle { height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; }
+.tid-soejle i { display: block; width: 70%; min-height: 3px; border-radius: 8px 8px 2px 2px; background: var(--farve-1); }
+.tid-soejle small, .tid-tal { font-size: 17px; }
+.indstilling { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; min-height: 56px; font-size: 18px; }
+.emne-liste { border-top: 1px solid #e6e1d6; margin-top: 6px; }
+.skifter { position: relative; width: 76px; height: 44px; min-width: 76px; border: none; border-radius: 22px; background: var(--slukket); padding: 0; transition: background 0.2s; }
+.skifter.til { background: var(--rigtig); }
+.skifter-knop { position: absolute; left: 4px; top: 4px; width: 36px; height: 36px; border-radius: 50%; background: var(--hvid); box-shadow: 0 2px 4px var(--skygge); transition: left 0.2s; }
+.skifter.til .skifter-knop { left: 36px; }
+.tidsvalg { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width: 600px) {
+  .indstilling:has(.tidsvalg) { flex-direction: column; align-items: stretch; }
+  .tidsvalg { display: grid; grid-template-columns: repeat(5, 1fr); }
+  .tidsvalg .tidsvalg-knap { min-width: 0; padding: 0 2px; }
+}
+/* Opgavetælleren i voksnes topbar skæres aldrig af — kun emnets navn får «…» */
+.topbar-titel .titel-navn { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.topbar-titel .titel-tal { flex: 0 0 auto; white-space: nowrap; }
+.voksen.opgave .topbar-titel { display: flex; justify-content: center; gap: 0.3em; min-width: 0; }
+.tidsvalg-knap { min-width: 64px; min-height: 52px; border: none; border-radius: 14px; background: var(--hvid); box-shadow: 0 3px 0 var(--farve-1-lys); font-family: inherit; font-size: 17px; font-weight: 700; color: var(--tekst); }
+.tidsvalg-knap.valgt { background: var(--farve-1); color: var(--hvid); box-shadow: 0 3px 0 var(--farve-1-moerk); }
+
+/* Familieduel: barnet til venstre, den voksne til højre */
+.duel .topbar { flex-wrap: nowrap; }
+.duel-baand { display: flex; justify-content: center; align-items: center; gap: 12px; padding: 0 14px 6px; }
+/* Det fælles mål: ægget/gaven vokser lidt for hver stjerne og vipper */
+.duel-aeg { --vokset: 0; display: inline-block; font-size: calc(clamp(34px, 5.6vmin, 52px) * (1 + var(--vokset) * 0.4)); line-height: 1; transition: font-size 0.4s; }
+.duel-aeg.vip { animation: vip 0.7s; }
+.duel-tvilling { font-size: 17px; color: var(--farve-1-moerk); background: var(--farve-1-lys); border-radius: 999px; padding: 2px 10px; }
+.duel-felt.voksen-side .duel-hoved { flex-wrap: wrap; gap: 6px; }
+.duel-klaekket { display: flex; align-items: flex-end; gap: 8px; font-size: clamp(70px, 14vmin, 130px); line-height: 1; }
+.duel-skal { font-size: 0.7em; animation: pop 0.6s both; }
+.duel-maaler { display: flex; gap: 2px; font-size: clamp(30px, 5vmin, 46px); line-height: 1; color: rgba(255, 255, 255, 0.9); -webkit-text-stroke: 2px var(--guld); }
+.duel-opgave { font-size: clamp(18px, 2.8vmin, 26px); font-weight: 800; color: var(--farve-1-moerk); flex: 1; text-align: center; }
+.duel-maaler i { font-style: normal; }
+.duel-maaler i.fuld { color: var(--guld); text-shadow: 0 2px 0 var(--guld-moerk); }
+.duel-krop { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 4px 14px 14px; }
+.duel-felt { min-height: 0; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 12px; border-radius: 24px; background: rgba(255, 253, 248, 0.92); box-shadow: 0 6px 16px var(--skygge); overflow: auto; }
+.duel-hoved { display: flex; align-items: center; justify-content: space-between; width: 100%; font-size: 20px; }
+.duel-figur { font-size: 48px; line-height: 1; }
+.duel-visning { flex: 1 1 auto; min-height: 180px; width: 100%; }
+.duel-valg { width: 100%; flex-direction: row; height: auto; }
+.duel-valg .valg-knap { flex: 1 1 0; min-height: 96px; font-size: clamp(40px, 7vmin, 72px); }
+.duel-valg.valg-gruppe { flex-direction: column; }
+.voksen-side .voksen-valg { grid-template-columns: 1fr 1fr; }
+.voksen-side .voksen-valg-knap { min-height: 64px; font-size: clamp(18px, 2.4vmin, 24px); }
+.voksen-side .voksen-spoerg { font-size: clamp(18px, 2.4vmin, 24px); }
+@media (orientation: portrait) {
+  .duel-krop { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+  /* Barnets felt er kun en halv skærm højt: tegningen tager den plads, der er tilbage, så
+     svarknapperne altid står helt (ingen rulning i feltet). Tegningen skalerer med feltet (cqh). */
+  .duel-visning { flex: 1 1 0; min-height: 0; }
+  .voksen-valg.antal-3 { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+  .voksen-valg { grid-template-columns: 1fr; }
+}
+
+/* Børnedelen: dagens tid er brugt */
+.tid-brugt .pause-tekst { text-align: center; max-width: 640px; }
+
+/* Container-enheder i variabler: en variabel tjekkes ikke ved indlæsning, så «fallback først, cq bagefter»
+   virker ikke for --kl/--k/--sh/--hd/--ku. Ældre iPads (Safari < 16) bruger vmin-værdierne ovenfor. */
+@supports (width: 1cqw) {
+  .hjaelp-felt .vis-tal .klodser { --kl: min(40px, 6cqw, 5.5vh); }
+  .hjaelp-felt .staenger { --k: min(20px, 3.4cqw, 2.3vh); }
+  .staenger { --k: min(30px, 3.6cqw, 6.5cqh); }
+  .klodser { --kl: min(84px, calc(84cqw / max(var(--n, 10), 4)), 20cqh); }
+  .hjaelp-felt .klodser { --kl: min(40px, 8.4cqw, 5.5vh); }
+  .streger { --sh: min(120px, 26cqh, 22cqw); }
+  .haender { --hd: min(190px, 30cqw, 44cqh); }
+  .hjaelp-felt .haender { --hd: min(150px, 30cqw, 18vh); }
+  .kugleramme { --ku: min(52px, 6.2cqw, 18cqh); }
+  .hjaelp-felt .kugleramme { --ku: min(40px, 6.2cqw, 6vh); }
+  .par-klodser .klods { --kl: min(50px, 7.5cqw, 18cqh); }
+  .taarne { --kl: min(88px, 14cqw, calc(64cqh / max(var(--n, 10), 3))); }
+  .taarne.hoeje { --kl: min(40px, 10cqw, 3.9cqh); }
+}
+
+/* ---------- Ekstra: Klokketorvet (ur og mønter, egen grafik) ---------- */
+.ur-svg { width: clamp(200px, 40vmin, 340px); height: auto; aspect-ratio: 1; display: block; }
+@supports (width: 1cqw) { .ur-ramme .ur-svg { width: min(340px, 64cqw, 70cqh); } }
+.ur-svg.lille { width: auto; height: min(140px, 100%); max-width: 100%; }
+.ur-skive { fill: var(--hvid); stroke: var(--farve-1-moerk); stroke-width: 3; }
+.ur-tal { font: 900 12px var(--skrift); fill: var(--tekst); text-anchor: middle; }
+.ur-svg.lille .ur-tal { font-size: 24px; }
+.ur-streg { stroke: var(--farve-1-moerk); stroke-width: 2; stroke-linecap: round; }
+.ur-time { stroke: var(--farve-2-moerk); stroke-width: 6; stroke-linecap: round; transition: stroke 0.2s; }
+.ur-minut { stroke: var(--farve-1-moerk); stroke-width: 3.5; stroke-linecap: round; transition: stroke 0.2s; }
+.ur-time.lyser, .ur-minut.lyser { stroke: var(--guld); stroke-width: 7; }
+.ur-midte { fill: var(--tekst); }
+.valg-ur .valg-knap { padding: 4px; display: flex; align-items: center; justify-content: center; }
+.valg-tid .valg-knap { font-variant-numeric: tabular-nums; font-size: clamp(34px, 8vmin, 96px); padding-left: 4px; padding-right: 4px; }
+@media (orientation: portrait) and (max-width: 600px) { .valg-tid .valg-knap { font-size: 30px; } } /* «10:30» skal kunne stå i tre knapper side om side */
+.vis-ur { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4vmin; }
+.vis-ur .ur-svg { width: clamp(150px, 22vmin, 190px); } /* tallene skal være mindst 17 px */
+.vis-ur-tid { font-size: clamp(44px, 8vmin, 90px); font-weight: 900; color: var(--farve-1-moerk); font-variant-numeric: tabular-nums; }
+
+.moenter { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: clamp(8px, 2vmin, 20px); max-width: 100%; }
+.moent-plads { display: block; width: clamp(80px, 15vmin, 150px); transition: transform 0.2s, filter 0.2s; }
+@supports (width: 1cqw) { .moent-plads { width: min(150px, 20cqw, 34cqh); } }
+.moent-plads.talt { transform: translateY(-8px); filter: drop-shadow(0 0 10px var(--guld)); }
+.moent { width: 100%; height: auto; display: block; }
+.moent-soelv { fill: #d9dde3; stroke: #8b939e; stroke-width: 3; }
+.moent-guld { fill: #f2c94c; stroke: #b8860b; stroke-width: 3; }
+.moent-kant { fill: none; stroke: rgba(0, 0, 0, 0.18); stroke-width: 2; }
+.moent-hul { fill: var(--papir); stroke: #8b939e; stroke-width: 2; }
+.moent-tal { font: 900 26px var(--skrift); fill: #3b3f45; text-anchor: middle; }
+.moent-tal.over-hul { font-size: 22px; }
+/* Smalle felter (telefon på højkant): større mønter, gerne på to rækker, så tallene kan læses */
+@container (max-aspect-ratio: 4/5) { .moent-plads { width: min(150px, 30cqw, 22cqh); } }
+.koeb .moent-plads { width: clamp(90px, 18vmin, 160px); }
+@supports (width: 1cqw) { .koeb .moent-plads { width: min(160px, 30cqw, 30cqh); } }
+.koeb { display: flex; align-items: center; justify-content: center; gap: clamp(14px, 4vmin, 40px); flex-wrap: wrap; }
+.koeb-vare { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.koeb-emoji { font-size: clamp(80px, 16vmin, 150px); line-height: 1; }
+.koeb-pris { font-size: clamp(30px, 5.6vmin, 54px); font-weight: 900; background: var(--hvid); border: 3px solid var(--farve-2); border-radius: 14px; padding: 2px 14px; color: var(--farve-2-moerk); }
+.koeb-pil { font-size: clamp(40px, 7vmin, 70px); color: var(--farve-1-moerk); }
+.tid-tekst { font-variant-numeric: tabular-nums; }
+
+/* Huskekort (voksen): verdenens regler før dagens dosis */
+.huskekort-titel { margin: 0; font-size: clamp(20px, 3vmin, 26px); color: var(--farve-1-moerk); }
+.huskekort-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 760px; }
+.huskekort-regel { font-size: clamp(18px, 2.6vmin, 24px); line-height: 1.5; background: var(--hvid); border-radius: 16px; padding: 14px 18px; box-shadow: 0 3px 0 var(--farve-1-lys), 0 6px 14px var(--skygge); overflow-x: auto; }
+.huskekort-regel math { font-size: 1.1em; }
+/* Prøve: uret står i topbaren og tæller op */
+.proeve-ur { flex: 0 0 auto; min-width: var(--ikon); text-align: right; font-size: clamp(18px, 2.6vmin, 24px); font-weight: 800; font-variant-numeric: tabular-nums; color: var(--farve-1-moerk); }

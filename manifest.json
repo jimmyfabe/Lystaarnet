@@ -1,0 +1,16 @@
+{
+  "name": "Lystårnet — matematik",
+  "short_name": "Lystårnet",
+  "lang": "da",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#fff4e3",
+  "theme_color": "#e98a3b",
+  "icons": [
+    { "src": "ikoner/index-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "ikoner/index-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "ikoner/index-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

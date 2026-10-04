@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-5GrPzlap8x3Zrk6tiJz5hOGwdNqGJ47UXlzaMy8A5+4='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Alma">
+<meta name="theme-color" content="#2f9a5c">
+<title>Almas matematik</title>
+<link rel="manifest" href="manifest-alma.json">
+<link rel="apple-touch-icon" href="ikoner/alma-180.png">
+<link rel="icon" type="image/png" href="ikoner/alma-192.png">
+<link rel="stylesheet" href="app.css">
+<style>
+  /* Almas farver: jungle */
+  :root {
+    --farve-1: #2f9a5c; --farve-1-lys: #8ed8a6; --farve-1-moerk: #1d6b3e;
+    --farve-2: #ff9a1f; --farve-2-lys: #ffc46b; --farve-2-moerk: #d06a00;
+    --baggrund-1: #fff6df; --baggrund-2: #d6efc4;
+    --tekst: #283a2c; --sti: #a8743a; --sti-kant: #f0d8a4;
+  }
+</style>
+<script>
+  window.TEMA = {
+    side: 'barn', id: 'alma', navn: 'Alma', noegle: 'mat_alma_v1',
+    figurer: ['bobo', 'rex'],
+    ting: ['banan', 'sommerfugl', 'froe', 'blad', 'skildpadde', 'aeg', 'mariehoene', 'aeble', 'fisk'],
+    samling: 'jungle'
+  };
+</script>
+<script src="opgaver.js" defer></script>
+<script src="gem.js" defer></script>
+<script src="app.js" defer></script>
+</head>
+<body><main id="app"></main></body>
+</html>

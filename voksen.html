@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-Ua45dnClsV/fCU1DSkm+lSAgLrLn9pO93IHcrlBewaM='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Lystårnet">
+<meta name="theme-color" content="#2f7f86">
+<meta name="robots" content="noindex">
+<title>Lystårnet — voksendel</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="ikoner/index-180.png">
+<link rel="icon" type="image/png" href="ikoner/index-192.png">
+<link rel="stylesheet" href="app.css">
+<style>
+  /* Voksendelens farver: rolig petrol og varm sand */
+  :root {
+    --farve-1: #2f7f86; --farve-1-lys: #9fd3d6; --farve-1-moerk: #1d555a;
+    --farve-2: #e98a3b; --farve-2-lys: #ffc58f; --farve-2-moerk: #b4601c;
+    --baggrund-1: #f6f3ec; --baggrund-2: #e3efee;
+    --tekst: #23383a; --sti: #8fb9bb; --sti-kant: #dcebea;
+  }
+</style>
+<script>
+  window.TEMA = { side: 'voksen' };
+</script>
+<script src="opgaver.js" defer></script>
+<script src="gem.js" defer></script>
+<script src="voksen-opgaver.js" defer></script>
+<script src="voksen.js" defer></script>
+<script src="app.js" defer></script>
+</head>
+<body><main id="app"></main></body>
+</html>
