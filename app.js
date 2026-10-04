@@ -1,5 +1,5 @@
 /* app.js — al logik til Matematikspillet («Lystårnet»).
-   Skallerne (index.html, alma.html, ella.html, voksen.html) sætter kun farver og window.TEMA.
+   Skallerne (index.html, dino.html, enhjorning.html, voksen.html) sætter kun farver og window.TEMA.
    Opgaver og facit kommer fra opgaver.js, gem/indlæs fra gem.js. */
 (function () {
   'use strict';
@@ -177,6 +177,8 @@
     // og «Gem en kopi» ville gemme en tom fil. Vi bliver på localStorage, kan læse alt og advarer om, at der ikke gemmes.
     try { lager.setItem('mat_test', '1'); lager.removeItem('mat_test'); } catch (e) { lagerFuldt = true; }
   }
+  // Data under de gamle nøgler kopieres til de nye (den gamle nøgle bliver liggende som backup) — på alle sider
+  G.migrerNoegler(lager);
   let voksenRes = G.indlaesVoksen(lager);
   const voksen = voksenRes.data;
 
@@ -389,13 +391,10 @@
   //  STARTSIDEN (index.html) — vælg spiller
   // =====================================================================
   function visIndex() {
-    const kort = (T.spillere || []).map((sp) => {
-      const d = G.indlaesBarn(lager, sp.noegle, sp.navn).data;
-      const fig = FIGURER[d.figur] || FIGURER[sp.figur] || FIGURER.bobo;
-      return h('a', { class: 'spiller-kort spiller-' + sp.id, href: sp.side, 'aria-label': sp.navn },
-        h('span', { class: 'spiller-figur', 'aria-hidden': 'true' }, fig.e),
-        h('span', { class: 'spiller-navn' }, sp.navn));
-    });
+    // Hvert barn har sit faste dyr (🦖 Dino, 🦄 Enhjørning) — det er det, barnet genkender uden at læse
+    const kort = (T.spillere || []).map((sp) => h('a', { class: 'spiller-kort spiller-' + sp.id, href: sp.side, 'aria-label': sp.navn },
+      h('span', { class: 'spiller-figur', 'aria-hidden': 'true' }, sp.e),
+      h('span', { class: 'spiller-navn' + (sp.navn.length > 6 ? ' langt' : '') }, sp.navn)));
     if (T.voksenSide) {
       kort.push(h('a', { class: 'spiller-kort spiller-voksen', href: T.voksenSide, 'aria-label': 'Voksen' },
         h('span', { class: 'spiller-figur', 'aria-hidden': 'true' }, '🔐'),

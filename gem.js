@@ -113,7 +113,8 @@
     d = rens(d);
     const ud = Object.assign({}, s, d);
     ud.version = Number.isInteger(d.version) ? d.version : VERSION;
-    ud.navn = typeof d.navn === 'string' && d.navn ? d.navn : s.navn;
+    // Navnet kommer altid fra skallen (Dino/Enhjørning), så et gammelt navn i data aldrig vises
+    ud.navn = navn || (typeof d.navn === 'string' ? d.navn : '');
     ud.figur = typeof d.figur === 'string' ? d.figur : null;
     ud.farve = typeof d.farve === 'string' ? d.farve : null;
     ud.oprettet = typeof d.oprettet === 'string' ? d.oprettet : s.oprettet;
@@ -180,6 +181,26 @@
     try { lager.setItem(noegle, tekst); return true; } catch (e) { return false; }
   }
 
+  // ---------- Nye nøgler uden børnenes navne (B1, oktober 2026) ----------
+  // Ny nøgle → den gamle nøgle med barnets navn. Den gamle nøgle bliver liggende som backup
+  // (slettes i en senere udgave). Kun her og i test/test-gem.js må de gamle navne stå.
+  const GAMLE_NOEGLER = { mat_dino_v1: 'mat_alma_v1', mat_enhjorning_v1: 'mat_ella_v1' };
+  const GAMLE_ID = { alma: 'dino', ella: 'enhjorning' }; // id'er i voksendata (tidsgrænse, emner, åbn alle, duel)
+  const nyNoegle = (gammel) => Object.keys(GAMLE_NOEGLER).find((n) => GAMLE_NOEGLER[n] === gammel) || null;
+
+  // Ved start på alle sider: findes den nye nøgle ikke, men den gamle, kopieres den rå tekst uændret.
+  // En eksisterende ny nøgle overskrives aldrig. Returnerer de nye nøgler, der blev skrevet.
+  function migrerNoegler(lager) {
+    const skrevet = [];
+    for (const ny of Object.keys(GAMLE_NOEGLER)) {
+      if (laes(lager, ny) !== null) continue;
+      const raa = laes(lager, GAMLE_NOEGLER[ny]);
+      if (raa === null || raa === undefined) continue;
+      if (skriv(lager, ny, raa) && laes(lager, ny) === raa) skrevet.push(ny);
+    }
+    return skrevet;
+  }
+
   // Gem en kopi af ulæselige data, så de aldrig går tabt. Hver ny fejl får sin egen nøgle
   // (samme dag: _2, _3 …), og vi læser kopien igen for at se, at den faktisk blev skrevet.
   // Returnerer nøglen — eller null, hvis der ikke var plads.
@@ -206,7 +227,9 @@
 
   // Indlæs børnedata. Returnerer { data, ny, backup, skrivebeskyttet, advarsel }.
   function indlaesBarn(lager, noegle, navn) {
-    const raa = laes(lager, noegle);
+    let raa = laes(lager, noegle);
+    // Kunne den gamle nøgle ikke kopieres (fx fuldt lager), læses den direkte — så data aldrig ser ud til at være væk
+    if ((raa === null || raa === undefined) && GAMLE_NOEGLER[noegle]) raa = laes(lager, GAMLE_NOEGLER[noegle]);
     if (raa === null || raa === undefined || raa === '') {
       return { data: standardBarn(navn), ny: true, backup: null, skrivebeskyttet: false, advarsel: null };
     }
@@ -276,22 +299,28 @@
 
   // Fortryd seneste indlæsning: den nyeste «_foer_import_»-kopi pr. nøgle bliver de gældende data igen.
   // Kun nøgler med en kopi røres. Returnerer de nøgler, der blev rullet tilbage.
+  // Kopier under en gammel nøgle (indlæst før B1) rulles tilbage til den nye nøgle — men kun, hvis den nye
+  // nøgle ikke selv har en kopi (den er i så fald nyere, for de gamle kopier er lavet før omdøbningen).
   function fortrydImport(lager) {
     const pr = importKopier(lager);
     const rullet = [];
     for (const n in pr) {
+      const maal = nyNoegle(n) || n;
+      if (maal !== n && pr[maal]) continue;
       const nyeste = pr[n][pr[n].length - 1];
       const v = laes(lager, nyeste);
-      if (v === null || !skriv(lager, n, v) || laes(lager, n) !== v) continue;
+      if (v === null || !skriv(lager, maal, v) || laes(lager, maal) !== v) continue;
       try { lager.removeItem(nyeste); } catch (e) { /* kopien bliver liggende */ }
-      rullet.push(n);
+      rullet.push(maal);
     }
     return rullet;
   }
 
   // En sikkerhedskopi til en fil: spillets data under «data» (det, der kan indlæses igen), og reservekopier
   // af ulæselige data for sig under «reservekopier» — de indlæses ikke igen, men kommer med ud af iPad'en.
-  const HOVEDNOEGLER = ['mat_alma_v1', 'mat_ella_v1', 'mat_voksen_v1'];
+  const HOVEDNOEGLER = ['mat_dino_v1', 'mat_enhjorning_v1', 'mat_voksen_v1'];
+  // De gamle nøgler tjekkes også (ulæselige data kan ligge dér), men de indlæses aldrig igen fra en fil
+  const ALLE_NOEGLER = HOVEDNOEGLER.concat(Object.keys(GAMLE_NOEGLER).map((n) => GAMLE_NOEGLER[n]));
 
   // Hovednøgler, hvis indhold ikke kan læses (ødelagt JSON). Er der ikke plads til en reservekopi,
   // bliver de liggende, og spillet er skrivebeskyttet, indtil en voksen har taget en kopi og ryddet op.
@@ -299,7 +328,7 @@
   // nye data oven i dem ved næste gem.
   function findUlaeselige(lager) {
     const reddet = new Set(findBackups(lager).filter((k) => k.indexOf('_backup_') > 0).map((k) => laes(lager, k)));
-    return HOVEDNOEGLER.filter((k) => {
+    return ALLE_NOEGLER.filter((k) => {
       const v = laes(lager, k);
       if (v === null || v === undefined || v === '' || reddet.has(v)) return false;
       try { return !erObjekt(JSON.parse(v)); } catch (e) { return true; }
@@ -316,6 +345,11 @@
       try { obj = JSON.parse(v); } catch (e) { obj = undefined; }
       if (erObjekt(obj)) data[k] = obj;
       else reservekopier[k] = v; // ulæselig: med i filen som den er, så intet går tabt
+    }
+    // De gamle nøgler (før B1) kommer med som reservekopier: med ud af iPad'en, men de indlæses ikke oven i de nye
+    for (const ny of Object.keys(GAMLE_NOEGLER)) {
+      const v = laes(lager, GAMLE_NOEGLER[ny]);
+      if (v) reservekopier[GAMLE_NOEGLER[ny]] = v;
     }
     for (const k of findBackups(lager)) if (k.indexOf('_backup_') > 0) reservekopier[k] = laes(lager, k);
     // Data fra før tidligere indlæsninger kommer også med (så en forkert indlæsning kan redes fra filen)
@@ -348,12 +382,15 @@
     const data = erObjekt(obj) && erObjekt(obj.data) ? obj.data : null;
     const nye = {};
     if (data) {
-      for (const k of Object.keys(data)) {
-        const m = /^mat_(alma|ella|voksen)_v1$/.exec(k);
-        if (!m || !erObjekt(data[k])) continue;
+      for (const fra of Object.keys(data)) {
+        // En kopi fra før B1 har de gamle nøgler: de lægges i de nye (men en ny nøgle i samme fil vinder)
+        const k = nyNoegle(fra) || fra;
+        if (k !== fra && Object.prototype.hasOwnProperty.call(data, k)) continue;
+        const m = /^mat_(dino|enhjorning|voksen)_v1$/.exec(k);
+        if (!m || !erObjekt(data[fra])) continue;
         try {
           const voksen = m[1] === 'voksen';
-          nye[k] = voksen ? normaliserVoksen(data[k]) : normaliserBarn(migrer(rens(data[k])), m[1] === 'alma' ? 'Alma' : 'Ella');
+          nye[k] = voksen ? normaliserVoksen(data[fra]) : normaliserBarn(migrer(rens(data[fra])), m[1] === 'dino' ? 'Dino' : 'Enhjørning');
           // Børnenes gentagelsesopgaver og en afbrudt mission er hele opgaveobjekter. Fra en fil kan de være
           // ufuldstændige (runden kan gå i stå) — de droppes. Man mister kun et par opgaver, der skulle gentages.
           // Voksnes gentagelser er kun parametre (type, niveau, frø) og bygges igen af koden — de må gerne komme med.
@@ -422,9 +459,9 @@
       version: VOKSEN_VERSION,
       lyd: true,                       // lydeffekter
       tale: true,                      // oplæsning
-      tidsgraense: { alma: 0, ella: 0 },   // minutter pr. dag, 0 = ingen grænse
-      emner: { alma: {}, ella: {} },       // emneId → false, hvis emnet er slået fra
-      aabneAlle: { alma: false, ella: false }, // voksen har åbnet alle verdener
+      tidsgraense: { dino: 0, enhjorning: 0 },   // minutter pr. dag, 0 = ingen grænse
+      emner: { dino: {}, enhjorning: {} },       // emneId → false, hvis emnet er slået fra
+      aabneAlle: { dino: false, enhjorning: false }, // voksen har åbnet alle verdener
       duel: { spil: [] },              // familieduellens resultater
       traening: standardTraening(),    // den voksnes egen træning (gymnasiematematik)
     };
@@ -439,7 +476,7 @@
   function normaliserVoksen(d) {
     const s = standardVoksen();
     if (!erObjekt(d)) return s;
-    d = rens(d);
+    d = migrerVoksenId(rens(d));
     const ud = Object.assign({}, s, d);
     ud.version = Number.isInteger(d.version) ? d.version : VOKSEN_VERSION;
     ud.lyd = d.lyd !== false;
@@ -468,6 +505,28 @@
       Object.keys(t.dage).filter((k) => /^\d{4}-\d{2}-\d{2}$/.test(k)).sort().slice(-MAX_DAGE).forEach((k) => {
         const x = erObjekt(t.dage[k]) ? t.dage[k] : {};
         ud.traening.dage[k] = { opgaver: ikkeNeg(x.opgaver, 0), rigtige: ikkeNeg(x.rigtige, 0) };
+      });
+    }
+    return ud;
+  }
+
+  // B1: tidsgrænse, emner til/fra og «åbn alle» flyttes fra de gamle id'er til de nye, hvis de nye mangler.
+  // Duellens resultater får de nye id'er. Arbejder på en kopi (d er allerede renset).
+  function migrerVoksenId(d) {
+    const ud = Object.assign({}, d);
+    for (const felt of ['tidsgraense', 'emner', 'aabneAlle']) {
+      if (!erObjekt(ud[felt])) continue;
+      const f = Object.assign({}, ud[felt]);
+      for (const gl of Object.keys(GAMLE_ID)) {
+        if (!Object.prototype.hasOwnProperty.call(f, gl)) continue;
+        if (!Object.prototype.hasOwnProperty.call(f, GAMLE_ID[gl])) f[GAMLE_ID[gl]] = f[gl];
+        delete f[gl];
+      }
+      ud[felt] = f;
+    }
+    if (erObjekt(ud.duel) && Array.isArray(ud.duel.spil)) {
+      ud.duel = Object.assign({}, ud.duel, {
+        spil: ud.duel.spil.map((x) => (erObjekt(x) && GAMLE_ID[x.barn] ? Object.assign({}, x, { barn: GAMLE_ID[x.barn] }) : x)),
       });
     }
     return ud;
@@ -533,6 +592,7 @@
   const Gem = {
     VERSION, VOKSEN_VERSION, MAX_DAGE, MAX_GENTAG, MIGRERINGER,
     idag, standardBarn, standardEmne, standardDag, standardVoksen, standardTraening,
+    GAMLE_NOEGLER, HOVEDNOEGLER, migrerNoegler, nyNoegle,
     migrer, normaliserBarn, normaliserEmne, normaliserVoksen, normaliserPauset, voksenGentag, rens,
     indlaesBarn, gemBarn, indlaesVoksen, gemVoksen, findBackups, findUlaeselige, importer, lavKopi, rydGamleKopier, fortrydImport, importKopier,
     dag, tilfoejGentag, fjernGentag, hukommelsesLager,

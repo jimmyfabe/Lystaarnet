@@ -1,12 +1,13 @@
 /* voksen.js — voksendelen: voksenlås, dagens dosis (gymnasiematematik uden hjælpemidler),
-   forældreoverblik (én pige ad gangen — søstrene sammenlignes aldrig), indstillinger og familieduel.
+   forældreoverblik (ét barn ad gangen — børnene sammenlignes aldrig), indstillinger og familieduel.
    Startes af app.js (window.Voksen.start) med fælles hjælpere. Opgaverne kommer fra voksen-opgaver.js. */
 (function () {
   'use strict';
 
+  // Børnene hedder Dino og Enhjørning i spillet (ingen rigtige navne). gave: duellens fælles mål er en gave (ellers et æg).
   const BOERN = [
-    { id: 'alma', navn: 'Alma', noegle: 'mat_alma_v1', side: 'alma.html', figur: 'bobo' },
-    { id: 'ella', navn: 'Ella', noegle: 'mat_ella_v1', side: 'ella.html', figur: 'luna' },
+    { id: 'dino', navn: 'Dino', e: '🦖', noegle: 'mat_dino_v1', side: 'dino.html', figur: 'bobo', bestemt: 'Dinoen', gave: false },
+    { id: 'enhjorning', navn: 'Enhjørning', e: '🦄', noegle: 'mat_enhjorning_v1', side: 'enhjorning.html', figur: 'luna', bestemt: 'Enhjørningen', gave: true },
   ];
   const LAAS_NOEGLE = 'mat_voksen_aaben';  // sessionStorage: låst op i denne fane
   const LAAS_MINUTTER = 30;
@@ -145,7 +146,7 @@
           kort('🧠', 'Dagens dosis', '5 opgaver · ca. 5 min' + (dage ? ' · ' + dage + (dage === 1 ? ' dag' : ' dage') + ' trænet' : ''), () => visVerdensvalg('dosis')),
           kort('⏱️', 'Prøve', '8 opgaver fra én verden', () => visVerdensvalg('proeve')),
           kort('🤝', 'Familieduel', 'Barn og voksen · fælles mål', visDuelValg),
-          ...BOERN.map((b) => kort((FIGURER[G.indlaesBarn(lager, b.noegle, b.navn).data.figur] || FIGURER[b.figur]).e, b.navn, 'Overblik', () => visOverblik(b))),
+          ...BOERN.map((b) => kort(b.e, b.navn, 'Overblik', () => visOverblik(b))),
           kort('⚙️', 'Indstillinger', 'Lyd, emner, tidsgrænse, kopi', visIndstillinger))));
     }
 
@@ -430,11 +431,10 @@
     }
 
     // =================================================================
-    //  Forældreoverblik — én pige ad gangen, aldrig sammenligning
+    //  Forældreoverblik — ét barn ad gangen, aldrig sammenligning
     // =================================================================
     function visOverblik(b) {
       const d = G.indlaesBarn(lager, b.noegle, b.navn).data;
-      const fig = FIGURER[d.figur] || FIGURER[b.figur];
       // Tid de sidste 7 dage
       const dage = [];
       for (let k = 6; k >= 0; k--) {
@@ -461,17 +461,17 @@
       for (const emne in d.fejl) for (const n in d.fejl[emne]) driller.push({ emne, n, antal: d.fejl[emne][n] });
       driller.sort((x, y) => y.antal - x.antal);
       const sidste = d.sidsteVerden && O.EMNER[d.sidsteVerden] ? d.sidsteVerden : 'taelle';
-      const antalMaerker = Object.keys(d.maerker).length;
+      const antalDyr = Object.keys(d.maerker).length;
       skift(h('div', { class: 'skaerm voksen overblik' },
-        topbar(fig.e + ' ' + b.navn, visMenu),
+        topbar(b.e + ' ' + b.navn, visMenu),
         h('div', { class: 'overblik-indhold' },
-          h('section', null, h('h2', null, 'Tid'), h('p', null, 'I dag: ' + idag.min + ' min' + (voksen.tidsgraense[b.id] ? ' (grænse ' + voksen.tidsgraense[b.id] + ' min)' : '') + ' · runder i alt: ' + d.runderIalt + ' · dyr i samlebogen: ' + antalMaerker), soejler),
+          h('section', null, h('h2', null, 'Tid'), h('p', null, 'I dag: ' + idag.min + ' min' + (voksen.tidsgraense[b.id] ? ' (grænse ' + voksen.tidsgraense[b.id] + ' min)' : '') + ' · runder i alt: ' + d.runderIalt + ' · dyr i samlebogen: ' + antalDyr), soejler),
           h('section', null, h('h2', null, 'Verdener'), h('table', { class: 'overblik-tabel' }, verdener)),
           h('section', null, h('h2', null, 'Det driller lige nu'),
             driller.length ? h('ul', null, driller.slice(0, 5).map((x) => h('li', null, O.beskrivNoegle(x.n) + ' — ' + x.antal + (x.antal === 1 ? ' gang' : ' gange'))))
               : h('p', null, 'Ingen opgaver, der driller endnu.')),
           h('section', null, h('h2', null, 'Idé til hjemmet'), h('p', null, O.HJEMME_IDEER[sidste])),
-          h('p', { class: 'voksen-hjaelp' }, 'Overblikket viser kun ' + b.navn + '. Søstrene sammenlignes ikke.'))));
+          h('p', { class: 'voksen-hjaelp' }, 'Overblikket viser kun ' + b.navn + '. Børnene sammenlignes ikke.'))));
     }
 
     // =================================================================
@@ -504,7 +504,11 @@
       const backups = G.findBackups(lager).filter((k) => k.indexOf('_backup_') > 0);
       // Ulæselige data uden plads til en reservekopi: spillet gemmer ikke, før de er taget med i en kopi og ryddet
       const ulaeselige = G.findUlaeselige(lager);
-      const navnPaa = (k) => ({ mat_alma_v1: 'Almas data', mat_ella_v1: 'Ellas data', mat_voksen_v1: 'voksendelens indstillinger' }[k] || k);
+      const navnPaa = (k) => {
+        if (k === 'mat_voksen_v1') return 'voksendelens indstillinger';
+        const b = BOERN.find((x) => x.noegle === k || x.noegle === G.nyNoegle(k));
+        return b ? b.bestemt + 's ' + (b.noegle === k ? 'data' : 'gamle data') : k;
+      };
       // Ryd sletter kun, når den voksne har valgt kopi-filen, og filen indeholder præcis de ulæselige data,
       // der ligger nu (en download kan mislykkes uden besked på iPad — så slettes intet)
       const rydKnap = h('button', {
@@ -615,27 +619,23 @@
     function visDuelValg() {
       skift(h('div', { class: 'skaerm voksen' },
         topbar('Familieduel', visMenu),
-        h('p', { class: 'voksen-hjaelp' }, 'Barnet får en opgave fra sin egen verden, den voksne en gymnasieopgave med samme idé. Hvert rigtigt svar giver en stjerne til det fælles mål: at klække Almas æg eller åbne Ellas gave. Ingen ur. Tip: Sig dit svar højt, og lad barnet trykke på din knap.'),
-        h('div', { class: 'menu-gitter' }, BOERN.map((b) => {
-          const d = G.indlaesBarn(lager, b.noegle, b.navn).data;
-          const fig = FIGURER[d.figur] || FIGURER[b.figur];
-          return h('button', { class: 'menu-kort', type: 'button', onclick: () => { Lyd.init(); Lyd.tryk(); startDuel(b); } },
-            h('span', { class: 'menu-ikon', 'aria-hidden': 'true' }, fig.e), h('b', null, b.navn + ' og en voksen'));
-        }))));
+        h('p', { class: 'voksen-hjaelp' }, 'Barnet får en opgave fra sin egen verden, den voksne en gymnasieopgave med samme idé. Hvert rigtigt svar giver en stjerne til det fælles mål: at klække Dinoens æg eller åbne Enhjørningens gave. Ingen ur. Tip: Sig dit svar højt, og lad barnet trykke på din knap.'),
+        h('div', { class: 'menu-gitter' }, BOERN.map((b) => h('button', { class: 'menu-kort', type: 'button', onclick: () => { Lyd.init(); Lyd.tryk(); startDuel(b); } },
+          h('span', { class: 'menu-ikon', 'aria-hidden': 'true' }, b.e), h('b', null, b.navn + ' og en voksen'))))));
     }
 
     function startDuel(b) {
       const barnData = G.indlaesBarn(lager, b.noegle, b.navn).data;
       const fig = FIGURER[barnData.figur] || FIGURER[b.figur];
-      // Barnets emne: den verden, hun sidst spillede (ikke Lystårnet), ellers plus til 10
+      // Barnets emne: den verden, barnet sidst spillede (ikke Lystårnet), ellers plus til 10
       const sidste = VERDENER.find((v) => v.id === barnData.sidsteVerden); // verdens-id → emne (Klokketorvet: «maaling»)
       const emne = sidste && O.EMNER[sidste.emne] ? sidste.emne : 'plus10';
       const niveau = barnData.emner[emne] ? barnData.emner[emne].niveau : 1;
       const MAAL = 10;
       const tilstand = { stjerner: 0 };
       const maaler = h('div', { class: 'duel-maaler', 'aria-label': 'Fælles stjerner' }, Array.from({ length: MAAL }, () => h('i', null, '★')));
-      // Det fælles mål: barnets æg (Alma) eller gave (Ella) vokser og vipper for hver stjerne — og klækkes ved 10
-      const aeg = h('span', { class: 'duel-aeg', 'aria-hidden': 'true' }, b.id === 'ella' ? '🎁' : '🥚');
+      // Det fælles mål: Dinoens æg eller Enhjørningens gave vokser og vipper for hver stjerne — og klækkes ved 10
+      const aeg = h('span', { class: 'duel-aeg', 'aria-hidden': 'true' }, b.gave ? '🎁' : '🥚');
       const barnFelt = h('div', { class: 'duel-felt barn' });
       const voksenFelt = h('div', { class: 'duel-felt voksen-side' });
       skift(h('div', { class: 'skaerm voksen duel' },
@@ -742,13 +742,13 @@
         skift(h('div', { class: 'skaerm voksen' },
           topbar('Familieduel', visMenu),
           h('div', { class: 'voksen-midte' },
-            h('div', { class: 'duel-klaekket', 'aria-hidden': 'true' }, h('span', { class: 'duel-skal' }, b.id === 'ella' ? '🎉' : '🐣'), h('span', { class: 'fejring-ven danser' }, fig.e)),
+            h('div', { class: 'duel-klaekket', 'aria-hidden': 'true' }, h('span', { class: 'duel-skal' }, b.gave ? '🎉' : '🐣'), h('span', { class: 'fejring-ven danser' }, fig.e)),
             h('div', { class: 'fejring-tekst' }, 'I klarede det sammen!'),
             h('div', { class: 'voksen-knaprad' },
               h('button', { class: 'voksen-valg-knap', type: 'button', onclick: () => startDuel(b) }, 'Spil igen'),
               h('button', { class: 'voksen-valg-knap', type: 'button', onclick: visMenu }, 'Til menuen')))));
         Lyd.fejring();
-        setTimeout(() => Tale.sig('I klarede det sammen! ' + (b.id === 'ella' ? 'Gaven er åbnet' : 'Ægget er klækket') + ', og ' + fig.navn + ' kom ud.'), 800);
+        setTimeout(() => Tale.sig('I klarede det sammen! ' + (b.gave ? 'Gaven er åbnet' : 'Ægget er klækket') + ', og ' + fig.navn + ' kom ud.'), 800);
       }
 
       nyBarneopgave();

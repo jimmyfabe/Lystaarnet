@@ -170,13 +170,15 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
   transition: transform 0.1s;
 }
 .spiller-kort:active { transform: translateY(6px) scale(0.98); }
-.spiller-alma { background: linear-gradient(160deg, var(--alma-1), var(--alma-2)); }
-.spiller-ella { background: linear-gradient(160deg, var(--ella-1), var(--ella-2)); }
+.spiller-dino { background: linear-gradient(160deg, var(--dino-1), var(--dino-2)); }
+.spiller-enhjorning { background: linear-gradient(160deg, var(--enhjorning-1), var(--enhjorning-2)); }
 .spiller-voksen { background: linear-gradient(160deg, var(--voksen-1), var(--voksen-2)); width: clamp(150px, 20vmin, 210px); }
 .spiller-figur { font-size: clamp(90px, 15vmin, 150px); filter: drop-shadow(0 6px 6px rgba(0, 0, 0, 0.2)); }
 .spiller-voksen .spiller-figur { font-size: clamp(60px, 10vmin, 100px); }
 .spiller-navn { font-size: clamp(30px, 5vmin, 46px); font-weight: 900; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.18); }
 .spiller-voksen .spiller-navn { font-size: clamp(22px, 3.6vmin, 34px); }
+/* Lange navne («Enhjørning») må ikke stikke ud af kortet på en smal telefon */
+.spiller-navn.langt { font-size: clamp(22px, 3.8vmin, 38px); }
 @media (orientation: portrait) and (max-width: 600px) {
   .spiller-kort { width: 40vw; }
   .spiller-voksen { width: 30vw; }

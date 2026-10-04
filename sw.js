@@ -1,11 +1,14 @@
 /* sw.js — service worker, så spillet virker uden net.
    Ved hver ny udgave: tæl VERSION op. Filerne hentes med cache: 'reload',
    så GitHub Pages' HTTP-cache ikke giver en blanding af gamle og nye filer. */
-const VERSION = 'mat-2026-10-04-v37';
-// FILER-HASH: cd2aff687445c77b mat-2026-10-04-v37 — opdateres med: node test/test-sw.js --opdater
+const VERSION = 'mat-2026-10-04-v38';
+// FILER-HASH: a8cb272fdd42ce97 mat-2026-10-04-v38 — opdateres med: node test/test-sw.js --opdater
 const FILER = [
   './',
   'index.html',
+  'dino.html',
+  'enhjorning.html',
+  // Tomme viderestillinger fra før B1 — så et gammelt hjemmeskærm-ikon også virker offline
   'alma.html',
   'ella.html',
   'voksen.html',
@@ -16,17 +19,17 @@ const FILER = [
   'voksen.js',
   'voksen-opgaver.js',
   'manifest.json',
-  'manifest-alma.json',
-  'manifest-ella.json',
+  'manifest-dino.json',
+  'manifest-enhjorning.json',
   'ikoner/index-180.png',
   'ikoner/index-192.png',
   'ikoner/index-512.png',
-  'ikoner/alma-180.png',
-  'ikoner/alma-192.png',
-  'ikoner/alma-512.png',
-  'ikoner/ella-180.png',
-  'ikoner/ella-192.png',
-  'ikoner/ella-512.png',
+  'ikoner/dino-180.png',
+  'ikoner/dino-192.png',
+  'ikoner/dino-512.png',
+  'ikoner/enhjorning-180.png',
+  'ikoner/enhjorning-192.png',
+  'ikoner/enhjorning-512.png',
 ];
 
 self.addEventListener('install', (e) => {

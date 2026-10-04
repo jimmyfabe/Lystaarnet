@@ -2,27 +2,27 @@
 <html lang="da">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-y4ZYqqsITvRA/AsxDgkJFEy1suFcoTQaixEU/Qt1ako='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-FNsCzaGJFfV4GfJjagHMYYsI2J2g+w8n8JUiT3gcGdY='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Lystårnet">
 <meta name="theme-color" content="#e98a3b">
-<title>Lystårnet — matematik</title>
+<title>Lystårnet</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="ikoner/index-180.png">
 <link rel="icon" type="image/png" href="ikoner/index-192.png">
 <link rel="stylesheet" href="app.css">
 <style>
-  /* Startsiden: varm aftenhimmel + begge pigers farver */
+  /* Startsiden: varm aftenhimmel + begge børns farver */
   :root {
     --farve-1: #e98a3b; --farve-1-lys: #ffc58f; --farve-1-moerk: #9a4b12;
     --farve-2: #f2b33d; --farve-2-lys: #ffd98a; --farve-2-moerk: #c2830f;
     --baggrund-1: #fff4e3; --baggrund-2: #ffe1c2;
     --tekst: #4a2f1c; --sti: #c58a4a; --sti-kant: #f6dcb6;
-    --alma-1: #3fae6c; --alma-2: #1d6b3e;
-    --ella-1: #b27ae6; --ella-2: #6a35a3;
+    --dino-1: #3fae6c; --dino-2: #1d6b3e;
+    --enhjorning-1: #b27ae6; --enhjorning-2: #6a35a3;
     --voksen-1: #8a7a6b; --voksen-2: #4f4338;
   }
 </style>
@@ -30,8 +30,8 @@
   window.TEMA = {
     side: 'index',
     spillere: [
-      { id: 'alma', navn: 'Alma', side: 'alma.html', noegle: 'mat_alma_v1', figur: 'bobo' },
-      { id: 'ella', navn: 'Ella', side: 'ella.html', noegle: 'mat_ella_v1', figur: 'luna' }
+      { id: 'dino', navn: 'Dino', e: '🦖', side: 'dino.html', noegle: 'mat_dino_v1' },
+      { id: 'enhjorning', navn: 'Enhjørning', e: '🦄', side: 'enhjorning.html', noegle: 'mat_enhjorning_v1' }
     ],
     voksenSide: 'voksen.html'
   };
