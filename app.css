@@ -1135,10 +1135,10 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
 .tid-soejle small, .tid-tal { font-size: 17px; }
 .indstilling { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; min-height: 56px; font-size: 18px; }
 .emne-liste { border-top: 1px solid #e6e1d6; margin-top: 6px; }
-.skifter { position: relative; width: 76px; height: 44px; min-width: 76px; border: none; border-radius: 22px; background: var(--slukket); padding: 0; transition: background 0.2s; }
+.skifter { position: relative; width: 84px; height: 52px; min-width: 84px; border: none; border-radius: 26px; background: var(--slukket); padding: 0; transition: background 0.2s; }
 .skifter.til { background: var(--rigtig); }
-.skifter-knop { position: absolute; left: 4px; top: 4px; width: 36px; height: 36px; border-radius: 50%; background: var(--hvid); box-shadow: 0 2px 4px var(--skygge); transition: left 0.2s; }
-.skifter.til .skifter-knop { left: 36px; }
+.skifter-knop { position: absolute; left: 5px; top: 5px; width: 42px; height: 42px; border-radius: 50%; background: var(--hvid); box-shadow: 0 2px 4px var(--skygge); transition: left 0.2s; }
+.skifter.til .skifter-knop { left: 37px; }
 .tidsvalg { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 @media (max-width: 600px) {
   .indstilling:has(.tidsvalg) { flex-direction: column; align-items: stretch; }
@@ -1257,3 +1257,159 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
 .huskekort-regel math { font-size: 1.1em; }
 /* Prøve: uret står i topbaren og tæller op */
 .proeve-ur { flex: 0 0 auto; min-width: var(--ikon); text-align: right; font-size: clamp(18px, 2.6vmin, 24px); font-weight: 800; font-variant-numeric: tabular-nums; color: var(--farve-1-moerk); }
+
+/* ---------- B2: «Vælg selv» (🎒) og lektioner ---------- */
+/* 🎒 på kortet: stor rund knap i øverste venstre hjørne (▶ står nederst til højre) */
+.kort-frit {
+  --k: clamp(68px, 10vmin, 96px);
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  z-index: 4;
+  width: var(--k);
+  height: var(--k);
+  border: 5px solid var(--hvid);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--farve-2-lys), var(--farve-2) 70%);
+  box-shadow: 0 6px 0 var(--farve-2-moerk), 0 10px 18px var(--skygge-stor);
+  font-size: calc(var(--k) * 0.5);
+  line-height: 1;
+  padding: 0;
+}
+.kort-frit:active { transform: translateY(4px) scale(0.96); }
+
+.vaelg-selv-liste {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 4px 16px 28px;
+}
+.vaelg-gruppe { margin: 0 0 clamp(12px, 2.4vmin, 22px); }
+.vaelg-gruppe-titel {
+  margin: 0 0 8px;
+  font-size: clamp(19px, 2.8vmin, 26px);
+  font-weight: 900;
+  color: var(--farve-1-moerk);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.vaelg-gruppe-titel span { font-size: 1.3em; }
+.vaelg-gitter {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(clamp(146px, 19vmin, 190px), 1fr));
+  gap: clamp(10px, 2vmin, 18px);
+}
+.vaelg-felt { position: relative; }
+.vaelg-emne {
+  width: 100%;
+  aspect-ratio: 1;
+  border: 5px solid var(--hvid);
+  border-radius: 28px;
+  background: radial-gradient(circle at 35% 30%, var(--farve-1-lys), var(--farve-1) 75%);
+  box-shadow: 0 6px 0 var(--farve-1-moerk), 0 10px 18px var(--skygge);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 4px;
+  color: var(--hvid);
+}
+.vaelg-emne:active { transform: translateY(4px) scale(0.97); }
+.vaelg-emne .station-ikon { font-size: clamp(44px, 7.5vmin, 76px); }
+.vaelg-emne .station-ikon.fyrtaarn { width: clamp(40px, 6vmin, 64px); height: clamp(48px, 7.5vmin, 76px); }
+.vaelg-navn {
+  font-size: clamp(17px, 2.3vmin, 21px);
+  font-weight: 800;
+  color: var(--tekst);
+  background: rgba(255, 253, 248, 0.92);
+  border-radius: 10px;
+  padding: 1px 8px;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.vaelg-emne .station-stjerner { position: static; transform: none; font-size: clamp(18px, 2.6vmin, 24px); box-shadow: none; }
+.vaelg-lektion { position: absolute; right: -6px; top: -6px; width: var(--tryk); height: var(--tryk); font-size: 24px; z-index: 2; }
+/* I runden er der ikke plads til 📖 på en smal telefon — lektionen kan høres igen fra 🎒 */
+@media (max-width: 440px) { .runde .hoer-lektion { display: none; } }
+
+/* Lektion: kort forklaring med en lille tegning, før verdenens første runde */
+.lektion-midte {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(14px, 4vmin, 48px);
+  padding: 8px 20px 20px;
+}
+.lektion-tegning {
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: 52vw;
+  max-height: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 28px;
+  background: rgba(255, 253, 248, 0.85);
+  box-shadow: 0 6px 18px var(--skygge);
+  --lille: 1;
+}
+.lektion-tegning .form-svg { width: clamp(70px, 14vmin, 130px); height: clamp(70px, 14vmin, 130px); }
+.lektion-tegning .ur-svg { width: clamp(170px, 26vmin, 230px); height: clamp(170px, 26vmin, 230px); }
+.lektion-tegning .moent { width: clamp(90px, 12vmin, 120px); height: clamp(90px, 12vmin, 120px); }
+.lektion-tegning .fyrtaarn { width: clamp(90px, 16vmin, 150px); height: clamp(110px, 20vmin, 180px); }
+/* Tegningen står ikke i opgavefeltet (ingen container): faste størrelser efter skærmen */
+.lektion-tegning .klodser { --kl: min(52px, 5.2vmin); }
+.lektion-tegning .staenger { --k: min(34px, 3.6vmin); }
+.lektion-tegning .streger { --sh: min(110px, 14vmin); }
+.lektion-tegning .haender { --hd: min(190px, 26vmin); }
+.lektion-tegning .kugleramme { --ku: min(44px, 3.4vw, 6vmin); }
+.lektion-tegning .moenster .brik-celle { width: min(64px, 9vmin); height: min(64px, 9vmin); font-size: min(44px, 6vmin); }
+.lektion-tekst {
+  flex: 1 1 260px;
+  max-width: 440px;
+  margin: 0;
+  font-size: clamp(19px, 2.8vmin, 26px);
+  line-height: 1.4;
+  font-weight: 700;
+}
+.lektion-knap { flex: 0 0 auto; }
+@media (orientation: portrait) {
+  .lektion-midte { flex-direction: column; }
+  .lektion-tegning { max-width: 100%; }
+  .lektion-tekst { flex: 0 1 auto; text-align: center; }
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  .lektion-tekst { font-size: 18px; }
+  .lektion-tegning { padding: 8px; }
+}
+
+/* ---------- B3: 🎙️ Indtal og stemmevalg (voksendelen) ---------- */
+.indtal-liste { display: flex; flex-direction: column; gap: 8px; }
+.indtal-raekke { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 16px; background: rgba(255, 253, 248, 0.85); }
+.indtal-raekke.har { background: #e6f4ea; }
+.indtal-bogstav { flex: 0 0 auto; width: 56px; text-align: center; font-size: 34px; font-weight: 900; color: var(--farve-1-moerk); }
+.indtal-tekst { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 17px; }
+.indtal-tekst b { font-size: 18px; }
+.indtal-flueben { flex: 0 0 auto; width: 24px; font-size: 22px; color: var(--rigtig); font-weight: 900; }
+.indtal-optag.optager { background: #ffd9d9; animation: puls 1s ease-in-out infinite; }
+.indtal-lyt:disabled { opacity: 0.35; }
+.indtal-taeller { align-self: center; font-size: 20px; }
+.indtal-status { min-height: 1.4em; }
+.stemme-liste { display: flex; flex-direction: column; gap: 8px; }
+.stemme-raekke { display: flex; align-items: center; gap: 10px; }
+.stemme-valg { flex: 1; min-width: 0; text-align: left; }
+.stemme-valg.valgt { box-shadow: inset 0 0 0 4px var(--farve-1); font-weight: 900; }
+@media (max-width: 600px) {
+  .indtal-raekke { flex-wrap: wrap; }
+  .indtal-tekst { flex-basis: calc(100% - 80px); }
+}

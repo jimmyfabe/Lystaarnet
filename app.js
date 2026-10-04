@@ -35,6 +35,29 @@
   ];
   const AABNE_FRA_START = 4;
 
+  // Lektion: vises første gang, en verden åbnes (og kan høres igen med 📖). 2–4 korte sætninger, der læses op,
+  // og en lille tegning med de repræsentationer, verdenen bruger (lektionTegning nedenfor).
+  const LEKTIONER = {
+    taelle: 'Her i Tælleskoven tæller vi. Vi peger på hver ting og siger et tal. Det sidste tal, vi siger, er, hvor mange der er.',
+    former: 'I Formbyen bor figurerne. En trekant har tre hjørner. En firkant har fire hjørner. En cirkel er rund og har ingen hjørner.',
+    plus10: 'På Plusbjerget lægger vi sammen. Tre og to er fem i alt. Vi kan tælle på fingrene.',
+    venner: "På Venneøen bor 10'er-vennerne. Syv og tre er 10'er-venner, for de er ti tilsammen.",
+    minus: 'I Minussøen tager vi væk. Vi har seks og tager to væk. Så er der fire tilbage.',
+    tiere: 'I Klodsbyen bygger vi med stænger. En stang er ti klodser. To stænger og tre klodser er treogtyve.',
+    tierbro: 'På Tierbroen går vi over ti. Otte og fem: først op til ti, og så resten. Det er tretten.',
+    moenstre: 'I Mønsterslottet gentager vi. Rød, blå, rød, blå. Hvad kommer så? Rød!',
+    torvet: 'På Klokketorvet ser vi på uret og tæller penge. Den lille viser viser timen. Den store viser viser minutterne.',
+    taarn: 'I Lystårnet er det hele blandet. Hver gang du hjælper et dyr, lyser tårnet lidt mere.',
+  };
+
+  // «Vælg selv» (🎒): alle emner som store ikoner, i grupper. Geometri står for sig.
+  const VAELG_GRUPPER = [
+    { e: '🔢', navn: 'Tal', verdener: ['taelle', 'plus10', 'venner', 'minus', 'tiere', 'tierbro', 'moenstre'] },
+    { e: '🔺', navn: 'Former', verdener: ['former'] },
+    { e: '🕰️', navn: 'Klokken og penge', verdener: ['torvet'] },
+    { e: '🗼', navn: 'Det hele blandet', verdener: ['taarn'] },
+  ];
+
   // Skolens ord bruges i oplæsningen (tælle videre, tage væk, forskel, 10'er-venner …)
   const HJAELP_TALE = {
     tael: 'Lad os tælle sammen.',
@@ -182,7 +205,51 @@
   let voksenRes = G.indlaesVoksen(lager);
   const voksen = voksenRes.data;
 
-  // ---------- Lyd (WebAudio — ingen lydfiler) ----------
+  // ---------- Lager på enheden (IndexedDB): indtalte lydklip og børnenes tegninger ----------
+  // Kun på denne enhed — intet sendes nogen steder hen. Fejler IndexedDB (fx privat browsing), virker spillet uden.
+  const KlipLager = {
+    db: null,
+    aaben() {
+      if (this.db) return Promise.resolve(this.db);
+      return new Promise((res, rej) => {
+        let r;
+        try { r = indexedDB.open('lystaarn', 1); } catch (e) { rej(e); return; }
+        r.onupgradeneeded = () => {
+          const db = r.result;
+          if (!db.objectStoreNames.contains('klip')) db.createObjectStore('klip');
+          if (!db.objectStoreNames.contains('tegninger')) db.createObjectStore('tegninger');
+        };
+        r.onsuccess = () => { this.db = r.result; res(this.db); };
+        r.onerror = () => rej(r.error);
+      });
+    },
+    async kald(store, mode, fn) {
+      const db = await this.aaben();
+      return new Promise((res, rej) => {
+        const tx = db.transaction(store, mode);
+        const req = fn(tx.objectStore(store));
+        tx.oncomplete = () => res(req ? req.result : undefined);
+        tx.onerror = () => rej(tx.error);
+        tx.onabort = () => rej(tx.error);
+      });
+    },
+    hent(store, id) { return this.kald(store, 'readonly', (s) => s.get(id)); },
+    gem(store, id, v) { return this.kald(store, 'readwrite', (s) => s.put(v, id)); },
+    slet(store, id) { return this.kald(store, 'readwrite', (s) => s.delete(id)); },
+    noegler(store) { return this.kald(store, 'readonly', (s) => s.getAllKeys()); },
+    alle(store) {
+      return this.aaben().then((db) => new Promise((res, rej) => {
+        const ud = {};
+        const tx = db.transaction(store, 'readonly');
+        const c = tx.objectStore(store).openCursor();
+        c.onsuccess = () => { const k = c.result; if (k) { ud[k.key] = k.value; k.continue(); } };
+        tx.oncomplete = () => res(ud);
+        tx.onerror = () => rej(tx.error);
+      }));
+    },
+  };
+
+  // ---------- Lyd (WebAudio) — toner og indtalte klip ----------
   const Lyd = {
     ctx: null,
     init() {
@@ -224,6 +291,55 @@
     pling() { this.tone(1568, 0, 0.5, 'sine', 0.13); this.tone(2093, 0.09, 0.6, 'sine', 0.09); this.tone(2637, 0.18, 0.7, 'sine', 0.06); },
     knaek() { this.tone(240, 0, 0.09, 'square', 0.05, 140); this.tone(180, 0.1, 0.09, 'square', 0.05, 110); },
     hop() { this.tone(260, 0, 0.22, 'sine', 0.13, 720); },
+
+    // ---- Indtalte klip (fx bogstavlyde): optaget på denne enhed (IndexedDB) → lyd/<id>.wav, hvis id'et står
+    // i lyd/liste.json → reserven med talesyntesen. En bogstavlyd må aldrig blive bogstavets navn: reserven er
+    // fx «lyden i sol». Klip er oplæsning, så de følger den voksnes «Oplæsning» til/fra.
+    lokale: {},      // id → Uint8Array (WAV), indtalt på denne enhed
+    liste: null,     // Set med id'er fra lyd/liste.json
+    bufre: {},       // id → afkodet AudioBuffer
+    harLokaltKlip(id) { return !!this.lokale[id]; },
+    lokaltKlip(id) { return this.lokale[id] || null; },
+    saetLokaltKlip(id, bytes) { this.lokale[id] = bytes; delete this.bufre[id]; },
+    harKlip(id) { return !!this.lokale[id] || !!(this.liste && this.liste.has(id)); },
+    indlaesKlip() {
+      const lokale = KlipLager.alle('klip').then((alle) => { for (const id in alle) if (alle[id]) this.lokale[id] = new Uint8Array(alle[id]); }).catch(() => {});
+      const liste = (/^https?:$/.test(location.protocol) ? fetch('lyd/liste.json').then((r) => (r.ok ? r.json() : [])) : Promise.resolve([]))
+        .then((l) => { this.liste = new Set(Array.isArray(l) ? l.filter((x) => typeof x === 'string') : []); })
+        .catch(() => { this.liste = new Set(); });
+      return Promise.all([lokale, liste]);
+    },
+    async afkod(id) {
+      if (this.bufre[id]) return this.bufre[id];
+      let bytes = this.lokale[id];
+      if (!bytes && this.liste && this.liste.has(id)) {
+        const r = await fetch('lyd/' + encodeURIComponent(id) + '.wav');
+        if (r.ok) bytes = new Uint8Array(await r.arrayBuffer());
+      }
+      if (!bytes || !this.ctx) return null;
+      const ab = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+      const buf = await new Promise((res, rej) => { const p = this.ctx.decodeAudioData(ab, res, rej); if (p && p.then) p.then(res, rej); });
+      this.bufre[id] = buf;
+      return buf;
+    },
+    // Afspil et klip (eller sig reserven). Løftet holder, til lyden er færdig.
+    async klip(id, reserve) {
+      if (!voksen.tale) return;
+      let buf = null;
+      try { if (this.harKlip(id)) buf = await this.afkod(id); } catch (e) { buf = null; }
+      if (buf && this.ctx) {
+        return new Promise((res) => {
+          try {
+            const s = this.ctx.createBufferSource();
+            s.buffer = buf; s.connect(this.ctx.destination);
+            s.onended = () => res();
+            s.start(0);
+            setTimeout(res, (buf.duration * 1000 + 400) * TEMPO + 200); // hvis onended aldrig kommer
+          } catch (e) { res(); }
+        });
+      }
+      if (reserve) return Tale.sigVent(reserve);
+    },
   };
 
   // ---------- Oplæsning (speechSynthesis, dansk) ----------
@@ -237,9 +353,12 @@
       if (!this.findes) return;
       const vaelgStemme = () => {
         const alle = window.speechSynthesis.getVoices() || [];
-        const da = alle.filter((v) => /^da([-_]|$)/i.test(v.lang || ''));
-        // foretræk en lokal stemme (virker offline), ellers den første danske
-        this.stemme = da.find((v) => v.localService) || da[0] || null;
+        // Den voksnes valg → «Premium/Enhanced/Forbedret» → ikke «compact» → lokal → første danske (lydklip.js)
+        if (window.Lydklip) this.stemme = window.Lydklip.vaelgStemme(alle, voksen.stemme);
+        else {
+          const da = alle.filter((v) => /^da([-_]|$)/i.test(v.lang || ''));
+          this.stemme = da.find((v) => v.localService) || da[0] || null;
+        }
         // Ingen dansk stemme: «hør og find» kan ikke bruges (iOS ville læse op på et andet sprog). En tom liste
         // (stemmerne er ikke hentet endnu) tæller også som «ingen dansk» — hellere springe de opgaver over.
         this.udenDansk = !this.stemme;
@@ -425,7 +544,7 @@
       class: 'start-taarn-knap', type: 'button', 'aria-label': 'Hør historien om Lystårnet',
       style: '--lys:' + lysStyrke(),
       onclick: () => { Lyd.init(); visHistorie(() => visStart()); },
-    }, fyrtaarn('start-taarn'), data.runderIalt ? h('span', { class: 'perle-tal' }, '✨ ' + data.runderIalt) : null);
+    }, fyrtaarn('start-taarn'), data.perler ? h('span', { class: 'perle-tal' }, '✨ ' + data.perler) : null);
     skift(h('div', { class: 'skaerm start' },
       h('a', { class: 'ikon-knap hjem', href: 'index.html', 'aria-label': 'Skift spiller', title: 'Skift spiller' }, '🏠'),
       advarselKnap(),
@@ -539,9 +658,10 @@
     return h('span', { class: 'station-groede', 'aria-hidden': 'true' }, tegn);
   }
 
-  // Lystårnets lys: én lysperle pr. runde (forudsigeligt), fuldt lys ved 30
+  // Lystårnets lys: én lysperle pr. runde i eventyret (forudsigeligt), fuldt lys ved 30.
+  // Runder i «Vælg selv» giver dyr til samlebogen, men ingen lysperler (data.perler).
   function lysStyrke() {
-    return Math.min(1, (data ? data.runderIalt : 0) / 30).toFixed(2);
+    return Math.min(1, (data ? data.perler : 0) / 30).toFixed(2);
   }
 
   function visKort(hils) {
@@ -583,6 +703,13 @@
     }, fig.e);
     flade.append(ven);
 
+    // 🎒 Vælg selv: alle emner frit — eventyret (▶ og stationerne) er det samme som før
+    const fritKnap = h('button', {
+      class: 'kort-frit', type: 'button', 'aria-label': 'Vælg selv',
+      onclick: () => { Lyd.init(); Lyd.tryk(); visVaelgSelv('Vælg selv. Tryk på det, du vil lege med.'); },
+    }, h('span', { 'aria-hidden': 'true' }, '🎒'));
+    flade.append(fritKnap);
+
     const v = VERDENER[anbefalet];
     const spil = () => { Lyd.init(); Lyd.tryk(); startRunde(v); };
     const spilKnap = h('button', { class: 'stor-knap spil-knap kort-spil puls', type: 'button', 'aria-label': 'Spil: ' + v.navn, onclick: spil },
@@ -597,7 +724,7 @@
       h('div', { class: 'topbar' },
         h('a', { class: 'ikon-knap', href: 'index.html', 'aria-label': 'Skift spiller', title: 'Skift spiller' }, '🏠'),
         advarsel || topbarPlads(), // to knapper til højre — så titlen står i midten
-        h('div', { class: 'topbar-titel' }, data.navn, data.runderIalt && !advarsel ? h('span', { class: 'perle-tal lille' }, ' ✨ ' + data.runderIalt) : null),
+        h('div', { class: 'topbar-titel' }, data.navn, data.perler && !advarsel ? h('span', { class: 'perle-tal lille' }, ' ✨ ' + data.perler) : null),
         h('div', { class: 'topbar-hoejre' },
           ikonKnap('📖', 'Samlebog', () => visSamlebog()),
           hoejttaler())),
@@ -615,18 +742,29 @@
       const n = VERDENER.length;
       const liggende = w >= hh * 1.05;
       const knap = spilKnap.offsetWidth || 130;
-      const punkter = VERDENER.map((_, i) => {
+      // 🎒 står i øverste venstre hjørne: ingen station (med navn og stjerner) må ligge inde over den
+      const frit = fritKnap.offsetWidth || 80;
+      const ssMax = Math.max(...stationer.map((s) => s.offsetWidth || 100));
+      let x0 = Math.min(90, w * 0.08), y0 = Math.min(80, hh * 0.08);
+      const beregn = () => VERDENER.map((_, i) => {
         const t = i / (n - 1);
         // Den sidste station står altid i øverste række (liggende) / til venstre (højkant), så ▶ nederst til højre ikke dækker den
         const top = (n - 1 - i) % 2 === 0;
         if (liggende) {
           // ▶-knappen har sin egen plads nederst til højre
-          const x0 = Math.min(90, w * 0.08), x1 = w - knap - 40;
+          const x1 = w - knap - 40;
           return { x: x0 + (x1 - x0) * t, y: hh * (top ? 0.3 : 0.7) };
         }
-        const y0 = Math.min(80, hh * 0.08), y1 = hh - knap - 50;
+        const y1 = hh - knap - 50;
         return { x: w * (top ? 0.3 : 0.7), y: y0 + (y1 - y0) * t };
       });
+      let punkter = beregn();
+      const halv = Math.max(ssMax, 150) / 2; // navneskiltet kan være bredere end stationen
+      const iHjoernet = (p) => p.x - halv < frit + 10 && p.y - ssMax / 2 - 30 < frit + 10;
+      for (let k = 0; k < 12 && punkter.some(iHjoernet); k++) {
+        if (liggende) x0 += 12; else y0 += 12;
+        punkter = beregn();
+      }
       punkter.forEach((p, i) => { stationer[i].style.left = p.x + 'px'; stationer[i].style.top = p.y + 'px'; });
       // glat kurve gennem punkterne
       let d = 'M' + punkter[0].x + ',' + punkter[0].y;
@@ -658,6 +796,7 @@
         vy = p.y - ss * 0.15;
       }
       vx = Math.max(vs * 0.5 + 2, Math.min(w - vs * 0.5 - 2, vx));
+      if (vx - vs / 2 < frit + 8 && vy - vs / 2 < frit + 8) vx = Math.min(w - vs * 0.5 - 2, p.x + ss * 0.5 + vs * 0.6); // ikke oven på 🎒
       ven.style.left = vx + 'px';
       ven.style.top = vy + 'px';
     };
@@ -692,7 +831,10 @@
     Tale.sig(S.gentagTale);
   }
 
-  function startRunde(verden) {
+  // opts.frit: runden er startet fra «Vælg selv» (🎒) — samme emne-niveau og samme dyr, men ingen lysperle,
+  // og ⬅️ fører tilbage til 🎒. opts.lektionSet: lektionen er vist (første gang i verdenen).
+  function startRunde(verden, opts) {
+    opts = opts || {};
     if (tidOpbrugt()) { visTidBrugt(); return; }
     // Afbrudt med 🗺️? Så fortsætter vi samme mission med de fodspor, der allerede er fyldt
     const p = S.pausetRunde;
@@ -709,6 +851,11 @@
         data.pauset = null;
       }
     }
+    // Første gang i en verden: en kort lektion først
+    if (!opts.lektionSet && LEKTIONER[verden.id] && !data.lektioner[verden.id]) {
+      visLektion(verden, () => startRunde(verden, Object.assign({}, opts, { lektionSet: true })), opts.frit ? () => visVaelgSelv() : () => visKort(false));
+      return;
+    }
     S.pausetRunde = null;
     data.pauset = null; // en ny mission i en anden verden erstatter den afbrudte
     const emne = verden.emne;
@@ -719,10 +866,10 @@
     const rng = O.lavRng((Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0);
     let opgaver;
     if (verden.blandet) {
-      // Lystårnet: en opgave fra hvert åbent emne, på barnets eget niveau i emnet
+      // Lystårnet: en opgave fra hvert åbent emne (i «Vælg selv»: alle emner), på barnets eget niveau i emnet
       const niveauer = {};
       VERDENER.forEach((v, i) => {
-        if (!v.blandet && verdenAaben(i) && emneSlaaetTil(v.emne)) niveauer[v.emne] = data.emner[v.emne] ? data.emner[v.emne].niveau : 1;
+        if (!v.blandet && (opts.frit || verdenAaben(i)) && emneSlaaetTil(v.emne)) niveauer[v.emne] = data.emner[v.emne] ? data.emner[v.emne].niveau : 1;
       });
       opgaver = O.lavBlandetRunde(niveauer, rng, { ting: T.ting, udenLyt: udenLyt });
     } else {
@@ -730,21 +877,21 @@
       opgaver = O.lavRunde(emne, ed.niveau, rng, { ting: T.ting, gentag: (data.gentag[emne] || []).filter(opgaveKendt), udenLyt: udenLyt });
     }
     if (!opgaver || !opgaver.length) { visKort(); return; } // fx alle emner slået fra — aldrig en tom runde
-    data.sidsteVerden = verden.id;
+    if (!opts.frit) data.sidsteVerden = verden.id;
     gem();
     S.runde = {
-      verden: verden, emne: emne, opgaver: opgaver, i: 0, forsoeg: 0,
+      verden: verden, emne: emne, opgaver: opgaver, i: 0, forsoeg: 0, frit: !!opts.frit,
       sidstAktiv: Date.now(), aktivMs: 0, niveauOp: false, registreret: -1,
       maerke: O.maerkeForRunde(T.samling, data.runderIalt, minFigur().e), // dyret, vi hjælper — kendt fra start
     };
-    visRundeSkaerm();
+    visRundeSkaerm(false, opts.frit ? verden.navn + '.' : '');
   }
 
   // Missionen gemmes undervejs, så den kan fortsætte, også hvis siden lukkes eller genindlæses
   function huskMission() {
     const r = S.runde;
     if (!r || r.test) return;
-    data.pauset = { verden: r.verden.id, i: r.i, opgaver: r.opgaver, niveauOp: r.niveauOp, registreret: r.registreret, maerke: r.maerke.id };
+    data.pauset = { verden: r.verden.id, i: r.i, opgaver: r.opgaver, niveauOp: r.niveauOp, registreret: r.registreret, maerke: r.maerke.id, frit: r.frit === true };
   }
 
   // En gemt opgave (afbrudt mission, «kommer igen») kan stamme fra en anden udgave af spillet: brug den kun,
@@ -763,7 +910,7 @@
     const pulje = O.MAERKER[T.samling] || O.MAERKER.jungle;
     S.pausetRunde = {
       verden: verden, emne: verden.emne, opgaver: p.opgaver, i: p.i, forsoeg: 0,
-      sidstAktiv: Date.now(), aktivMs: 0, niveauOp: p.niveauOp, registreret: p.registreret,
+      sidstAktiv: Date.now(), aktivMs: 0, niveauOp: p.niveauOp, registreret: p.registreret, frit: p.frit === true,
       maerke: pulje.find((m) => m.id === p.maerke) || O.maerkeForRunde(T.samling, data.runderIalt, minFigur().e),
     };
   }
@@ -779,7 +926,14 @@
   const pronomen = (m) => (m.art === 'et' ? 'det' : 'den');
   const stort = (t) => t.charAt(0).toUpperCase() + t.slice(1);
 
-  function visRundeSkaerm(genoptag) {
+  // Tilbage fra en runde: til kortet (eventyret) eller til 🎒 (Vælg selv). Missionen huskes (▶ fortsætter den).
+  function forladRunde() {
+    const r = S.runde;
+    registrerAktivitet(); gemTid(); S.pausetRunde = r;
+    if (r && r.frit) visVaelgSelv(); else visKort(false);
+  }
+
+  function visRundeSkaerm(genoptag, forTale) {
     const r = S.runde;
     // Fodspor, der fyldes undervejs, og dyret for enden af sporet
     const prikker = h('div', { class: 'fremdrift', 'aria-hidden': 'true' },
@@ -799,15 +953,18 @@
       r.dom.svar);
     skift(h('div', { class: 'skaerm runde' },
       h('div', { class: 'topbar' },
-        ikonKnap('🗺️', 'Tilbage til kortet', () => { registrerAktivitet(); gemTid(); S.pausetRunde = S.runde; visKort(false); }),
+        r.frit ? ikonKnap('🎒', 'Tilbage til Vælg selv', forladRunde) : ikonKnap('🗺️', 'Tilbage til kortet', forladRunde),
         prikker,
-        hoejttaler()),
+        // 📖 læser verdenens lektion op igen (uden at forlade opgaven)
+        LEKTIONER[r.verden.id] && !r.test
+          ? h('div', { class: 'topbar-hoejre' }, ikonKnap('📖', 'Hør lektionen igen', () => Tale.sig(LEKTIONER[r.verden.id]), 'hoer-lektion'), hoejttaler())
+          : hoejttaler()),
       r.dom.krop),
     rundeTaster);
     // Fodspor, der allerede er fyldt (når en afbrudt mission fortsætter)
     [...prikker.querySelectorAll('.prik')].slice(0, r.i).forEach((pk) => pk.classList.add('fuld'));
     // Kort missionsbesked før første spørgsmål — lange sætninger mister man undervejs
-    visOpgave(genoptag ? 'Vi fortsætter.' : 'Hjælp ' + r.maerke.bestemt + '!');
+    visOpgave(genoptag ? 'Vi fortsætter.' : (forTale ? forTale + ' ' : '') + 'Hjælp ' + r.maerke.bestemt + '!');
   }
 
   function gemTid() {
@@ -1226,7 +1383,7 @@
     const r = S.runde;
     if (!r) return;
     const opg = r.opgaver[r.i];
-    if (e.key === 'Escape') { registrerAktivitet(); gemTid(); S.pausetRunde = r; visKort(false); return; }
+    if (e.key === 'Escape') { forladRunde(); return; }
     if (e.key === ' ' || e.key === 'r' || e.key === 'R') { e.preventDefault(); Tale.sig(S.gentagTale); return; }
     if (!opg || r.laast) return;
     if (r.visSvar) {
@@ -1824,6 +1981,7 @@
     const ed = data.emner[r.emne] = G.normaliserEmne(data.emner[r.emne]);
     ed.runder++;
     data.runderIalt++;
+    if (!r.frit) data.perler++; // lysperler kommer kun fra eventyret
     data.rundeTaeller++;
     const d = G.dag(data);
     d.runder++;
@@ -1833,18 +1991,20 @@
     data.maerker[maerke.id] = (data.maerker[maerke.id] || 0) + 1;
     if (!r.test) { S.pausetRunde = null; data.pauset = null; } // en testrunde rører ikke en rigtig afbrudt mission
     gem();
-    visFejring(maerke, r.niveauOp, r.verden);
+    visFejring(maerke, r.niveauOp, r.verden, r.frit);
   }
 
   // Fejring — én hændelse ad gangen: først lyd og stjerner, så tale, så dyret
-  function visFejring(maerke, niveauOp, verden) {
+  function visFejring(maerke, niveauOp, verden, frit) {
     const fig = minFigur();
     const r = S.runde;
     const sidsteTal = r.opgaver.map((o) => o.svar).filter((x) => typeof x === 'number' && x >= 3 && x <= 8).pop();
     const videre = (fn) => { Lyd.init(); Lyd.tryk(); if (data.rundeTaeller >= 3) visBevaegelse(fn, sidsteTal); else fn(); };
     const knapper = h('div', { class: 'fejring-knapper skjult' },
-      h('button', { class: 'stor-knap igen-knap', type: 'button', 'aria-label': 'Spil igen', onclick: () => videre(() => startRunde(verden)) }, '▶'),
-      h('button', { class: 'stor-knap kort-knap', type: 'button', 'aria-label': 'Til kortet', onclick: () => videre(() => visKort(false)) }, '🗺️'));
+      h('button', { class: 'stor-knap igen-knap', type: 'button', 'aria-label': 'Spil igen', onclick: () => videre(() => startRunde(verden, { frit: frit })) }, '▶'),
+      frit
+        ? h('button', { class: 'stor-knap kort-knap', type: 'button', 'aria-label': 'Til Vælg selv', onclick: () => videre(() => visVaelgSelv()) }, '🎒')
+        : h('button', { class: 'stor-knap kort-knap', type: 'button', 'aria-label': 'Til kortet', onclick: () => videre(() => visKort(false)) }, '🗺️'));
     let aabnet = false;
     let token = -1; // sættes efter skærmskiftet nedenfor
     const dyr = h('button', { class: 'fund-dyr skygge', type: 'button', 'aria-label': maerke.navn }, maerke.e);
@@ -1873,8 +2033,10 @@
       }, 600);
     };
     // En lysperle flyver fra dyret til tårnet, og tårnet lyser op (historiens røde tråd)
-    const perle = h('div', { class: 'fejring-perle', style: '--lys:' + lysStyrke(), 'aria-hidden': 'true' }, fyrtaarn(), h('span', { class: 'perle-tal' }, '✨ ' + data.runderIalt));
+    // Lysperlen (og tårnet) kun i eventyret — i «Vælg selv» er dyret belønningen
+    const perle = frit ? null : h('div', { class: 'fejring-perle', style: '--lys:' + lysStyrke(), 'aria-hidden': 'true' }, fyrtaarn(), h('span', { class: 'perle-tal' }, '✨ ' + data.perler));
     const flyvPerle = () => {
+      if (!perle) return;
       try {
         const a = dyr.getBoundingClientRect(), b = perle.firstChild.getBoundingClientRect();
         const p = h('span', { class: 'flyvende-perle', 'aria-hidden': 'true', style: 'left:' + (a.left + a.width / 2) + 'px;top:' + (a.top + a.height / 2) + 'px' }, '✨');
@@ -1902,7 +2064,7 @@
         e.preventDefault();
         if (!aabnet) aabn();
         else if (!knapper.classList.contains('skjult')) knapper.firstChild.click();
-      } else if (e.key === 'Escape') visKort(false);
+      } else if (e.key === 'Escape') { if (frit) visVaelgSelv(); else visKort(false); }
     });
     token = S.token;
     Lyd.fejring();
@@ -2027,6 +2189,86 @@
     Tale.sig(S.gentagTale);
   }
 
+  // ---------- 🎒 Vælg selv: alle emner frit (også dem, eventyret ikke er nået til) ----------
+  // Runder her tæller på samme emne-niveau og mestring som i eventyret — øvelse hjælper eventyret videre.
+  function visVaelgSelv(hilsen) {
+    S.runde = null;
+    const felt = (v) => {
+      const antalStj = stjerner(v.emne);
+      const knap = h('button', {
+        class: 'vaelg-emne', type: 'button', 'aria-label': v.navn, 'data-verden': v.id,
+        onclick: () => { Lyd.init(); Lyd.tryk(); startRunde(v, { frit: true }); },
+      },
+      v.svg ? fyrtaarn('station-ikon') : h('span', { class: 'station-ikon', 'aria-hidden': 'true' }, v.e),
+      h('span', { class: 'vaelg-navn' }, v.navn),
+      h('span', { class: 'station-stjerner', 'aria-label': antalStj + (antalStj === 1 ? ' stjerne' : ' stjerner') },
+        [0, 1, 2].map((k) => h('i', { class: k < antalStj ? 'fuld' : '' }, '★'))));
+      // 📖 ved verdenens navn: hør lektionen igen
+      const lektion = LEKTIONER[v.id] && data.lektioner[v.id] ? ikonKnap('📖', 'Lektion: ' + v.navn, () => visLektion(v, () => startRunde(v, { frit: true, lektionSet: true }), () => visVaelgSelv()), 'vaelg-lektion') : null;
+      return h('div', { class: 'vaelg-felt' }, knap, lektion);
+    };
+    const grupper = VAELG_GRUPPER.map((g) => {
+      const verdener = g.verdener.map((id) => VERDENER.find((v) => v.id === id)).filter((v) => v && (v.blandet || (O.EMNER[v.emne] && emneSlaaetTil(v.emne))));
+      if (!verdener.length) return null;
+      return h('section', { class: 'vaelg-gruppe' },
+        h('h2', { class: 'vaelg-gruppe-titel' }, h('span', { 'aria-hidden': 'true' }, g.e), g.navn),
+        h('div', { class: 'vaelg-gitter' }, verdener.map(felt)));
+    });
+    S.gentagTale = 'Vælg selv. Tryk på det, du vil lege med.';
+    const knapper = () => [...document.querySelectorAll('.vaelg-emne')];
+    skift(h('div', { class: 'skaerm vaelg-selv' },
+      h('div', { class: 'topbar' },
+        ikonKnap('🗺️', 'Tilbage til eventyret', () => visKort(false)),
+        h('div', { class: 'topbar-titel' }, '🎒 Vælg selv'),
+        hoejttaler()),
+      h('div', { class: 'vaelg-selv-liste' }, grupper)),
+    (e) => {
+      if (e.key === 'Escape') visKort(false);
+      const n = Number(e.key);
+      if (n >= 1 && n <= knapper().length) knapper()[n - 1].click();
+    });
+    if (hilsen) Tale.sig(hilsen);
+  }
+
+  // ---------- Lektion: kort forklaring (læses op) og en lille tegning, før verdenens første runde ----------
+  function lektionTegning(id) {
+    switch (id) {
+      case 'taelle': return [klodser(5, 0), streger(7)];
+      case 'former': return ['trekant', 'kvadrat', 'cirkel'].map((f, i) => formSvg(f, i, 0, f !== 'cirkel'));
+      case 'plus10': return haender(3, 2, 5);
+      case 'venner': return kugleramme(7, 10, false);
+      case 'minus': {
+        const kl = klodser(6, 0);
+        [...kl.querySelectorAll('.klods')].slice(4).forEach((k) => k.classList.add('vaek'));
+        return kl;
+      }
+      case 'tiere': return staenger(2, 3);
+      case 'tierbro': return klodser(8, 5);
+      case 'moenstre': return h('div', { class: 'moenster' }, ['🔴', '🔵', '🔴', '🔵'].map((b) => h('span', { class: 'brik-celle' }, b)), h('span', { class: 'brik-celle hul' }, '?'));
+      case 'torvet': return [urSvg('3:00'), moentSvg(5)];
+      default: return fyrtaarn();
+    }
+  }
+
+  function visLektion(verden, start, tilbage) {
+    data.lektioner[verden.id] = true; // vist én gang — kan altid høres igen med 📖
+    gem();
+    const tekst = LEKTIONER[verden.id] || verden.tale;
+    const knap = h('button', { class: 'stor-knap spil-knap lektion-knap puls', type: 'button', 'aria-label': 'Start', onclick: () => { Lyd.init(); Lyd.tryk(); start(); } }, '▶');
+    S.gentagTale = tekst;
+    skift(h('div', { class: 'skaerm lektion' },
+      h('div', { class: 'topbar' },
+        ikonKnap('⬅️', 'Tilbage', () => tilbage()),
+        h('div', { class: 'topbar-titel' }, verden.svg ? '🗼' : verden.e, ' ' + verden.navn),
+        hoejttaler()),
+      h('div', { class: 'lektion-midte' },
+        h('div', { class: 'lektion-tegning', 'aria-hidden': 'true' }, lektionTegning(verden.id)),
+        h('p', { class: 'lektion-tekst' }, tekst),
+        knap)),
+    (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); knap.click(); } else if (e.key === 'Escape') tilbage(); });
+    Tale.sig(verden.navn + '. ' + tekst);
+  }
+
   // ---------- Samlebog ----------
   function visSamlebog() {
     const pulje = O.MAERKER[T.samling] || O.MAERKER.jungle;
@@ -2102,6 +2344,7 @@
     });
 
     Tale.init();
+    Lyd.indlaesKlip(); // indtalte klip (IndexedDB) og lyd/liste.json — spillet virker også uden
 
     if (T.side === 'barn') {
       const res = G.indlaesBarn(lager, T.noegle, T.navn);
@@ -2112,7 +2355,7 @@
       hentMission();
       visStart();
     } else if (T.side === 'voksen' && window.Voksen) {
-      window.Voksen.start({ h, G, O, lager, voksen, Lyd, Tale, skift, hop, vent, FIGURER, VERDENER, fyrtaarn, tegnVisning, valgIndhold, gemVoksen, lagerAdvarsel });
+      window.Voksen.start({ h, G, O, lager, voksen, Lyd, Tale, KlipLager, skift, hop, vent, FIGURER, VERDENER, fyrtaarn, tegnVisning, valgIndhold, gemVoksen, lagerAdvarsel });
     } else {
       visIndex();
     }
@@ -2125,7 +2368,8 @@
 
   // Til test og voksendelen. _testRunde viser bestemte opgaver (bruges kun af test/test-e2e.js).
   window.Spil = {
-    FIGURER, VERDENER, S, get data() { return data; },
+    FIGURER, VERDENER, S, get data() { return data; }, _lyd: Lyd,
+    _visLektion(verdenId) { const v = VERDENER.find((x) => x.id === verdenId); visLektion(v, () => visKort(false), () => visKort(false)); },
     _testRunde(verdenId, opgaver) {
       const verden = VERDENER.find((v) => v.id === verdenId) || VERDENER.find((v) => v.emne === verdenId); // verdens-id eller emne
       S.runde = { verden: verden, emne: verden.emne, opgaver: opgaver, i: 0, forsoeg: 0, sidstAktiv: Date.now(), aktivMs: 0, niveauOp: false, registreret: -1, test: true, maerke: O.maerkeForRunde(T.samling, data.runderIalt, minFigur().e) };

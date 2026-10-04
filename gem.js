@@ -54,10 +54,12 @@
       fejl: {},             // emneId → { noegle: antal } — «hvad driller» til voksenoverblikket
       maerker: {},          // mærkeId → antal
       runderIalt: 0,
+      perler: 0,            // lysperler = runder i eventyret («Vælg selv» giver dyr, men ingen perler)
       rundeTaeller: 0,      // runder siden sidste bevægelsespause
       sidsteVerden: null,
       dage: {},             // 'ÅÅÅÅ-MM-DD' → { sek, runder, opgaver, rigtige }
       pauset: null,         // afbrudt mission { verden, i, opgaver, niveauOp, registreret } — fortsætter næste gang
+      lektioner: {},        // verdensId → true, når verdenens lektion er vist (B2)
     };
   }
 
@@ -122,6 +124,10 @@
     ud.sidsteVerden = typeof d.sidsteVerden === 'string' ? d.sidsteVerden : null;
     ud.runderIalt = ikkeNeg(d.runderIalt, 0);
     ud.rundeTaeller = ikkeNeg(d.rundeTaeller, 0);
+    // Lysperler (B2): data fra før havde ingen «Vælg selv» — alle runder var eventyr-runder
+    ud.perler = Math.min(ikkeNeg(d.perler, ud.runderIalt), ud.runderIalt);
+    ud.lektioner = {};
+    if (erObjekt(d.lektioner)) for (const k in d.lektioner) if (d.lektioner[k] === true) ud.lektioner[k] = true;
 
     ud.emner = {};
     if (erObjekt(d.emner)) for (const k in d.emner) ud.emner[k] = normaliserEmne(d.emner[k]);
@@ -169,6 +175,7 @@
       verden: p.verden, i: p.i, opgaver: p.opgaver, niveauOp: p.niveauOp === true,
       registreret: Number.isInteger(p.registreret) ? p.registreret : -1,
       maerke: typeof p.maerke === 'string' ? p.maerke : null,
+      frit: p.frit === true, // startet fra «Vælg selv»
     };
   }
 
@@ -464,6 +471,7 @@
       aabneAlle: { dino: false, enhjorning: false }, // voksen har åbnet alle verdener
       duel: { spil: [] },              // familieduellens resultater
       traening: standardTraening(),    // den voksnes egen træning (gymnasiematematik)
+      stemme: null,                    // navnet på den danske stemme, den voksne har valgt (B3); null = automatisk
     };
   }
 
@@ -480,6 +488,7 @@
     const ud = Object.assign({}, s, d);
     ud.version = Number.isInteger(d.version) ? d.version : VOKSEN_VERSION;
     ud.lyd = d.lyd !== false;
+    ud.stemme = typeof d.stemme === 'string' && d.stemme ? d.stemme.slice(0, 200) : null;
     ud.tale = d.tale !== false;
     ud.tidsgraense = Object.assign({}, s.tidsgraense, erObjekt(d.tidsgraense) ? d.tidsgraense : {});
     for (const k in ud.tidsgraense) ud.tidsgraense[k] = ikkeNeg(ud.tidsgraense[k], 0);

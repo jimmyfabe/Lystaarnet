@@ -1192,7 +1192,7 @@
     tiere: 'Saml ting i bunker af 10 (tiere) og resten løse (enere). Tæl tikroner og enkroner i sparegrisen.',
     tierbro: 'Dobbelt: 6 og 6, 7 og 7. Brug en æggebakke med 10 huller: fyld op til 10 først, så resten.',
     moenstre: 'Lav mønstre med klodser eller perler: rød-blå-rød-blå. Tæl i 2\'ere på trappen.',
-    maaling: 'Kig på uret sammen ved hele og halve timer: «Nu er klokken halv fem — den store viser peger på 6.» Lad hende betale med mønter i bageren og tælle byttepengene.',
+    maaling: 'Kig på uret sammen ved hele og halve timer: «Nu er klokken halv fem — den store viser peger på 6.» Lad barnet betale med mønter i bageren og tælle byttepengene.',
   };
 
   const Opgaver = {

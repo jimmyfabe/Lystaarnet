@@ -1,8 +1,8 @@
 /* sw.js — service worker, så spillet virker uden net.
    Ved hver ny udgave: tæl VERSION op. Filerne hentes med cache: 'reload',
    så GitHub Pages' HTTP-cache ikke giver en blanding af gamle og nye filer. */
-const VERSION = 'mat-2026-10-04-v38';
-// FILER-HASH: a8cb272fdd42ce97 mat-2026-10-04-v38 — opdateres med: node test/test-sw.js --opdater
+const VERSION = 'mat-2026-10-04-v45';
+// FILER-HASH: 76ca272d02129a02 mat-2026-10-04-v45 — opdateres med: node test/test-sw.js --opdater
 const FILER = [
   './',
   'index.html',
@@ -18,6 +18,9 @@ const FILER = [
   'gem.js',
   'voksen.js',
   'voksen-opgaver.js',
+  'lydklip.js',
+  'dansk-opgaver.js',
+  'lyd/liste.json', // listen over indtalte klip i lyd/ (læg også hver .wav-fil på FILER-listen)
   'manifest.json',
   'manifest-dino.json',
   'manifest-enhjorning.json',

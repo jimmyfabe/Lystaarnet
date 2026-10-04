@@ -147,7 +147,8 @@
           kort('⏱️', 'Prøve', '8 opgaver fra én verden', () => visVerdensvalg('proeve')),
           kort('🤝', 'Familieduel', 'Barn og voksen · fælles mål', visDuelValg),
           ...BOERN.map((b) => kort(b.e, b.navn, 'Overblik', () => visOverblik(b))),
-          kort('⚙️', 'Indstillinger', 'Lyd, emner, tidsgrænse, kopi', visIndstillinger))));
+          kort('🎙️', 'Indtal', 'Bogstavlyde til dansk', visIndtal),
+          kort('⚙️', 'Indstillinger', 'Lyd, stemme, emner, tidsgrænse, kopi', visIndstillinger))));
     }
 
     // =================================================================
@@ -532,6 +533,7 @@
           h('section', null, h('h2', null, 'Lyd'),
             skifter('Lydeffekter', voksen.lyd, (v) => { voksen.lyd = v; }),
             skifter('Oplæsning', voksen.tale, (v) => { voksen.tale = v; })),
+          stemmeSektion(),
           h('section', null, h('h2', null, 'Din træning'),
             skifter('Huskekort før dagens dosis', voksen.traening.huskekort !== false, (v) => { voksen.traening.huskekort = v; }),
             skifter('Ur i prøven', voksen.traening.proeveUr !== false, (v) => { voksen.traening.proeveUr = v; }),
@@ -547,6 +549,44 @@
               h('button', { class: 'voksen-valg-knap', type: 'button', onclick: gemKopi }, '💾 Gem en kopi'),
               h('button', { class: 'voksen-valg-knap', type: 'button', onclick: indlaesKopi }, '📂 Indlæs en kopi'),
               kanFortryde ? h('button', { class: 'voksen-valg-knap', type: 'button', onclick: fortrydIndlaesning }, '↩️ Fortryd seneste indlæsning') : null)))));
+    }
+
+    // Stemme: de danske stemmer på enheden med «Prøv». Valget gemmes som stemmens navn (findes den ikke længere,
+    // vælges der automatisk: «Premium/Enhanced/Forbedret» → ikke «compact» → lokal → første danske).
+    function stemmeSektion() {
+      const LK = window.Lydklip;
+      const alle = Tale.findes ? (window.speechSynthesis.getVoices() || []) : [];
+      const da = LK ? LK.danskeStemmer(alle) : [];
+      const auto = LK ? LK.vaelgStemme(alle, null) : null;
+      // iPad henter stemmerne lidt efter sidens start: vis listen igen, når de kommer
+      if (!da.length && Tale.findes && window.speechSynthesis.addEventListener) {
+        window.speechSynthesis.addEventListener('voiceschanged', () => { if (document.querySelector('.indstillinger') && LK && LK.danskeStemmer(window.speechSynthesis.getVoices()).length) visIndstillinger(); }, { once: true });
+      }
+      const proev = (v) => {
+        Lyd.init();
+        try {
+          window.speechSynthesis.cancel();
+          const u = new SpeechSynthesisUtterance('Hej! Jeg hedder ' + (v ? v.name.replace(/\s*\(.*\)\s*/g, '') : 'Lystårnet') + '. Tre og to er fem.');
+          u.lang = 'da-DK'; if (v) u.voice = v; u.rate = 0.92;
+          window.speechSynthesis.speak(u);
+        } catch (e) { /* ingen tale */ }
+      };
+      const vaelg = (navn) => {
+        voksen.stemme = navn;
+        gemV();
+        if (Tale.opdaterStemmer) Tale.opdaterStemmer();
+        visIndstillinger();
+      };
+      const raekke = (navn, label, v) => h('div', { class: 'stemme-raekke' },
+        h('button', { class: 'voksen-valg-knap stemme-valg' + ((voksen.stemme || null) === navn ? ' valgt' : ''), type: 'button', 'aria-pressed': (voksen.stemme || null) === navn ? 'true' : 'false', onclick: () => { Lyd.init(); Lyd.tryk(); vaelg(navn); } }, label),
+        h('button', { class: 'voksen-valg-knap stemme-proev', type: 'button', onclick: () => proev(v) }, '🔊 Prøv'));
+      return h('section', null, h('h2', null, 'Stemme'),
+        da.length
+          ? h('div', { class: 'stemme-liste' },
+            raekke(null, 'Automatisk' + (auto ? ' (' + auto.name + ')' : ''), auto),
+            da.map((v) => raekke(v.name, v.name + (v.localService ? '' : ' (kræver net)'), v)))
+          : h('p', null, 'Der er ingen danske stemmer på denne enhed endnu. På iPad: Indstillinger → Tilgængelighed → Talt indhold → Stemmer → Dansk. Hent en stemme, hvor der står «Forbedret» eller «Premium».'),
+        h('p', { class: 'voksen-hjaelp' }, 'Bogstavlyde siges aldrig af stemmen — de kommer fra 🎙️ Indtal (ellers siger spillet «lyden i sol»).'));
     }
 
     function gemKopi() {
@@ -753,6 +793,115 @@
 
       nyBarneopgave();
       nyVoksenopgave();
+    }
+
+    // =================================================================
+    //  🎙️ Indtal — bogstavlyde og ord optages her på enheden (bag voksenlåsen). Intet sendes nogen steder hen.
+    // =================================================================
+    function visIndtal() {
+      const DA = window.Dansk, LK = window.Lydklip, KL = ctx.KlipLager;
+      const liste = (DA && DA.LYDLISTE) || [];
+      let optagelse = null; // { id, recorder, stream, chunks }
+      const status = h('p', { class: 'voksen-hjaelp indtal-status' }, '');
+      const kanOptage = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
+      const raekker = {};
+      const taelIndtalt = () => {
+        const n = liste.filter((l) => ctx.Lyd.harLokaltKlip(l.id)).length;
+        taeller.textContent = n + ' af ' + liste.length + ' indtalt';
+      };
+      const taeller = h('b', { class: 'indtal-taeller' }, '');
+      const opdaterRaekke = (l) => {
+        const r = raekker[l.id];
+        const har = ctx.Lyd.harLokaltKlip(l.id);
+        r.classList.toggle('har', har);
+        r.querySelector('.indtal-lyt').disabled = !har;
+        r.querySelector('.indtal-flueben').textContent = har ? '✓' : '';
+      };
+      async function stop() {
+        const o = optagelse;
+        if (!o) return;
+        optagelse = null;
+        o.knap.classList.remove('optager');
+        o.knap.textContent = '🔴';
+        const faerdig = new Promise((res) => { o.recorder.onstop = res; });
+        try { o.recorder.stop(); } catch (e) { /* allerede stoppet */ }
+        await faerdig;
+        o.stream.getTracks().forEach((t) => t.stop());
+        try {
+          const blob = new Blob(o.chunks, { type: o.recorder.mimeType || 'audio/webm' });
+          const buf = await blob.arrayBuffer();
+          Lyd.init();
+          const ac = Lyd.ctx || new (window.AudioContext || window.webkitAudioContext)();
+          const lyd = await new Promise((res, rej) => { const p = ac.decodeAudioData(buf.slice(0), res, rej); if (p && p.then) p.then(res, rej); });
+          const kanaler = [];
+          for (let k = 0; k < lyd.numberOfChannels; k++) kanaler.push(lyd.getChannelData(k));
+          const r = LK.behandl(kanaler, lyd.sampleRate);
+          if (!r) { status.textContent = 'Der var kun stilhed — prøv igen tættere på mikrofonen.'; return; }
+          await KL.gem('klip', o.id, r.wav);
+          ctx.Lyd.saetLokaltKlip(o.id, r.wav);
+          status.textContent = 'Gemt: ' + o.id + ' (' + r.sek.toFixed(1).replace('.', ',') + ' s). Tryk ▶ for at lytte.';
+          opdaterRaekke(liste.find((l) => l.id === o.id));
+          taelIndtalt();
+        } catch (e) {
+          status.textContent = 'Optagelsen kunne ikke gemmes (' + (e && e.message ? e.message : 'ukendt fejl') + ').';
+        }
+      }
+      async function optag(l, knap) {
+        if (optagelse) { const forrige = optagelse.id; await stop(); if (forrige === l.id) return; }
+        if (!kanOptage) { status.textContent = 'Denne browser kan ikke optage lyd.'; return; }
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          const recorder = new MediaRecorder(stream);
+          const chunks = [];
+          recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+          recorder.start();
+          optagelse = { id: l.id, recorder, stream, chunks, knap };
+          knap.classList.add('optager');
+          knap.textContent = '⏹';
+          status.textContent = 'Optager «' + l.id + '» — sig lyden, og tryk ⏹.';
+        } catch (e) {
+          status.textContent = 'Mikrofonen kunne ikke bruges. Giv spillet lov til mikrofonen i browserens indstillinger.';
+        }
+      }
+      const rk = liste.map((l) => {
+        const optagKnap = h('button', { class: 'ikon-knap indtal-optag', type: 'button', 'aria-label': 'Optag ' + l.id, onclick: (e) => { Lyd.init(); optag(l, e.currentTarget); } }, '🔴');
+        const lytKnap = h('button', { class: 'ikon-knap indtal-lyt', type: 'button', 'aria-label': 'Lyt til ' + l.id, onclick: () => { Lyd.init(); ctx.Lyd.klip(l.id, ''); } }, '▶');
+        const r = h('div', { class: 'indtal-raekke' },
+          h('span', { class: 'indtal-bogstav' }, l.bogstav),
+          h('div', { class: 'indtal-tekst' }, h('b', null, l.id + (l.eksempel ? ' · ' + l.eksempel : '')), h('span', null, l.instruktion)),
+          h('span', { class: 'indtal-flueben', 'aria-hidden': 'true' }, ''),
+          optagKnap, lytKnap);
+        raekker[l.id] = r;
+        return r;
+      });
+      skift(h('div', { class: 'skaerm voksen indtal' },
+        topbar('🎙️ Indtal', () => { stop(); visMenu(); }),
+        h('div', { class: 'overblik-indhold' },
+          h('section', null,
+            h('p', null, 'Sid et stille sted 10–15 cm fra mikrofonen. Tryk 🔴, sig lyden, og tryk ⏹. Holdelyde (m, s, l …) i ca. 1 sekund; stoplyde (p, t, k …) helt korte uden «ø» bagefter. Tryk ▶ for at lytte, og optag igen, hvis det ikke lød rigtigt.'),
+            h('p', null, 'Klippene gemmes kun på denne enhed og virker med det samme her. «Eksportér» laver én fil, som kan lægges i spillet, så alle enheder får dem.'),
+            h('div', { class: 'voksen-knaprad' }, taeller,
+              h('button', { class: 'voksen-valg-knap', type: 'button', onclick: eksporter }, '💾 Eksportér')),
+            status),
+          h('section', { class: 'indtal-liste' }, rk))));
+      liste.forEach(opdaterRaekke);
+      taelIndtalt();
+      if (!kanOptage) status.textContent = 'Denne browser kan ikke optage lyd (mangler MediaRecorder).';
+
+      async function eksporter() {
+        const klip = {};
+        for (const l of liste) if (ctx.Lyd.harLokaltKlip(l.id)) klip[l.id] = ctx.Lyd.lokaltKlip(l.id);
+        if (!Object.keys(klip).length) { status.textContent = 'Der er ingen indtalte klip endnu.'; return; }
+        const tekst = JSON.stringify(LK.lavEksport(klip));
+        try {
+          const blob = new Blob([tekst], { type: 'application/json' });
+          const a = h('a', { href: URL.createObjectURL(blob), download: 'lystaarn-lyde-' + G.idag() + '.json' });
+          document.body.append(a); a.click(); a.remove();
+          status.textContent = 'Filen er gemt (' + Object.keys(klip).length + ' klip).';
+        } catch (e) {
+          status.textContent = 'Filen kunne ikke gemmes.';
+        }
+      }
     }
 
     // Start: låst op i denne fane? Så direkte til menuen.
