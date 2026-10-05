@@ -15,6 +15,8 @@
 
   function start(ctx) {
     const { h, G, O, lager, voksen, Lyd, Tale, skift, hop, FIGURER, VERDENER, tegnVisning, valgIndhold } = ctx;
+    const D = ctx.D;
+    const DANSK_VERDENER = (ctx.DANSK_VERDENER || []).filter((v) => v.emne && D && D.EMNER[v.emne]); // dansk med opgaver
     const VO = window.VoksenOpgaver;
     // Gem gennem app.js: den ved, om voksendata er skrivebeskyttede (ulæselige og uden kopi)
     let gemFejlVist = false;
@@ -450,13 +452,24 @@
         h('i', { style: 'height:' + Math.round((x.min / maks) * 100) + '%' }),
         h('small', null, x.navn))));
       // Verdener
-      const verdener = VERDENER.filter((v) => !v.blandet).map((v) => {
-        const e = d.emner[v.emne];
+      const raekke = (v, e, emneNavn) => {
         const pct = e && e.ialt ? Math.round((e.rigtige / e.ialt) * 100) : null;
         const status = !e ? 'Ikke prøvet endnu' : e.mestret ? 'Mestret ✓' : 'Trin ' + e.niveau + ' af 3';
-        return h('tr', null, h('td', null, v.e + ' ' + v.navn), h('td', null, O.EMNER[v.emne].navn), h('td', null, status),
+        return h('tr', null, h('td', null, v.e + ' ' + v.navn), h('td', null, emneNavn), h('td', null, status),
           h('td', null, e ? e.runder + (e.runder === 1 ? ' runde' : ' runder') : ''), h('td', null, pct === null ? '' : pct + ' % rigtige i første forsøg'));
-      });
+      };
+      const verdener = VERDENER.filter((v) => !v.blandet).map((v) => raekke(v, d.emner[v.emne], O.EMNER[v.emne].navn));
+      // Dansk (B4): samme slags overblik
+      const danskRaekker = DANSK_VERDENER.map((v) => raekke(v, d.dansk[v.emne], D.EMNER[v.emne].navn));
+      // Historiebogen (B5): hvor mange historier er læst, tegnet og skrevet
+      if (D && D.HISTORIER) {
+        const hs = Object.keys(d.historier || {}).map((k) => d.historier[k]);
+        const faerdige = hs.filter((x) => x.faerdig).length, laest = hs.reduce((a, x) => a + x.bobler, 0), voksenHoert = hs.filter((x) => x.voksen).length;
+        danskRaekker.push(h('tr', null, h('td', null, '📖 Historiebogen'), h('td', null, 'Læs, tegn og skriv'),
+          h('td', null, faerdige + ' af ' + D.HISTORIER.length + ' færdige'), h('td', null, laest + (laest === 1 ? ' gang læst' : ' gange læst')),
+          h('td', null, voksenHoert ? 'En voksen har hørt ' + voksenHoert + (voksenHoert === 1 ? ' historie' : ' historier') : '')));
+      }
+      const beskriv = (n) => (D && D.beskrivNoegle(n)) || O.beskrivNoegle(n);
       // Det driller (flest fejl, seneste først)
       const driller = [];
       for (const emne in d.fejl) for (const n in d.fejl[emne]) driller.push({ emne, n, antal: d.fejl[emne][n] });
@@ -467,9 +480,10 @@
         topbar(b.e + ' ' + b.navn, visMenu),
         h('div', { class: 'overblik-indhold' },
           h('section', null, h('h2', null, 'Tid'), h('p', null, 'I dag: ' + idag.min + ' min' + (voksen.tidsgraense[b.id] ? ' (grænse ' + voksen.tidsgraense[b.id] + ' min)' : '') + ' · runder i alt: ' + d.runderIalt + ' · dyr i samlebogen: ' + antalDyr), soejler),
-          h('section', null, h('h2', null, 'Verdener'), h('table', { class: 'overblik-tabel' }, verdener)),
+          h('section', null, h('h2', null, 'Matematik'), h('table', { class: 'overblik-tabel' }, verdener)),
+          danskRaekker.length ? h('section', null, h('h2', null, 'Dansk'), h('table', { class: 'overblik-tabel' }, danskRaekker)) : null,
           h('section', null, h('h2', null, 'Det driller lige nu'),
-            driller.length ? h('ul', null, driller.slice(0, 5).map((x) => h('li', null, O.beskrivNoegle(x.n) + ' — ' + x.antal + (x.antal === 1 ? ' gang' : ' gange'))))
+            driller.length ? h('ul', null, driller.slice(0, 5).map((x) => h('li', null, beskriv(x.n) + ' — ' + x.antal + (x.antal === 1 ? ' gang' : ' gange'))))
               : h('p', null, 'Ingen opgaver, der driller endnu.')),
           h('section', null, h('h2', null, 'Idé til hjemmet'), h('p', null, O.HJEMME_IDEER[sidste])),
           h('p', { class: 'voksen-hjaelp' }, 'Overblikket viser kun ' + b.navn + '. Børnene sammenlignes ikke.'))));
@@ -493,15 +507,16 @@
       const barnBlok = (b) => h('section', null, h('h2', null, b.navn),
         tidsvalg(b),
         skifter('Åbn alle verdener', voksen.aabneAlle[b.id], (v) => { voksen.aabneAlle[b.id] = v; }),
-        h('div', { class: 'emne-liste' }, VERDENER.filter((v) => !v.blandet).map((v) =>
-          skifter(v.e + ' ' + v.navn, voksen.emner[b.id][v.emne] !== false, (til) => {
-            if (til) { delete voksen.emner[b.id][v.emne]; return true; }
-            // Mindst ét emne skal være slået til, ellers er der intet at spille
-            const tilbage = VERDENER.filter((x) => !x.blandet && x.emne !== v.emne && voksen.emner[b.id][x.emne] !== false);
-            if (!tilbage.length) { alert('Mindst én verden skal være slået til.'); return false; }
-            voksen.emner[b.id][v.emne] = false;
-            return true;
-          }))));
+        ...[['Matematik', VERDENER.filter((v) => !v.blandet)], ['Dansk', DANSK_VERDENER]].filter((x) => x[1].length).map(([titel, liste]) =>
+          h('div', { class: 'emne-liste' }, h('h3', null, titel), liste.map((v) =>
+            skifter(v.e + ' ' + v.navn, voksen.emner[b.id][v.emne] !== false, (til) => {
+              if (til) { delete voksen.emner[b.id][v.emne]; return true; }
+              // Mindst ét emne pr. fag skal være slået til, ellers er der intet at spille
+              const tilbage = liste.filter((x) => x.emne !== v.emne && voksen.emner[b.id][x.emne] !== false);
+              if (!tilbage.length) { alert('Mindst én verden skal være slået til.'); return false; }
+              voksen.emner[b.id][v.emne] = false;
+              return true;
+            })))));
       const backups = G.findBackups(lager).filter((k) => k.indexOf('_backup_') > 0);
       // Ulæselige data uden plads til en reservekopi: spillet gemmer ikke, før de er taget med i en kopi og ryddet
       const ulaeselige = G.findUlaeselige(lager);
@@ -605,6 +620,7 @@
     function kendteNoegler() {
       const emner = { taarn: 1 };
       for (const k of Object.keys(O.EMNER)) emner[k] = O.EMNER[k].maxNiveau;
+      if (D) for (const k of Object.keys(D.EMNER)) emner[k] = D.EMNER[k].maxNiveau;
       const maerker = [];
       for (const k of Object.keys(O.MAERKER)) O.MAERKER[k].forEach((m) => maerker.push(m.id));
       const voksenEmner = {};

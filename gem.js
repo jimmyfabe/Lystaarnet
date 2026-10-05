@@ -60,7 +60,26 @@
       dage: {},             // 'ÅÅÅÅ-MM-DD' → { sek, runder, opgaver, rigtige }
       pauset: null,         // afbrudt mission { verden, i, opgaver, niveauOp, registreret } — fortsætter næste gang
       lektioner: {},        // verdensId → true, når verdenens lektion er vist (B2)
+      dansk: {},            // dansk-emneId → standardEmne() — samme form som emner (B4)
+      fag: null,            // 'matematik' | 'dansk' — det sidste valg (null: barnet har ikke valgt endnu)
+      historier: {},        // historienr → standardHistorie() — Historiebogen (B5)
     };
+  }
+
+  // Én historie i Historiebogen: læst (bobler 0–4 + en voksen har hørt), tegnet, skrevet, færdig (= belønnet)
+  function standardHistorie() {
+    return { bobler: 0, voksen: false, tegnet: false, skrevet: false, faerdig: false };
+  }
+
+  function normaliserHistorie(x) {
+    if (!erObjekt(x)) return standardHistorie();
+    const ud = Object.assign({}, x);
+    ud.bobler = Math.min(4, ikkeNeg(x.bobler, 0));
+    ud.voksen = x.voksen === true;
+    ud.tegnet = x.tegnet === true;
+    ud.skrevet = x.skrevet === true;
+    ud.faerdig = x.faerdig === true;
+    return ud;
   }
 
   function standardEmne() {
@@ -131,6 +150,11 @@
 
     ud.emner = {};
     if (erObjekt(d.emner)) for (const k in d.emner) ud.emner[k] = normaliserEmne(d.emner[k]);
+    ud.dansk = {};
+    if (erObjekt(d.dansk)) for (const k in d.dansk) ud.dansk[k] = normaliserEmne(d.dansk[k]);
+    ud.fag = d.fag === 'dansk' || d.fag === 'matematik' ? d.fag : null;
+    ud.historier = {};
+    if (erObjekt(d.historier)) for (const k in d.historier) if (/^[1-9]\d{0,2}$/.test(k)) ud.historier[k] = normaliserHistorie(d.historier[k]);
 
     ud.gentag = {};
     if (erObjekt(d.gentag)) {
@@ -378,7 +402,7 @@
       }
     };
     if (voksen) { if (kendte.voksenEmner) klem(d.traening.emner, kendte.voksenEmner); }
-    else if (kendte.emner) klem(d.emner, kendte.emner);
+    else if (kendte.emner) { klem(d.emner, kendte.emner); klem(d.dansk || {}, kendte.emner); }
     return d;
   }
 
@@ -600,7 +624,7 @@
 
   const Gem = {
     VERSION, VOKSEN_VERSION, MAX_DAGE, MAX_GENTAG, MIGRERINGER,
-    idag, standardBarn, standardEmne, standardDag, standardVoksen, standardTraening,
+    idag, standardBarn, standardEmne, standardDag, standardHistorie, normaliserHistorie, standardVoksen, standardTraening,
     GAMLE_NOEGLER, HOVEDNOEGLER, migrerNoegler, nyNoegle,
     migrer, normaliserBarn, normaliserEmne, normaliserVoksen, normaliserPauset, voksenGentag, rens,
     indlaesBarn, gemBarn, indlaesVoksen, gemVoksen, findBackups, findUlaeselige, importer, lavKopi, rydGamleKopier, fortrydImport, importKopier,

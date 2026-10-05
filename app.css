@@ -1336,6 +1336,8 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
 .vaelg-lektion { position: absolute; right: -6px; top: -6px; width: var(--tryk); height: var(--tryk); font-size: 24px; z-index: 2; }
 /* I runden er der ikke plads til 📖 på en smal telefon — lektionen kan høres igen fra 🎒 */
 @media (max-width: 440px) { .runde .hoer-lektion { display: none; } }
+/* Smal telefon på højkant: 🏠 🔤 ✨ 📖 🔊 skal kunne stå i kortets topbar — navnet giver plads (vennen og ✨ ses stadig) */
+@media (max-width: 440px) { .kort .topbar { gap: 6px; padding-left: 10px; padding-right: 10px; } .kort .topbar-hoejre { gap: 6px; } .kort .kort-navn { display: none; } }
 
 /* Lektion: kort forklaring med en lille tegning, før verdenens første runde */
 .lektion-midte {
@@ -1412,4 +1414,182 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
 @media (max-width: 600px) {
   .indtal-raekke { flex-wrap: wrap; }
   .indtal-tekst { flex-basis: calc(100% - 80px); }
+}
+
+/* ---------- B4: den danske del ---------- */
+/* Valget mellem matematik og dansk: to store kort */
+.fagvalg-liste { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6vmin; padding: 16px; flex-wrap: wrap; }
+.fag-kort {
+  width: clamp(180px, 34vmin, 320px);
+  aspect-ratio: 1;
+  border: 6px solid var(--hvid);
+  border-radius: 40px;
+  background: radial-gradient(circle at 35% 30%, var(--farve-1-lys), var(--farve-1) 75%);
+  box-shadow: 0 9px 0 var(--farve-1-moerk), 0 16px 30px var(--skygge);
+  color: var(--hvid);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2vmin;
+}
+.fag-kort.dansk { background: radial-gradient(circle at 35% 30%, var(--farve-2-lys), var(--farve-2) 75%); box-shadow: 0 9px 0 var(--farve-2-moerk), 0 16px 30px var(--skygge); }
+.fag-kort.sidst { outline: 6px solid var(--guld); outline-offset: 4px; }
+.fag-kort:active { transform: translateY(6px) scale(0.98); }
+.fag-ikon { font-size: clamp(80px, 16vmin, 150px); line-height: 1; }
+.fag-navn { font-size: clamp(26px, 4.4vmin, 40px); font-weight: 900; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.18); }
+@media (orientation: portrait) and (max-width: 600px) { .fag-kort { width: 46vw; } }
+@media (orientation: landscape) and (max-height: 500px) { .fag-kort { width: min(260px, 60vh); } }
+
+/* Bogstaver og ord */
+.bogstav-kort { display: inline-flex; align-items: baseline; gap: 0.15em; font-weight: 900; line-height: 1; font-family: var(--skrift); }
+.bogstav-stort { font-size: 0.7em; opacity: 0.75; }
+.bogstav-stort.kun { font-size: 1em; opacity: 1; }
+.bogstav-lille { font-size: 1em; }
+.dansk-billede { display: flex; align-items: center; justify-content: center; gap: clamp(16px, 4vmin, 40px); flex-wrap: wrap; max-width: 100%; }
+.dansk-billede .bogstav-kort { font-size: clamp(72px, 16vmin, 150px); color: var(--farve-1-moerk); background: var(--hvid); border-radius: 28px; padding: 0.1em 0.3em; box-shadow: 0 6px 0 var(--skygge); }
+.dansk-billede.byg { flex-direction: column; gap: clamp(8px, 2vmin, 20px); }
+.ord-emoji { border: none; background: var(--hvid); border-radius: 50%; box-shadow: 0 6px 0 var(--skygge), 0 8px 18px var(--skygge); padding: 0; display: flex; align-items: center; justify-content: center; line-height: 1; }
+.ord-emoji.stor { width: clamp(120px, 26vmin, 240px); height: clamp(120px, 26vmin, 240px); font-size: clamp(76px, 17vmin, 160px); }
+.ord-emoji.mellem { width: clamp(84px, 16vmin, 150px); height: clamp(84px, 16vmin, 150px); font-size: clamp(54px, 10vmin, 100px); }
+.skrevet-ord { display: flex; gap: clamp(4px, 1vmin, 10px); }
+.ord-bogstav {
+  min-width: clamp(56px, 10vmin, 96px); height: clamp(72px, 13vmin, 120px); padding: 0 6px;
+  border: none; border-radius: 18px; background: var(--hvid); box-shadow: 0 5px 0 var(--skygge);
+  font-family: var(--skrift); font-size: clamp(48px, 10vmin, 92px); font-weight: 800; color: var(--tekst); line-height: 1;
+}
+.ord-bogstav.lyser { background: var(--guld); }
+.alfabet-stribe { display: flex; gap: clamp(4px, 1vmin, 10px); max-width: 100%; }
+.alfabet-celle {
+  min-width: clamp(44px, 8.6vmin, 86px); height: clamp(60px, 11vmin, 100px);
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 16px; background: var(--hvid); box-shadow: 0 4px 0 var(--skygge);
+  font-size: clamp(36px, 7.4vmin, 72px); font-weight: 800;
+}
+.alfabet-celle.hul { border: 4px dashed var(--farve-2); color: var(--farve-2-moerk); background: var(--papir); }
+.alfabet-celle.talt { background: var(--farve-1-lys); }
+.byg-felter { display: flex; gap: clamp(6px, 1.4vmin, 14px); flex-wrap: wrap; justify-content: center; }
+.byg-felt {
+  min-width: clamp(52px, 9vmin, 88px); height: clamp(60px, 10vmin, 96px); padding: 0 8px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 16px; border: 4px dashed var(--farve-1); background: var(--papir);
+  font-size: clamp(36px, 7vmin, 66px); font-weight: 800;
+}
+.byg-felter.ord .byg-felt { min-width: clamp(80px, 14vmin, 150px); font-size: clamp(28px, 5vmin, 48px); }
+.byg-felt.fyldt { border-style: solid; background: var(--hvid); }
+.byg-panel { display: flex; flex-wrap: wrap; gap: clamp(8px, 1.6vmin, 16px); justify-content: center; align-content: center; padding: 8px; }
+.byg-brik {
+  min-width: clamp(64px, 11vmin, 104px); height: clamp(64px, 11vmin, 104px); padding: 0 10px;
+  border: none; border-radius: 20px; background: var(--hvid); box-shadow: 0 6px 0 var(--skygge);
+  font-family: var(--skrift); font-size: clamp(36px, 7vmin, 64px); font-weight: 800; color: var(--tekst);
+}
+.byg-brik.ord { font-size: clamp(24px, 4.4vmin, 42px); }
+.byg-brik:disabled { opacity: 0.3; }
+.byg-brik.slet { background: var(--slukket); }
+.valg-emoji { font-size: clamp(56px, 11vmin, 104px); line-height: 1; }
+/* Fire svarkort på én række (fx «Hvilket passer ikke?») på en telefon på højkant: mindre luft og emoji, så de
+   kan være der — i Safari stak det fjerde kort 9 px ud over kanten */
+@media (orientation: portrait) and (max-width: 600px) {
+  .valg.antal-4 { gap: 8px; }
+  .valg.antal-4 .valg-knap { padding: 4px; }
+  .valg.antal-4 .valg-emoji { font-size: 44px; }
+}
+.valg-bogstav .bogstav-kort { font-size: clamp(52px, 10vmin, 96px); }
+.valg-skrevet { font-size: clamp(30px, 6vmin, 56px); font-weight: 800; }
+.vis-bogstav { display: flex; align-items: center; gap: 20px; background: var(--hvid); border-radius: 24px; padding: 8px 20px; box-shadow: 0 4px 12px var(--skygge); }
+.vis-bogstav .bogstav-kort { font-size: clamp(54px, 10vmin, 90px); color: var(--farve-1-moerk); }
+.vis-bogstav-e { font-size: clamp(48px, 9vmin, 84px); line-height: 1; }
+.vis-bogstav-ord { font-size: clamp(30px, 5vmin, 48px); font-weight: 800; }
+.valg-knap.lytter { box-shadow: 0 0 0 6px var(--guld); }
+.lektion-emoji { font-size: clamp(56px, 10vmin, 96px); line-height: 1; }
+.lektion-bogstav { font-size: clamp(54px, 9vmin, 90px); color: var(--farve-1-moerk); }
+.lektion-ord { font-size: clamp(30px, 5vmin, 48px); font-weight: 800; padding: 4px 14px; border-radius: 14px; background: var(--hvid); box-shadow: 0 3px 0 var(--skygge); }
+
+/* ---------- B5: Historiebogen (📖 Læs · 🖍️ Tegn · ✏️ Skriv) ---------- */
+.historie-valg-gitter {
+  flex: 1; min-height: 0; overflow-y: auto;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 14px;
+  align-content: center; padding: 12px 20px 20px;
+}
+.historie-valg {
+  position: relative; min-height: 96px; border: none; border-radius: 22px; background: var(--hvid);
+  box-shadow: 0 5px 0 var(--skygge), 0 8px 16px var(--skygge);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  font-family: inherit; color: var(--farve-1-moerk);
+}
+.historie-valg b { font-size: 22px; }
+.historie-valg-e { font-size: 40px; line-height: 1; }
+.historie-valg.faerdig { background: #e6f4ea; }
+.historie-valg-ok { position: absolute; top: 4px; right: 10px; font-size: 22px; font-weight: 900; color: var(--rigtig); }
+
+.historie-trin { flex: 0 0 auto; display: flex; gap: 4px; font-size: 26px; }
+.historie-trin span { opacity: 0.3; filter: grayscale(1); }
+.historie-trin span.ok { opacity: 1; filter: none; }
+
+.historie-krop {
+  flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: clamp(10px, 2.4vmin, 28px); padding: 4px clamp(12px, 2.4vmin, 28px) clamp(12px, 2vmin, 24px);
+}
+.historie-laes { min-width: 0; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; justify-content: center; gap: clamp(4px, 1.2vmin, 14px); }
+.laes-linje { margin: 0; display: flex; flex-wrap: wrap; gap: 0 0.28em; }
+.laes-ord {
+  min-height: var(--tryk); min-width: var(--tryk); padding: 0 6px; border: none; border-radius: 14px; background: transparent;
+  font-family: inherit; font-size: clamp(28px, 4.6vmin, 46px); font-weight: 800; line-height: 1.25; color: #2b2b2b;
+}
+.laes-ord:active, .laes-ord.lyser { background: var(--guld); }
+.laes-knapper { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-top: clamp(4px, 1.4vmin, 16px); }
+.trin-knap { width: clamp(64px, 11vmin, 104px); height: clamp(64px, 11vmin, 104px); font-size: clamp(30px, 5.4vmin, 52px); }
+.skriv-knap.ok { box-shadow: 0 0 0 5px var(--rigtig), 0 7px 0 var(--farve-2-moerk); }
+.laes-bobler { display: flex; gap: 8px; }
+.laes-boble {
+  width: 56px; height: 56px; border-radius: 50%; border: 3px dashed var(--farve-1); background: var(--hvid);
+  font-size: 28px; display: inline-flex; align-items: center; justify-content: center; padding: 0;
+}
+.laes-boble.fuld { border-style: solid; background: #fff3c4; }
+.laes-boble.voksen { margin-left: 6px; border-color: var(--farve-2); }
+
+.historie-tegn { min-width: 0; min-height: 0; display: flex; }
+.tegne-felt { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+.tegne-ramme { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+.tegne-canvas { display: block; background: #fff; border-radius: 18px; box-shadow: 0 4px 14px var(--skygge); touch-action: none; }
+.tegne-vaerktoej { flex: 0 0 auto; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.farve-knap {
+  width: var(--tryk); height: var(--tryk); border-radius: 50%; border: 4px solid var(--hvid);
+  box-shadow: 0 2px 6px var(--skygge); font-size: 26px; padding: 0; background: var(--hvid);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.farve-knap.valgt { box-shadow: 0 0 0 4px var(--farve-1-moerk); transform: scale(1.08); }
+
+@media (orientation: portrait) {
+  .historie-krop { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .historie-tegn { min-height: 220px; }
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  .historie-krop { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); padding-bottom: 8px; }
+  .historie-laes { gap: 0; }
+  .laes-ord { font-size: 28px; line-height: 1.1; }
+  .laes-knapper { gap: 6px; margin-top: 4px; flex-wrap: nowrap; }
+  .trin-knap { width: 52px; height: 52px; font-size: 26px; }
+  .laes-bobler { gap: 6px; }
+  .laes-boble { width: 52px; height: 52px; font-size: 24px; }
+  .laes-boble.voksen { margin-left: 0; }
+  .historie-trin { font-size: 20px; }
+}
+@media (max-width: 440px) { .historie-trin { display: none; } } /* smal telefon på højkant: titlen skal kunne stå */
+
+/* ✏️ Skriv: tastatur-brikker eller følg forlægget */
+.skriv-midte { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(10px, 3vmin, 30px); padding: 8px 16px 16px; }
+.spor-midte { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: stretch; gap: 10px; padding: 4px 16px 16px; }
+.spor-ramme { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; background: #fff; border-radius: 22px; box-shadow: 0 4px 14px var(--skygge); }
+.spor-svg { width: 100%; height: 100%; touch-action: none; }
+.spor-linje { stroke: #9cc7e8; stroke-width: 1; }
+.spor-linje.tynd { stroke: #d5e7f4; }
+.spor-linje.stiplet { stroke-dasharray: 3 3; }
+.spor-forlaeg { fill: none; stroke: #b9b0a6; stroke-width: 3.2; stroke-dasharray: 0.1 5.5; stroke-linecap: round; stroke-linejoin: round; }
+.spor-start { fill: #2fae66; }
+.spor-pil { fill: none; stroke: #2fae66; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.spor-streg { fill: none; stroke: var(--farve-1-moerk); stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; opacity: 0.85; }
+.spor-knapper { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.spor-besked { flex: 1; }
+.spor-ok { position: static; margin: 0; width: clamp(72px, 12vmin, 110px); height: clamp(72px, 12vmin, 110px); }
+.trin-knap { padding: 0; }
+@media (orientation: landscape) and (max-height: 500px) {
+  .spor-midte { flex-direction: row; }
+  .spor-knapper { flex-direction: column; justify-content: center; }
 }
