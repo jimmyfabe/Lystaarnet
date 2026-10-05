@@ -1186,7 +1186,8 @@
     const emner = bland(rng, Object.keys(niveauer).filter((e) => EMNER[e]));
     const runde = [];
     let i = 0;
-    while (runde.length < 5 && emner.length) {
+    const antal = opts.antal || 5;
+    while (runde.length < antal && emner.length) {
       const e = emner[i % emner.length];
       const n = klemNiveau(e, niveauer[e]);
       const typer = brugbareTyper(EMNER[e].niveauer[n], opts);

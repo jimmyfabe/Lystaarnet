@@ -63,6 +63,7 @@
       dansk: {},            // dansk-emneId → standardEmne() — samme form som emner (B4)
       fag: null,            // 'matematik' | 'dansk' — det sidste valg (null: barnet har ikke valgt endnu)
       historier: {},        // historienr → standardHistorie() — Historiebogen (B5)
+      tilstand: null,       // B10: 'eventyr' | 'frit' — det sidste valg på «Eventyr eller Vælg selv?»
     };
   }
 
@@ -153,6 +154,7 @@
     ud.dansk = {};
     if (erObjekt(d.dansk)) for (const k in d.dansk) ud.dansk[k] = normaliserEmne(d.dansk[k]);
     ud.fag = d.fag === 'dansk' || d.fag === 'matematik' ? d.fag : null;
+    ud.tilstand = d.tilstand === 'eventyr' || d.tilstand === 'frit' ? d.tilstand : null;
     ud.historier = {};
     if (erObjekt(d.historier)) for (const k in d.historier) if (/^[1-9]\d{0,2}$/.test(k)) ud.historier[k] = normaliserHistorie(d.historier[k]);
 
@@ -496,6 +498,8 @@
       duel: { spil: [] },              // familieduellens resultater
       traening: standardTraening(),    // den voksnes egen træning (gymnasiematematik)
       stemme: null,                    // navnet på den danske stemme, den voksne har valgt (B3); null = automatisk
+      opgaverPrRunde: 8,               // B10: 5 · 8 · 10 opgaver i en runde (matematik og dansk)
+      pauseEfter: 3,                   // B10: bevægelsespause efter 2 · 3 · 4 runder
     };
   }
 
@@ -514,6 +518,9 @@
     ud.version = Number.isInteger(d.version) ? d.version : VOKSEN_VERSION;
     ud.lyd = d.lyd !== false;
     ud.stemme = typeof d.stemme === 'string' && d.stemme ? d.stemme.slice(0, 200) : null;
+    // B10: kun de valg, indstillingerne tilbyder — ellers standarden (også for data fra før B10)
+    ud.opgaverPrRunde = [5, 8, 10].indexOf(d.opgaverPrRunde) >= 0 ? d.opgaverPrRunde : 8;
+    ud.pauseEfter = [2, 3, 4].indexOf(d.pauseEfter) >= 0 ? d.pauseEfter : 3;
     ud.tale = d.tale !== false;
     ud.tidsgraense = Object.assign({}, s.tidsgraense, erObjekt(d.tidsgraense) ? d.tidsgraense : {});
     for (const k in ud.tidsgraense) ud.tidsgraense[k] = ikkeNeg(ud.tidsgraense[k], 0);

@@ -47,6 +47,7 @@
     { id: 'lydering', fag: 'dansk', e: '🐍', navn: 'Lydering', emne: 'lydering', tale: 'Lydering. Lydene efter hinanden bliver til et ord.' },
     { id: 'smaaord', fag: 'dansk', e: '👀', navn: 'Små ord', emne: 'smaaord', tale: 'Små ord. Ord, vi kender med det samme.' },
     { id: 'historiebog', fag: 'dansk', e: '📖', navn: 'Historiebogen', emne: 'historie', tale: 'Historiebogen. Læs, tegn og skriv.' },
+    { id: 'jagt', fag: 'dansk', e: '🫧', navn: 'Bogstavjagt', emne: 'jagt', tale: 'Bogstavjagt. Stryg gennem det bogstav, du hører.' },
   ];
   const DANSK_AABNE_FRA_START = 4;
 
@@ -69,6 +70,7 @@
     alfabet: 'Alfabetet er alle bogstaverne i rækkefølge. Hvert bogstav har et stort og et lille.',
     lydering: 'Når vi lyderer, siger vi lydene efter hinanden. Så hører vi, hvilket ord det er.',
     smaaord: 'Nogle små ord ser vi så tit, at vi kender dem med det samme. Og, er og jeg er små ord.',
+    jagt: 'I Bogstavjagten flyver der bobler med bogstaver. Lyt til lyden, og stryg gennem det bogstav, du hører — med fingeren eller pennen.',
     historiebog: 'I Historiebogen er der små historier. Tryk på et ord, så hører du det. Læs historien, tegn den, og skriv et ord fra den.',
   };
 
@@ -78,7 +80,7 @@
     { e: '🔺', navn: 'Former', verdener: ['former', 'tegne'] },
     { e: '🕰️', navn: 'Klokken og penge', verdener: ['torvet'] },
     { e: '🗼', navn: 'Det hele blandet', verdener: ['taarn'] },
-    { e: '🔤', navn: 'Dansk', verdener: ['rim', 'lyde', 'alfabet', 'lydering', 'smaaord', 'historiebog'] },
+    { e: '🔤', navn: 'Dansk', verdener: ['rim', 'lyde', 'alfabet', 'lydering', 'smaaord', 'historiebog', 'jagt'] },
   ];
 
   // Skolens ord bruges i oplæsningen (tælle videre, tage væk, forskel, 10'er-venner …)
@@ -572,7 +574,7 @@
       } else if (D && !data.fag) {
         visFagValg('Hej ' + data.navn + '!');
       } else {
-        visKort('Hej ' + data.navn + '! Skal vi rejse videre? Tryk på den store knap.');
+        visTilstandValg('Hej ' + data.navn + '!');
       }
     };
     const taarn = h('button', {
@@ -603,9 +605,9 @@
         Lyd.init(); Lyd.rigtig();
         data.figur = valgt;
         gem();
-        if (!data.historie) { visHistorie(() => (D && !data.fag ? visFagValg() : visKort(false)), 'Godt valgt! ' + FIGURER[valgt].navn + ' tager med.'); return; }
+        if (!data.historie) { visHistorie(() => (D && !data.fag ? visFagValg() : visTilstandValg()), 'Godt valgt! ' + FIGURER[valgt].navn + ' tager med.'); return; }
         if (D && !data.fag) { visFagValg('Godt valgt! ' + FIGURER[valgt].navn + ' tager med.'); return; }
-        visKort('Godt valgt! ' + FIGURER[valgt].navn + ' tager med. Tryk på den store knap, så rejser vi.');
+        visTilstandValg('Godt valgt! ' + FIGURER[valgt].navn + ' tager med.');
       },
     }, '✔');
     const vaelgFigur = (id) => {
@@ -646,7 +648,7 @@
   const fagNu = () => (D && data && data.fag === 'dansk' ? 'dansk' : 'matematik');
   const verdenerFor = (fag) => (fag === 'dansk' ? DANSK_VERDENER : VERDENER);
   const alleVerdener = () => VERDENER.concat(DANSK_VERDENER);
-  const erDanskEmne = (emne) => !!(D && (D.EMNER[emne] || emne === 'historie'));
+  const erDanskEmne = (emne) => !!(D && (D.EMNER[emne] || emne === 'historie' || emne === 'jagt'));
   const emneDef = (emne) => O.EMNER[emne] || (D && D.EMNER[emne]) || null;
   // Dansk-emnerne gemmes for sig (data.dansk) med samme form som matematikkens (data.emner)
   const emneLager = (emne) => (erDanskEmne(emne) ? data.dansk : data.emner);
@@ -658,7 +660,7 @@
     const v = liste[i];
     if (fag === 'dansk') {
       if (!v.emne) return false;
-      if (v.emne === 'historie') return true;              // Historiebogen er åben fra start (B5)
+      if (v.emne === 'historie' || v.emne === 'jagt') return true; // Historiebogen (B5) og Bogstavjagt (B10) er åbne fra start
       if (!D.EMNER[v.emne]) return false;
       if (i < DANSK_AABNE_FRA_START) return true;
       if (voksen.aabneAlle && voksen.aabneAlle[T.id]) return true;
@@ -725,7 +727,7 @@
       Lyd.init(); Lyd.rigtig();
       data.fag = fag;
       gem();
-      visKort(fag === 'dansk' ? 'Dansk. Tryk på den store knap, så leger vi med bogstaver.' : 'Matematik. Tryk på den store knap, så leger vi med tal.');
+      visTilstandValg(fag === 'dansk' ? 'Dansk.' : 'Matematik.');
     };
     const kort = (fag, ikon, navn, label) => h('button', {
       class: 'fag-kort ' + fag + (data.fag === fag ? ' sidst' : ''), type: 'button', 'aria-label': label, 'data-fag': fag,
@@ -741,6 +743,40 @@
         kort('matematik', '🔢', 'Matematik', 'Matematik — tal'),
         kort('dansk', '🔤', 'Dansk', 'Dansk — bogstaver'))),
     (e) => { if (e.key === '1') vaelg('matematik'); else if (e.key === '2') vaelg('dansk'); });
+    Tale.sig((hilsen ? hilsen + ' ' : '') + S.gentagTale);
+  }
+
+  // B10: Eventyr eller Vælg selv? To store kort efter fagvalget — vises hver gang (ét tryk); det sidste valg lyser
+  function visTilstandValg(hilsen) {
+    S.runde = null;
+    const fag = fagNu();
+    const vaelg = (t) => {
+      Lyd.init(); Lyd.rigtig();
+      data.tilstand = t;
+      gem();
+      if (t === 'frit') visVaelgSelv('Vælg selv. Tryk på det, du vil lege med.');
+      else visKort(fag === 'dansk' ? 'Eventyr. Tryk på den store knap, så leger vi med bogstaver.' : 'Eventyr. Tryk på den store knap, så leger vi med tal.');
+    };
+    const kort = (t, ikon, navn, label) => h('button', {
+      class: 'fag-kort tilstand-kort ' + t + (data.tilstand === t ? ' sidst' : ''), type: 'button', 'aria-label': label, 'data-tilstand': t,
+      onclick: () => vaelg(t),
+    }, h('span', { class: 'fag-ikon', 'aria-hidden': 'true' }, ikon), h('span', { class: 'fag-navn' }, navn));
+    const fagKnap = D ? ikonKnap(fag === 'dansk' ? '🔢' : '🔤', fag === 'dansk' ? 'Skift til matematik' : 'Skift til dansk', () => visFagValg(), 'fag-knap') : topbarPlads();
+    S.gentagTale = 'Vil du på eventyr, eller vil du selv vælge?';
+    skift(h('div', { class: 'skaerm fagvalg tilstandvalg fag-' + fag },
+      h('div', { class: 'topbar' },
+        h('a', { class: 'ikon-knap', href: 'index.html', 'aria-label': 'Skift spiller', title: 'Skift spiller' }, '🏠'),
+        fagKnap,
+        h('div', { class: 'topbar-titel' }, data.navn),
+        h('div', { class: 'topbar-hoejre' }, advarselKnap(), hoejttaler())),
+      h('div', { class: 'fagvalg-liste' },
+        kort('eventyr', '🗺️', 'Eventyr', 'Eventyr — verdenerne i rækkefølge'),
+        kort('frit', '🎒', 'Vælg selv', 'Vælg selv — alle emner'))),
+    (e) => {
+      if (e.key === '1') vaelg('eventyr');
+      else if (e.key === '2') vaelg('frit');
+      else if (e.key === 'Enter') { e.preventDefault(); vaelg(data.tilstand || 'eventyr'); }
+    });
     Tale.sig((hilsen ? hilsen + ' ' : '') + S.gentagTale);
   }
 
@@ -948,6 +984,10 @@
 
   // opts.frit: runden er startet fra «Vælg selv» (🎒) — samme emne-niveau og samme dyr, men ingen lysperle,
   // og ⬅️ fører tilbage til 🎒. opts.lektionSet: lektionen er vist (første gang i verdenen).
+  // B10: opgaver pr. runde og pause efter så mange runder — den voksne vælger under Indstillinger
+  const antalOpgaver = () => ([5, 8, 10].indexOf(voksen.opgaverPrRunde) >= 0 ? voksen.opgaverPrRunde : 8);
+  const pauseEfter = () => ([2, 3, 4].indexOf(voksen.pauseEfter) >= 0 ? voksen.pauseEfter : 3);
+
   function startRunde(verden, opts) {
     opts = opts || {};
     if (tidOpbrugt()) { visTidBrugt(); return; }
@@ -976,6 +1016,7 @@
       if (opts.frit) visHistorieValg(); else visHistorieSide(naesteHistorie(), false);
       return;
     }
+    if (verden.emne === 'jagt') { visBogstavjagt(!!opts.frit); return; } // B10
     S.pausetRunde = null;
     data.pauset = null; // en ny mission i en anden verden erstatter den afbrudte
     const emne = verden.emne;
@@ -992,13 +1033,13 @@
       VERDENER.forEach((v, i) => {
         if (!v.blandet && (opts.frit || verdenAaben(i)) && emneSlaaetTil(v.emne)) niveauer[v.emne] = data.emner[v.emne] ? data.emner[v.emne].niveau : 1;
       });
-      opgaver = O.lavBlandetRunde(niveauer, rng, { ting: T.ting, udenLyt: udenLyt });
+      opgaver = O.lavBlandetRunde(niveauer, rng, { ting: T.ting, udenLyt: udenLyt, antal: antalOpgaver() });
     } else if (verden.fag === 'dansk') {
       ed.niveau = Math.min(D.EMNER[emne].maxNiveau, Math.max(1, ed.niveau || 1));
-      opgaver = D.lavRunde(emne, ed.niveau, rng, { gentag: (data.gentag[emne] || []).filter(opgaveKendt), udenLyt: udenLyt });
+      opgaver = D.lavRunde(emne, ed.niveau, rng, { gentag: (data.gentag[emne] || []).filter(opgaveKendt), udenLyt: udenLyt, antal: antalOpgaver() });
     } else {
       ed.niveau = O.klemNiveau(emne, ed.niveau);
-      opgaver = O.lavRunde(emne, ed.niveau, rng, { ting: T.ting, gentag: (data.gentag[emne] || []).filter(opgaveKendt), udenLyt: udenLyt });
+      opgaver = O.lavRunde(emne, ed.niveau, rng, { ting: T.ting, gentag: (data.gentag[emne] || []).filter(opgaveKendt), udenLyt: udenLyt, antal: antalOpgaver() });
     }
     if (!opgaver || !opgaver.length) { visKort(); return; } // fx alle emner slået fra — aldrig en tom runde
     if (!opts.frit) data.sidsteVerden = verden.id;
@@ -1062,7 +1103,7 @@
   function visRundeSkaerm(genoptag, forTale) {
     const r = S.runde;
     // Fodspor, der fyldes undervejs, og dyret for enden af sporet
-    const prikker = h('div', { class: 'fremdrift', 'aria-hidden': 'true' },
+    const prikker = h('div', { class: 'fremdrift', 'aria-hidden': 'true', style: '--n:' + r.opgaver.length },
       r.opgaver.map(() => h('span', { class: 'prik' })),
       h('span', { class: 'fremdrift-dyr' }, r.maerke.e));
     const fig = minFigur();
@@ -2607,8 +2648,7 @@
   function visFejring(maerke, niveauOp, verden, frit) {
     const fig = minFigur();
     const r = S.runde;
-    const sidsteTal = r.opgaver.map((o) => o.svar).filter((x) => typeof x === 'number' && x >= 3 && x <= 8).pop();
-    const videre = (fn) => { Lyd.init(); Lyd.tryk(); if (data.rundeTaeller >= 3) visBevaegelse(fn, sidsteTal); else fn(); };
+    const videre = (fn) => { Lyd.init(); Lyd.tryk(); if (data.rundeTaeller >= pauseEfter()) visBevaegelse(fn); else fn(); };
     const knapper = h('div', { class: 'fejring-knapper skjult' },
       h('button', { class: 'stor-knap igen-knap', type: 'button', 'aria-label': 'Spil igen', onclick: () => videre(() => startRunde(verden, { frit: frit })) }, '▶'),
       frit
@@ -2701,66 +2741,74 @@
   }
 
   // ---------- Bevægelsespause efter hver 3. runde («læg iPad'en ned» først, altid en siddende variant) ----------
+  // B10: en pause er tre øvelser efter hinanden (ca. 90 sekunder), hver med sit antal og et roligt tempo (ms pr. gang)
   const BEVAEGELSER = {
     staa: [
-      { e: '🐸', anim: 'hop', tekst: (n) => 'Hop ' + n + ' gange!' },
-      { e: '👏', anim: 'klap', tekst: (n) => 'Klap ' + n + ' gange!' },
-      { e: '🦶', anim: 'stamp', tekst: (n) => 'Stamp ' + n + ' gange med fødderne!' },
-      { e: '🙌', anim: 'straek', tekst: (n) => 'Stræk armene op mod himlen ' + n + ' gange!' },
-      { e: '🦵', anim: 'knae', tekst: (n) => 'Gå ned i knæ ' + n + ' gange!' },
+      { e: '🐸', anim: 'hop', n: 10, takt: 2400, tekst: (n) => 'Hop ' + n + ' gange!' },
+      { e: '🔄', anim: 'drej', n: 3, takt: 7500, tekst: (n) => 'Drej rundt ' + n + ' gange!' },
+      { e: '🙌', anim: 'straek', n: 10, takt: 2400, tekst: (n) => 'Stræk dig mod loftet, og tæl til ' + n + '!' },
+      { e: '👏', anim: 'klap', n: 12, takt: 2000, tekst: (n) => 'Klap ' + n + ' gange!' },
+      { e: '🦶', anim: 'stamp', n: 12, takt: 2000, tekst: (n) => 'Stamp ' + n + ' gange med fødderne!' },
+      { e: '🦵', anim: 'knae', n: 8, takt: 3000, tekst: (n) => 'Gå ned i knæ ' + n + ' gange!' },
     ],
     sid: [
-      { e: '👐', anim: 'klap', tekst: (n) => 'Klap på lårene ' + n + ' gange!' },
-      { e: '🙌', anim: 'straek', tekst: (n) => 'Stræk armene op ' + n + ' gange!' },
-      { e: '🔄', anim: 'drej', tekst: (n) => 'Rul med skuldrene ' + n + ' gange!' },
-      { e: '🦶', anim: 'stamp', tekst: (n) => 'Tramp med fødderne under bordet ' + n + ' gange!' },
-      { e: '🙂', anim: 'nik', tekst: (n) => 'Nik med hovedet ' + n + ' gange!' },
+      { e: '👐', anim: 'klap', n: 12, takt: 2000, tekst: (n) => 'Klap på lårene ' + n + ' gange!' },
+      { e: '🙌', anim: 'straek', n: 10, takt: 2600, tekst: (n) => 'Stræk armene op ' + n + ' gange!' },
+      { e: '🔄', anim: 'drej', n: 10, takt: 2600, tekst: (n) => 'Rul med skuldrene ' + n + ' gange!' },
+      { e: '🦶', anim: 'stamp', n: 12, takt: 2000, tekst: (n) => 'Tramp med fødderne under bordet ' + n + ' gange!' },
+      { e: '🙂', anim: 'nik', n: 10, takt: 2400, tekst: (n) => 'Nik med hovedet ' + n + ' gange!' },
     ],
   };
+  const PAUSE_INTRO = 2600;    // ms: øvelsen vises og siges, før der tælles
+  const SPRING_EFTER = 15000;  // ms: ⏭ vises først, når øvelsen har kørt så længe — og springer kun den øvelse over
+  // De tre øvelser i en pause: skifter fra pause til pause
+  const pauseOevelser = (stil, nr) => { const l = BEVAEGELSER[stil]; return [0, 1, 2].map((k) => l[(nr * 3 + k) % l.length]); };
 
-  function visBevaegelse(videre, tal) {
-    const n = tal || 5;
+  function visBevaegelse(videre) {
     // Pausen er «brugt», så snart den vises — lukkes appen midt i den, kommer den ikke igen efter hver runde
     data.rundeTaeller = 0;
     gem();
     const slut = () => videre();
-    // ⏭ springer ét trin over: valget → hele pausen, «læg iPad'en ned» → øvelsen, øvelsen → «godt klaret»
-    const spring = (fn, label) => h('button', { class: 'ikon-knap spring-over', type: 'button', 'aria-label': label || 'Spring pausen over', title: 'Spring over', onclick: () => { Lyd.init(); Lyd.tryk(); fn(); } }, '⏭');
     const fig = minFigur();
     const vaelgStil = (stil) => {
       Lyd.init(); Lyd.tryk();
-      const liste = BEVAEGELSER[stil];
-      const ov = liste[(data.runderIalt / 3 | 0) % liste.length]; // skifter fra pause til pause
-      let trin = 1; // 1 = læg ned, 2 = øvelse, 3 = færdig — hvert trin vises kun én gang
-      // 3) Færdig: tag iPad'en igen
+      const oevelser = pauseOevelser(stil, (data.runderIalt / 3) | 0);
+      let faerdigVist = false;
+      // Til sidst: tag iPad'en igen
       const faerdig = () => {
-        if (trin >= 3) return;
-        trin = 3;
+        if (faerdigVist) return;
+        faerdigVist = true;
         const knap = h('button', { class: 'stor-knap spil-knap puls', type: 'button', 'aria-label': 'Videre', onclick: () => { Lyd.init(); Lyd.tryk(); slut(); } }, '▶');
         const t3 = skift(h('div', { class: 'skaerm pause' },
           h('div', { class: 'topbar' }, topbarPlads(), h('div', { class: 'topbar-titel' }, 'Godt klaret!'), hoejttaler()),
           h('div', { class: 'pause-midte' }, h('div', { class: 'pause-ven danser', 'aria-hidden': 'true' }, fig.e), knap)),
         (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); knap.click(); } });
         Lyd.fejring();
-        // Kun hvis barnet stadig står på skærmen — ellers afbryder vi oplæsningen af den nye opgave
         S.gentagTale = 'Godt klaret! Tag iPad\'en igen, og tryk på den store knap.';
         setTimeout(() => { if (t3 === S.token) Tale.sig(S.gentagTale); }, 700);
       };
-      // 2) Øvelsen: vennen viser bevægelsen, og vi tæller højt
-      const oevelse = async () => {
-        if (trin >= 2) return;
-        trin = 2;
+      // En øvelse: vennen viser bevægelsen, og vi tæller højt i et roligt tempo. ⏭ kommer først efter 15 sekunder.
+      const oevelse = async (i) => {
+        if (i >= oevelser.length) { faerdig(); return; }
+        const ov = oevelser[i];
+        const n = ov.n;
+        let videreVist = false;
+        const naeste = () => { if (videreVist) return; videreVist = true; oevelse(i + 1); };
+        const springKnap = h('button', { class: 'ikon-knap spring-over usynlig', type: 'button', 'aria-label': 'Spring øvelsen over', title: 'Spring øvelsen over', onclick: () => { Lyd.init(); Lyd.tryk(); naeste(); } }, '⏭');
         const stort = h('div', { class: 'pause-tal' }, '');
         const ven = h('div', { class: 'pause-ven anim-' + ov.anim, 'aria-hidden': 'true' }, fig.e);
         // Bevægelsen selv vises stort ved siden af vennen — barnet kan ikke læse, hvad det skal gøre
         const bev = h('div', { class: 'pause-ven pause-bevaegelse anim-' + ov.anim, 'aria-hidden': 'true' }, ov.e);
         const prikker = h('div', { class: 'pause-prikker', 'aria-hidden': 'true' }, Array.from({ length: n }, () => h('i')));
-        const t2 = skift(h('div', { class: 'skaerm pause' },
-          h('div', { class: 'topbar' }, spring(faerdig, 'Spring øvelsen over'), h('div', { class: 'topbar-titel' }, ov.e + ' ' + n + ' gange'), hoejttaler()),
+        const oevelsePrikker = h('div', { class: 'pause-oevelser', 'aria-label': 'Øvelse ' + (i + 1) + ' af ' + oevelser.length },
+          oevelser.map((x, k) => h('i', { class: k < i ? 'fuld' : k === i ? 'nu' : '' }, x.e)));
+        const t2 = skift(h('div', { class: 'skaerm pause', 'data-oevelse': i + 1 },
+          h('div', { class: 'topbar' }, springKnap, oevelsePrikker, hoejttaler()),
           h('div', { class: 'pause-midte' }, h('div', { class: 'pause-par' }, ven, bev), stort, prikker)));
+        setTimeout(() => { if (t2 === S.token) springKnap.classList.remove('usynlig'); }, SPRING_EFTER * TEMPO);
         S.gentagTale = ov.tekst(n);
         Tale.sig(ov.tekst(n));
-        await vent(2600);
+        await vent(PAUSE_INTRO);
         for (let k = 1; k <= n; k++) {
           if (t2 !== S.token) return;
           stort.textContent = String(k);
@@ -2770,30 +2818,31 @@
           prikker.children[k - 1].classList.add('fuld');
           Lyd.hop();
           Tale.sig(String(k));
-          await vent(1500);
+          await vent(ov.takt);
         }
         if (t2 !== S.token) return;
-        faerdig();
+        await vent(800);
+        if (t2 === S.token) naeste();
       };
-      // 1) Læg iPad'en ned
+      // Først: læg iPad'en ned (ingen ⏭ — pausen kan ikke klikkes igennem)
       const token = skift(h('div', { class: 'skaerm pause' },
-        h('div', { class: 'topbar' }, spring(oevelse, 'Videre til øvelsen'), h('div', { class: 'topbar-titel' }, 'Pause'), hoejttaler()),
+        h('div', { class: 'topbar' }, topbarPlads(), h('div', { class: 'topbar-titel' }, 'Pause'), hoejttaler()),
         h('div', { class: 'pause-midte' },
           h('div', { class: 'laeg-ned', 'aria-hidden': 'true' }, h('span', { class: 'laeg-ned-ipad' }, '📱'), h('span', { class: 'laeg-ned-pil' }, '⬇️')),
           h('div', { class: 'pause-tekst' }, 'Læg iPad\'en ned'))));
-      S.gentagTale = 'Læg iPad\'en ned på bordet. ' + (stil === 'sid' ? 'Bliv siddende. ' : 'Rejs dig op. ') + 'Så gør vi det sammen.';
+      S.gentagTale = 'Læg iPad\'en ned på bordet. ' + (stil === 'sid' ? 'Bliv siddende. ' : 'Rejs dig op. ') + 'Så gør vi tre øvelser sammen.';
       Tale.sig(S.gentagTale);
-      setTimeout(() => { if (token === S.token) oevelse(); }, 4500 * TEMPO + 300);
+      setTimeout(() => { if (token === S.token) oevelse(0); }, 4500 * TEMPO + 300);
     };
-    // Valget: stå op eller blive siddende (to valg)
+    // Valget: stå op eller blive siddende (to valg) — ingen ⏭ her heller
     skift(h('div', { class: 'skaerm pause' },
-      h('div', { class: 'topbar' }, spring(slut), h('div', { class: 'topbar-titel' }, 'Pause!'), hoejttaler()),
+      h('div', { class: 'topbar' }, topbarPlads(), h('div', { class: 'topbar-titel' }, 'Pause!'), hoejttaler()),
       h('div', { class: 'pause-midte' },
         h('div', { class: 'pause-ven', 'aria-hidden': 'true' }, fig.e),
         h('div', { class: 'pause-valg' },
           h('button', { class: 'pause-knap', type: 'button', 'aria-label': 'Stå op', onclick: () => vaelgStil('staa') }, h('span', { 'aria-hidden': 'true' }, '🧍'), h('b', null, 'Stå')),
           h('button', { class: 'pause-knap', type: 'button', 'aria-label': 'Sid ned', onclick: () => vaelgStil('sid') }, h('span', { 'aria-hidden': 'true' }, '🪑'), h('b', null, 'Sid'))))),
-    (e) => { if (e.key === '1') vaelgStil('staa'); else if (e.key === '2') vaelgStil('sid'); else if (e.key === 'Escape') slut(); });
+    (e) => { if (e.key === '1') vaelgStil('staa'); else if (e.key === '2') vaelgStil('sid'); });
     S.gentagTale = 'Pause! Vil du stå op eller blive siddende?';
     Tale.sig(S.gentagTale);
   }
@@ -2817,7 +2866,7 @@
       return h('div', { class: 'vaelg-felt' }, knap, lektion);
     };
     const grupper = VAELG_GRUPPER.map((g) => {
-      const verdener = g.verdener.map((id) => alleVerdener().find((v) => v.id === id)).filter((v) => v && (v.blandet || ((emneDef(v.emne) || v.emne === 'historie') && emneSlaaetTil(v.emne))));
+      const verdener = g.verdener.map((id) => alleVerdener().find((v) => v.id === id)).filter((v) => v && (v.blandet || ((emneDef(v.emne) || v.emne === 'historie' || v.emne === 'jagt') && emneSlaaetTil(v.emne))));
       if (!verdener.length) return null;
       return h('section', { class: 'vaelg-gruppe' },
         h('h2', { class: 'vaelg-gruppe-titel' }, h('span', { 'aria-hidden': 'true' }, g.e), g.navn),
@@ -2863,6 +2912,7 @@
       case 'lydering': return [h('span', { class: 'lektion-emoji' }, '🐭'), h('span', { class: 'lektion-ord' }, 'm · u · s')];
       case 'smaaord': return ['og', 'er', 'jeg'].map((o) => h('span', { class: 'lektion-ord' }, o));
       case 'historiebog': return ['📖', '🖍️', '✏️'].map((e) => h('span', { class: 'lektion-emoji' }, e));
+      case 'jagt': return [h('span', { class: 'lektion-emoji' }, '🫧'), h('span', { class: 'bogstav-kort lektion-bogstav' }, h('span', { class: 'bogstav-stort' }, 'S'), h('span', { class: 'bogstav-lille' }, 's'))];
       default: return fyrtaarn();
     }
   }
@@ -3314,11 +3364,175 @@
     S.spor = { forlaeg: F, get spor() { return spor; }, saetSpor(s) { spor = s; tegn(); } }; // til test
   }
 
+  // =====================================================================
+  //  BOGSTAVJAGT (B10): bobler med bogstaver flyver op i buer. Spillet siger en lyd, og barnet stryger
+  //  gennem det rigtige bogstav med pen eller finger (Pointer Events). Forkert: boblen flyver bare videre.
+  // =====================================================================
+  function visBogstavjagt(frit) {
+    if (tidOpbrugt()) { visTidBrugt(); return; }
+    S.runde = null;
+    const verden = DANSK_VERDENER.find((v) => v.id === 'jagt');
+    if (!data.dansk.jagt) data.dansk.jagt = G.standardEmne();
+    const ed = data.dansk.jagt = G.normaliserEmne(data.dansk.jagt);
+    const trin = Math.min(3, Math.max(1, ed.niveau));
+    const rng = O.lavRng((Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0);
+    const runde = D.lavJagtRunde(D.jagtBogstaver(data.dansk.lyde), trin, rng);
+    const langsom = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    const start = Date.now();
+    const st = { i: 0, point: 0, forsoeg: 0, bobler: [], aktiv: true, rigtige: [], laast: false };
+    st.facit = () => runde[Math.min(st.i, runde.length - 1)].bogstav;
+    S.jagt = st; // til test
+    const felt = h('div', { class: 'jagt-felt', 'aria-label': 'Bogstavjagt' });
+    const spor = svgEl('svg', { class: 'jagt-spor', 'aria-hidden': 'true' });
+    felt.append(spor);
+    const pointTal = h('span', { class: 'jagt-point' }, '0');
+    const lyde = h('div', { class: 'jagt-lyde', 'aria-hidden': 'true' }, runde.map(() => h('i')));
+    const tilbage = () => { st.aktiv = false; gemJagtTid(); if (frit) visVaelgSelv(); else visKort(false); };
+    const sigLyd = () => { const b = runde[st.i].bogstav; return Lyd.klip(D.lydId(b), D.lydReserve(b)); };
+    S.gentagFn = () => sigLyd();
+    S.gentagTale = 'Stryg gennem det bogstav, du hører.';
+    const token = skift(h('div', { class: 'skaerm bogstavjagt' },
+      h('div', { class: 'topbar' },
+        frit ? ikonKnap('🎒', 'Tilbage til Vælg selv', tilbage) : ikonKnap('🗺️', 'Tilbage til kortet', tilbage),
+        h('div', { class: 'topbar-titel' }, h('span', { 'aria-hidden': 'true' }, '🫧 '), lyde),
+        h('div', { class: 'jagt-score', 'aria-label': 'Point' }, '⭐ ', pointTal),
+        hoejttaler()),
+      felt),
+    (e) => {
+      if (e.key === 'Escape') { tilbage(); return; }
+      if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); sigLyd(); return; }
+      // Fysisk tastatur: tryk bogstavet
+      const k = e.key.toLowerCase();
+      if (k.length === 1 && /[a-zæøå]/.test(k)) { const b = st.bobler.find((x) => !x.ramt && x.b === k); if (b) ram(b); }
+    });
+    function gemJagtTid() {
+      G.dag(data).sek += Math.min(1200, Math.round((Date.now() - start) / 1000));
+      gem();
+    }
+    const boblePx = () => { const b = felt.querySelector('.jagt-boble'); return b ? b.offsetWidth : 90; };
+    // En ny boelge bobler til lyden nu (samme lyd igen, hvis de alle faldt ned uden et ramt)
+    function boelge() {
+      if (!st.aktiv || token !== S.token) return;
+      const r = runde[st.i];
+      st.bobler.forEach((b) => b.el.remove());
+      st.bobler = [];
+      const w = felt.clientWidth, hh = felt.clientHeight;
+      const nu = performance.now();
+      r.bobler.forEach((bogstav, k) => {
+        const el = h('div', { class: 'jagt-boble', 'data-b': bogstav, 'aria-hidden': 'true' }, h('span', null, bogstav));
+        // Hjælp: efter to boelger uden et ramt lyser det rigtige bogstav
+        if (st.forsoeg >= 2 && bogstav === r.bogstav) el.classList.add('hjaelp');
+        felt.append(el);
+        st.bobler.push({ b: bogstav, el: el, bane: D.lavBane(rng, trin, w, hh, langsom), t0: nu + k * 450 * (langsom ? 1.4 : 1), ramt: false });
+      });
+      setTimeout(() => { if (st.aktiv && token === S.token) sigLyd(); }, 150);
+    }
+    // Animationen: hver boble følger sin bue (requestAnimationFrame); når alle er landet, kommer en ny boelge
+    function frame(nu) {
+      if (!st.aktiv || token !== S.token) return;
+      const r = boblePx() / 2;
+      let iLuften = 0;
+      for (const b of st.bobler) {
+        if (b.ramt) continue;
+        const t = (nu - b.t0) / 1000;
+        if (t < 0) { b.el.style.transform = 'translate(-999px, -999px)'; iLuften++; continue; }
+        if (t > b.bane.T) { b.el.style.transform = 'translate(-999px, -999px)'; b.ude = true; continue; }
+        const p = D.banePunkt(b.bane, t);
+        b.pos = { x: p.x, y: p.y - r };
+        b.el.style.transform = 'translate(' + (p.x - r) + 'px, ' + (p.y - 2 * r) + 'px)';
+        iLuften++;
+      }
+      if (!iLuften && !st.laast && st.bobler.length) { st.forsoeg++; boelge(); }
+      requestAnimationFrame(frame);
+    }
+    // Ramt: det rigtige deles med en lille lyd og et point; et forkert flyver bare videre
+    function ram(b) {
+      if (st.laast || b.ramt) return;
+      const r = runde[st.i];
+      // Forkert: boblen ryster og flyver videre — ingen straf, men det tæller ikke som rigtigt i første forsøg
+      if (b.b !== r.bogstav) { st.forkertHer = true; b.el.classList.remove('forbi'); void b.el.offsetWidth; b.el.classList.add('forbi'); return; }
+      b.ramt = true;
+      st.laast = true;
+      b.el.classList.add('delt');
+      Lyd.pling();
+      st.point++;
+      pointTal.textContent = String(st.point);
+      lyde.children[st.i].classList.add('fuld');
+      const rigtig = st.forsoeg === 0 && !st.forkertHer;
+      st.rigtige.push(rigtig);
+      // Første forsøg tæller i trinnet (som de andre emner: op ved 4 af 5, ned ved 3 forkerte i træk)
+      const res = O.opdaterNiveau(G.normaliserEmne(data.dansk.jagt), rigtig, 3);
+      data.dansk.jagt = res.data;
+      data.dansk.jagt.ialt++;
+      if (rigtig) data.dansk.jagt.rigtige++;
+      const d = G.dag(data); d.opgaver++; if (rigtig) d.rigtige++;
+      gem();
+      setTimeout(() => {
+        if (!st.aktiv || token !== S.token) return;
+        st.i++;
+        st.forsoeg = 0;
+        st.forkertHer = false;
+        st.laast = false;
+        if (st.i < runde.length) boelge(); else slut();
+      }, 1100);
+    }
+    function slut() {
+      st.aktiv = false;
+      st.bobler.forEach((b) => b.el.remove());
+      gemJagtTid();
+      S.runde = {
+        verden: verden, emne: 'jagt', opgaver: runde.map((x) => ({ svar: x.bogstav })), i: runde.length, forsoeg: 0, frit: !!frit,
+        sidstAktiv: Date.now(), aktivMs: 0, niveauOp: false, registreret: -1,
+        maerke: O.maerkeForRunde(T.samling, data.runderIalt, minFigur().e),
+      };
+      afslutRunde();
+    }
+    // Strøg med pen eller finger: hvert stykke af strøget testes mod alle bobler i luften
+    let sidst = null, sporPunkter = [];
+    const pkt = (e) => { const f = felt.getBoundingClientRect(); return { x: e.clientX - f.left, y: e.clientY - f.top }; };
+    const tjek = (p, q) => { const r = boblePx() / 2; for (const b of st.bobler) if (!b.ramt && b.pos && D.strygRammer(p, q, b.pos, r)) ram(b); };
+    const tegnSpor = () => { spor.textContent = ''; if (sporPunkter.length > 1) svgEl('polyline', { points: sporPunkter.map((p) => p.x + ',' + p.y).join(' '), class: 'jagt-streg' }, spor); };
+    felt.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      Lyd.init();
+      if (felt.setPointerCapture) felt.setPointerCapture(e.pointerId);
+      sidst = pkt(e);
+      sporPunkter = [sidst];
+      tjek(sidst, sidst);
+    });
+    felt.addEventListener('pointermove', (e) => {
+      if (!sidst) return;
+      const p = pkt(e);
+      tjek(sidst, p);
+      sidst = p;
+      sporPunkter.push(p);
+      if (sporPunkter.length > 14) sporPunkter.shift();
+      tegnSpor();
+    });
+    ['pointerup', 'pointercancel'].forEach((t) => felt.addEventListener(t, () => { sidst = null; sporPunkter = []; setTimeout(tegnSpor, 120); }));
+    felt.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+    // Vendes skærmen midt i en bølge, skaleres boblernes baner til det nye felt (ellers flyver de uden for skærmen)
+    let felStr = null;
+    vedStoerrelse(felt, () => {
+      const w = felt.clientWidth, hh = felt.clientHeight;
+      if (!w || !hh) return;
+      if (felStr && (felStr.w !== w || felStr.h !== hh)) {
+        const sx = w / felStr.w, sy = hh / felStr.h;
+        st.bobler.forEach((x) => { const B = x.bane; x.bane = Object.assign({}, B, { x0: B.x0 * sx, vx: B.vx * sx, y0: B.y0 * sy, vy: B.vy * sy, g: B.g * sy }); });
+      }
+      felStr = { w: w, h: hh };
+    });
+    Tale.sig('Bogstavjagt! Lyt, og stryg gennem det bogstav, du hører.');
+    setTimeout(() => { if (token === S.token) { boelge(); requestAnimationFrame(frame); } }, 2600 * TEMPO + 200);
+  }
+
   // Til test og voksendelen. _testRunde viser bestemte opgaver (bruges kun af test/test-e2e.js).
   window.Spil = {
     FIGURER, VERDENER, S, get data() { return data; }, _lyd: Lyd,
+    _pause: { BEVAEGELSER, PAUSE_INTRO, SPRING_EFTER, pauseOevelser, vis: () => visBevaegelse(() => visKort(false)) },
     DANSK_VERDENER,
     _visHistorie(nr) { visHistorieSide(nr, true); },
+    _startVerden(id, frit) { startRunde(alleVerdener().find((v) => v.id === id), { frit: !!frit }); },
     _visLektion(verdenId) { const v = alleVerdener().find((x) => x.id === verdenId); visLektion(v, () => visKort(false), () => visKort(false)); },
     _testRunde(verdenId, opgaver) {
       const verden = alleVerdener().find((v) => v.id === verdenId) || alleVerdener().find((v) => v.emne === verdenId); // verdens-id eller emne

@@ -579,6 +579,14 @@
           h('td', null, faerdige + ' af ' + D.HISTORIER.length + ' færdige'), h('td', null, laest + (laest === 1 ? ' gang læst' : ' gange læst')),
           h('td', null, voksenHoert ? 'En voksen har hørt ' + voksenHoert + (voksenHoert === 1 ? ' historie' : ' historier') : '')));
       }
+      // Bogstavjagt (B10): trin, runder og rigtige i første forsøg
+      if (D && D.JAGT_TRIN) {
+        const j = d.dansk.jagt;
+        const pct = j && j.ialt ? Math.round((j.rigtige / j.ialt) * 100) : null;
+        danskRaekker.push(h('tr', null, h('td', null, '🫧 Bogstavjagt'), h('td', null, 'Lyde → bogstav'),
+          h('td', null, !j ? 'Ikke prøvet endnu' : 'Trin ' + j.niveau + ' af 3'), h('td', null, j ? j.runder + (j.runder === 1 ? ' runde' : ' runder') : ''),
+          h('td', null, pct === null ? '' : pct + ' % rigtige i første forsøg')));
+      }
       const beskriv = (n) => (D && D.beskrivNoegle(n)) || O.beskrivNoegle(n);
       // Det driller (flest fejl, seneste først)
       const driller = [];
@@ -614,6 +622,12 @@
           class: 'tidsvalg-knap' + (voksen.tidsgraense[b.id] === m ? ' valgt' : ''), type: 'button',
           onclick: (e) => { Lyd.init(); Lyd.tryk(); voksen.tidsgraense[b.id] = m; gemV(); e.currentTarget.parentNode.querySelectorAll('button').forEach((x) => x.classList.toggle('valgt', x === e.currentTarget)); },
         }, m ? m + ' min' : 'Ingen'))));
+      // B10: et valg blandt få muligheder (samme knapper som tidsgrænsen)
+      const valgRaekke = (label, felt, muligheder, tekst, kl) => h('div', { class: 'indstilling ' + (kl || '') }, h('span', null, label),
+        h('div', { class: 'tidsvalg' }, muligheder.map((m) => h('button', {
+          class: 'tidsvalg-knap' + (voksen[felt] === m ? ' valgt' : ''), type: 'button', 'data-v': m,
+          onclick: (e) => { Lyd.init(); Lyd.tryk(); voksen[felt] = m; gemV(); e.currentTarget.parentNode.querySelectorAll('button').forEach((x) => x.classList.toggle('valgt', x === e.currentTarget)); },
+        }, tekst(m)))));
       const barnBlok = (b) => h('section', null, h('h2', null, b.navn),
         tidsvalg(b),
         skifter('Åbn alle verdener', voksen.aabneAlle[b.id], (v) => { voksen.aabneAlle[b.id] = v; }),
@@ -659,6 +673,10 @@
             skifter('Lydeffekter', voksen.lyd, (v) => { voksen.lyd = v; }),
             skifter('Oplæsning', voksen.tale, (v) => { voksen.tale = v; })),
           stemmeSektion(),
+          h('section', null, h('h2', null, 'Runder og pauser'),
+            valgRaekke('Opgaver pr. runde', 'opgaverPrRunde', [5, 8, 10], (m) => String(m), 'opgaver-pr-runde'),
+            valgRaekke('Bevægelsespause efter', 'pauseEfter', [2, 3, 4], (m) => m + ' runder', 'pause-efter'),
+            h('p', { class: 'voksen-hjaelp' }, 'Gælder både matematik og dansk. En pause er tre rolige øvelser (ca. halvandet minut).')),
           h('section', null, h('h2', null, 'Din træning'),
             skifter('Huskekort før dagens dosis', voksen.traening.huskekort !== false, (v) => { voksen.traening.huskekort = v; }),
             skifter('Ur i prøven', voksen.traening.proeveUr !== false, (v) => { voksen.traening.proeveUr = v; }),

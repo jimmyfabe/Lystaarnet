@@ -634,11 +634,64 @@
     return t[art] ? t[art]() : null;
   }
 
+  // =====================================================================
+  //  BOGSTAVJAGT (B10): bobler med bogstaver flyver op i buer; barnet stryger gennem det, det hører
+  //  Rene funktioner (testes i test-dansk.js): hvilke bogstaver, runden, banen og «ramte strøget boblen?»
+  // =====================================================================
+  // Tempo pr. trin: bobler ad gangen, lyde pr. runde og en flyvetur (op og ned igen) i sekunder
+  const JAGT_TRIN = {
+    1: { samtidig: 2, lyde: 8, flyvetid: 6.5 },
+    2: { samtidig: 3, lyde: 9, flyvetid: 5.2 },
+    3: { samtidig: 4, lyde: 10, flyvetid: 4.0 },
+  };
+  // Bogstaver nået i Lyde-verdenen (rækkefølgen i DANSK-ANALYSE): flere jo længere barnet er nået.
+  // Kun bogstaver med en lyd (ikke q, w, x, z og c).
+  function jagtBogstaver(lyde) {
+    const n = !lyde || !lyde.runder ? 8 : lyde.mestret ? 99 : ({ 1: 10, 2: 15, 3: 22 }[lyde.niveau] || 10);
+    return RAEKKEFOELGE.filter((b) => KUN_NAVN.indexOf(b) < 0 && b !== 'c').slice(0, n);
+  }
+  // En runde: for hver lyd det rigtige bogstav og 1–3 andre (2–4 bobler ad gangen); samme bogstav aldrig to gange i træk
+  function lavJagtRunde(bogstaver, trin, rng) {
+    const T = JAGT_TRIN[trin] || JAGT_TRIN[1];
+    const pulje = bogstaver.length >= T.samtidig ? bogstaver : RAEKKEFOELGE.slice(0, 8);
+    const ud = [];
+    let forrige = null;
+    for (let i = 0; i < T.lyde; i++) {
+      let b;
+      do { b = vaelg(rng, pulje); } while (b === forrige && pulje.length > 1);
+      forrige = b;
+      // Bogstaver, der ligner hinanden (b/d/p, m/n …), kommer gerne med — det er dem, der skal øves
+      const andre = bland(rng, pulje.filter((x) => x !== b)).slice(0, T.samtidig - 1);
+      ud.push({ bogstav: b, bobler: bland(rng, [b].concat(andre)) });
+    }
+    return ud;
+  }
+  // En bane: boblen starter under feltets bund, flyver op i en bue og falder ned igen.
+  // Koordinater i px med y nedad; g er tyngden. hoejde = toppunktet (andel af feltets højde fra bunden).
+  function lavBane(rng, trin, w, h, langsom) {
+    const T = (JAGT_TRIN[trin] || JAGT_TRIN[1]).flyvetid * (langsom ? 1.5 : 1);
+    const x0 = w * (0.15 + rng() * 0.7);
+    const x1 = Math.min(w * 0.88, Math.max(w * 0.12, x0 + (rng() - 0.5) * w * 0.5));
+    const top = h * (0.55 + rng() * 0.3);   // så højt op kommer boblen (fra bunden)
+    const g = 8 * top / (T * T);            // så den er i toppen efter T/2 og tilbage ved bunden efter T
+    return { x0: x0, y0: h, vx: (x1 - x0) / T, vy: g * T / 2, g: g, T: T };
+  }
+  const banePunkt = (b, t) => ({ x: b.x0 + b.vx * t, y: b.y0 - b.vy * t + b.g * t * t / 2 });
+  // Rammer et strøg (linjestykket p → q) en cirkel (midte c, radius r)? Et tryk (p = q) tæller også.
+  function strygRammer(p, q, c, r) {
+    const dx = q.x - p.x, dy = q.y - p.y;
+    const l2 = dx * dx + dy * dy;
+    const t = l2 ? Math.max(0, Math.min(1, ((c.x - p.x) * dx + (c.y - p.y) * dy) / l2)) : 0;
+    const nx = p.x + t * dx - c.x, ny = p.y + t * dy - c.y;
+    return nx * nx + ny * ny <= r * r;
+  }
+
   const Dansk = {
     ALFABET, VOKALER, ORD, ORDLISTE, RIM, RAEKKEFOELGE, HOLDELYDE, STOPLYDE, KUN_NAVN, NAVNE, LYDLISTE, SMAAORD, HISTORIER,
     EMNER, GEN, LYT_TYPER, SKRIFT, SKRIVEVEJ, BOGSTAV_BREDDE, forlaegOrd, vurderSpor, langs,
     lydId, navnId, lydReserve, rimdel, rimerPaa, rimGruppe, ordIGruppe, ordILinje, undtagelser, ligner,
     lavOpgave, lavRunde, beskrivNoegle, lavRng,
+    JAGT_TRIN, jagtBogstaver, lavJagtRunde, lavBane, banePunkt, strygRammer,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Dansk;

@@ -1673,3 +1673,44 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
 .laer-trin-linje { animation: ind 0.25s ease-out; }
 .laer-naeste-trin { align-self: flex-start; }
 .laer-afsnit-side .naeste-knap { align-self: center; }
+
+/* ---------- B10: pausen er tre øvelser (ca. 90 s); ⏭ kommer først efter 15 s ---------- */
+.pause-oevelser { flex: 1; display: flex; justify-content: center; gap: 10px; }
+.pause-oevelser i { font-style: normal; font-size: clamp(30px, 5vmin, 44px); opacity: 0.35; filter: grayscale(1); }
+.pause-oevelser i.nu { opacity: 1; filter: none; transform: scale(1.2); }
+.pause-oevelser i.fuld { opacity: 0.8; filter: none; }
+.spring-over.usynlig { visibility: hidden; pointer-events: none; }
+
+/* ---------- B10: Bogstavjagt ---------- */
+.bogstavjagt { background: linear-gradient(180deg, #bfe6ff, #e9f7ff 60%, #fdf6e3); }
+.bogstavjagt .topbar-titel { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.jagt-lyde { display: flex; gap: 5px; }
+.jagt-lyde i { width: 16px; height: 16px; border-radius: 50%; background: rgba(255, 255, 255, 0.9); border: 3px solid var(--farve-1-lys); }
+.jagt-lyde i.fuld { background: var(--guld); border-color: var(--guld-moerk); }
+.jagt-score { flex: 0 0 auto; font-size: clamp(22px, 3.6vmin, 32px); font-weight: 900; color: var(--farve-1-moerk); }
+.jagt-felt { position: relative; flex: 1; min-height: 0; margin: 0 12px 12px; border-radius: 28px; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; background: rgba(255, 255, 255, 0.35); }
+.jagt-boble {
+  --b: clamp(64px, 13vmin, 120px);
+  position: absolute; left: 0; top: 0; width: var(--b); height: var(--b); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; pointer-events: none; will-change: transform;
+  background: radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.95), rgba(160, 215, 255, 0.75) 45%, rgba(90, 160, 230, 0.85));
+  box-shadow: inset 0 -6px 12px rgba(40, 90, 160, 0.35), 0 6px 14px var(--skygge);
+  transform: translate(-999px, -999px);
+}
+.jagt-boble span { font-size: calc(var(--b) * 0.56); font-weight: 900; line-height: 1; color: #1d3557; }
+.jagt-boble.hjaelp { box-shadow: 0 0 0 6px var(--guld), 0 0 24px var(--guld); }
+.jagt-boble.forbi span { animation: ryst 0.4s; }
+.jagt-boble.delt { animation: jagtDelt 0.6s ease-out forwards; }
+@keyframes jagtDelt { 0% { opacity: 1; filter: none; } 40% { filter: brightness(1.4); } 100% { opacity: 0; filter: blur(2px); } }
+.jagt-boble.delt span { animation: jagtSpalt 0.6s ease-out forwards; }
+@keyframes jagtSpalt { to { transform: scale(1.6) rotate(-12deg); opacity: 0; } }
+.jagt-spor { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; }
+.jagt-streg { fill: none; stroke: rgba(255, 255, 255, 0.95); stroke-width: 9; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 0 4px rgba(47, 125, 225, 0.8)); }
+@media (prefers-reduced-motion: reduce) { .jagt-boble.delt, .jagt-boble.delt span { animation-duration: 0.01s; } }
+/* B10: 8–10 fodspor skal kunne stå i rundens topbar på en smal telefon på højkant (--n = antal opgaver) */
+@media (max-width: 600px) {
+  .runde .topbar { gap: 8px; padding-left: 10px; padding-right: 10px; }
+  .runde .fremdrift { gap: 3px; }
+  .runde .prik { width: clamp(12px, calc((100vw - 176px) / var(--n, 5) - 3px), 30px); height: clamp(12px, calc((100vw - 176px) / var(--n, 5) - 3px), 30px); border-width: 2px; font-size: clamp(10px, calc((100vw - 176px) / var(--n, 5) * 0.7), 22px); }
+  .runde .fremdrift-dyr { font-size: 26px; margin-left: 2px; }
+}
