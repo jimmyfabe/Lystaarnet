@@ -237,8 +237,9 @@
   // Gem en kopi af ulæselige data, så de aldrig går tabt. Hver ny fejl får sin egen nøgle
   // (samme dag: _2, _3 …), og vi læser kopien igen for at se, at den faktisk blev skrevet.
   // Returnerer nøglen — eller null, hvis der ikke var plads.
-  function backup(lager, noegle, raa) {
-    const grund = noegle + '_backup_' + idag();
+  // art «backup» = reservekopi af ulæselige data; «foer_fortryd» = gyldige data gemt, før «Fortryd» overskrev dem
+  function backup(lager, noegle, raa, art) {
+    const grund = noegle + '_' + (art || 'backup') + '_' + idag();
     for (let n = 1; n < 100; n++) {
       const k = n === 1 ? grund : grund + '_' + n;
       const fundet = laes(lager, k);
@@ -283,7 +284,7 @@
     try {
       for (let i = 0; i < lager.length; i++) {
         const k = lager.key(i);
-        if (k && /^mat_.+_(backup|foer_import)_/.test(k)) ud.push(k);
+        if (k && /^mat_.+_(backup|foer_import|foer_fortryd)_/.test(k)) ud.push(k);
       }
     } catch (e) { /* intet lager */ }
     return ud.sort();
@@ -332,21 +333,30 @@
 
   // Fortryd seneste indlæsning: den nyeste «_foer_import_»-kopi pr. nøgle bliver de gældende data igen.
   // Kun nøgler med en kopi røres. Returnerer de nøgler, der blev rullet tilbage.
-  // Kopier under en gammel nøgle (indlæst før B1) rulles tilbage til den nye nøgle — men kun, hvis den nye
-  // nøgle ikke selv har en kopi (den er i så fald nyere, for de gamle kopier er lavet før omdøbningen).
+  // En kopi under en gammel nøgle (indlæst før B1) rulles ALDRIG tilbage: den er ældre end alt, barnet har spillet
+  // siden, og ville overskrive det (den kommer stadig med i «Gem en kopi»). De nuværende data gemmes som backup,
+  // før de overskrives; lykkes backuppen ikke, røres nøglen ikke.
   function fortrydImport(lager) {
     const pr = importKopier(lager);
     const rullet = [];
     for (const n in pr) {
-      const maal = nyNoegle(n) || n;
-      if (maal !== n && pr[maal]) continue;
+      if (nyNoegle(n)) continue; // gammel nøgle fra før B1
       const nyeste = pr[n][pr[n].length - 1];
       const v = laes(lager, nyeste);
-      if (v === null || !skriv(lager, maal, v) || laes(lager, maal) !== v) continue;
+      if (v === null || v === undefined) continue;
+      const nu = laes(lager, n);
+      // Eget navn («_foer_fortryd_»), så voksendelen ikke tror, det er ulæselige data (det er «_backup_»)
+      if (nu !== null && nu !== undefined && nu !== v && !backup(lager, n, nu, 'foer_fortryd')) continue;
+      if (!skriv(lager, n, v) || laes(lager, n) !== v) continue;
       try { lager.removeItem(nyeste); } catch (e) { /* kopien bliver liggende */ }
-      rullet.push(maal);
+      rullet.push(n);
     }
     return rullet;
+  }
+
+  // Kan «Fortryd seneste indlæsning» gøre noget? Kun kopier under de nye nøgler tæller (se fortrydImport).
+  function kanFortryde(lager) {
+    return Object.keys(importKopier(lager)).some((n) => !nyNoegle(n));
   }
 
   // En sikkerhedskopi til en fil: spillets data under «data» (det, der kan indlæses igen), og reservekopier
@@ -384,7 +394,7 @@
       const v = laes(lager, GAMLE_NOEGLER[ny]);
       if (v) reservekopier[GAMLE_NOEGLER[ny]] = v;
     }
-    for (const k of findBackups(lager)) if (k.indexOf('_backup_') > 0) reservekopier[k] = laes(lager, k);
+    for (const k of findBackups(lager)) if (k.indexOf('_backup_') > 0 || k.indexOf('_foer_fortryd_') > 0) reservekopier[k] = laes(lager, k);
     // Data fra før tidligere indlæsninger kommer også med (så en forkert indlæsning kan redes fra filen)
     const tidligere = {};
     for (const k of findBackups(lager)) {
@@ -649,7 +659,7 @@
     idag, standardBarn, standardEmne, standardDag, standardHistorie, normaliserHistorie, standardVoksen, standardTraening,
     GAMLE_NOEGLER, HOVEDNOEGLER, migrerNoegler, nyNoegle,
     migrer, normaliserBarn, normaliserEmne, normaliserVoksen, normaliserPauset, voksenGentag, rens,
-    indlaesBarn, gemBarn, indlaesVoksen, gemVoksen, findBackups, findUlaeselige, importer, lavKopi, rydGamleKopier, fortrydImport, importKopier,
+    indlaesBarn, gemBarn, indlaesVoksen, gemVoksen, findBackups, findUlaeselige, importer, lavKopi, rydGamleKopier, fortrydImport, kanFortryde, importKopier,
     dag, tilfoejGentag, fjernGentag, hukommelsesLager,
   };
 

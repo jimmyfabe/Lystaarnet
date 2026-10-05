@@ -664,8 +664,8 @@
           location.reload();
         }),
       }, '🧹 Ryd ulæselige data');
-      const importKopier = G.importKopier(lager);
-      const kanFortryde = Object.keys(importKopier).length > 0;
+      // Kun kopier under de nye nøgler kan fortrydes (en kopi fra før omdøbningen ville overskrive nyere data)
+      const kanFortryde = G.kanFortryde(lager);
       skift(h('div', { class: 'skaerm voksen indstillinger' },
         topbar('Indstillinger', visMenu),
         h('div', { class: 'overblik-indhold' },
@@ -791,9 +791,13 @@
 
     // Fortryd: data fra før seneste indlæsning bliver de gældende igen
     function fortrydIndlaesning() {
-      if (!confirm('Fortryde seneste indlæsning? Data fra før indlæsningen bliver de gældende igen.')) return;
+      if (!confirm('Fortryde seneste indlæsning? Data fra før indlæsningen bliver de gældende igen. Det, der er spillet siden, gemmes som en kopi og kommer med i «Gem en kopi».')) return;
+      const navn = (k) => ({ mat_dino_v1: 'Dino', mat_enhjorning_v1: 'Enhjørning', mat_voksen_v1: 'voksendelen' }[k] || k);
+      const kunne = Object.keys(G.importKopier(lager)).filter((k) => !G.nyNoegle(k));
       const rullet = G.fortrydImport(lager);
-      alert(rullet.length ? 'Fortrudt.' : 'Der var intet at fortryde.');
+      if (!rullet.length) alert('Intet blev fortrudt — lageret er måske fuldt. Tag en kopi med «Gem en kopi», og prøv igen.');
+      else if (rullet.length < kunne.length) alert('Kun ' + rullet.map(navn).join(' og ') + ' blev fortrudt — lageret er måske fuldt.');
+      else alert('Fortrudt.');
       location.reload();
     }
 
