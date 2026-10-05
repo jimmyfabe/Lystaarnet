@@ -161,6 +161,92 @@
     { navn: 'Ballonen', e: '🎈' }, { navn: 'Bogen', e: '📕' }, { navn: 'Bananen', e: '🍌' },
   ];
 
+  // ---------- Tegnebyen (B6): sømbræt, lineal og klodser ----------
+  const SOEMBRAET = { kol: 5, raek: 4 };
+  const TEGNE_FIGURER = { 1: ['trekant', 'firkant'], 2: ['trekant', 'firkant', 'kvadrat'], 3: ['trekant', 'kvadrat', 'rektangel'] };
+  const STREG_CM = { 1: [1, 5], 2: [2, 8], 3: [3, 10] };
+  const LINEAL_CM = { 1: 6, 2: 10, 3: 10 };
+  const KLODS_MAAL = { 1: [2, 5], 2: [3, 8], 3: [4, 10] };
+  const MAALE_TING = [
+    { id: 'blyant', e: '✏️', bestemt: 'blyanten' },
+    { id: 'pensel', e: '🖌️', bestemt: 'penslen' },
+    { id: 'tog', e: '🚂', bestemt: 'toget' },
+    { id: 'slange', e: '🐍', bestemt: 'slangen' },
+  ];
+
+  // Et sømbræt er et gitter af prikker (heltal x, y). vurderFigur → hjørner (punkter på linje tæller ikke),
+  // sider (kvadratet på længden), rette vinkler, lige lange sider, om siderne krydser, og typen.
+  function vurderFigur(punkter) {
+    const ud = { hjoerner: [], sider: [], retteVinkler: 0, ligeLange: false, krydser: false, type: 'ingen' };
+    if (!Array.isArray(punkter)) return ud;
+    const gyldig = punkter.filter((q) => Array.isArray(q) && Number.isFinite(q[0]) && Number.isFinite(q[1]));
+    // Gentagne punkter i træk væk (også et sidste punkt = det første, som lukker figuren)
+    let p = gyldig.filter((q, i) => i === 0 || q[0] !== gyldig[i - 1][0] || q[1] !== gyldig[i - 1][1]);
+    if (p.length > 1 && p[0][0] === p[p.length - 1][0] && p[0][1] === p[p.length - 1][1]) p = p.slice(0, -1);
+    // Punkter på linje med naboerne er ikke hjørner — fjern dem, til intet ændrer sig
+    let aendret = true;
+    while (aendret && p.length >= 3) {
+      aendret = false;
+      for (let i = 0; i < p.length; i++) {
+        const a = p[(i - 1 + p.length) % p.length], b = p[i], c = p[(i + 1) % p.length];
+        if ((b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]) === 0) { p.splice(i, 1); aendret = true; break; }
+      }
+    }
+    if (p.length < 3) return ud;
+    const n = p.length;
+    ud.hjoerner = p;
+    for (let i = 0; i < n; i++) {
+      const a = p[i], b = p[(i + 1) % n];
+      ud.sider.push((b[0] - a[0]) * (b[0] - a[0]) + (b[1] - a[1]) * (b[1] - a[1]));
+    }
+    for (let i = 0; i < n; i++) {
+      const a = p[(i - 1 + n) % n], b = p[i], c = p[(i + 1) % n];
+      if ((a[0] - b[0]) * (c[0] - b[0]) + (a[1] - b[1]) * (c[1] - b[1]) === 0) ud.retteVinkler++;
+    }
+    ud.ligeLange = ud.sider.every((s) => s === ud.sider[0]);
+    // To sider, der ikke er naboer, må ikke krydse (en «sløjfe» er ikke en figur)
+    const side = (a, b, c) => Math.sign((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]));
+    const skaerer = (p1, p2, p3, p4) => side(p1, p2, p3) * side(p1, p2, p4) < 0 && side(p3, p4, p1) * side(p3, p4, p2) < 0;
+    for (let i = 0; i < n; i++) for (let j = i + 2; j < n; j++) {
+      if (i === 0 && j === n - 1) continue;
+      if (skaerer(p[i], p[(i + 1) % n], p[j], p[(j + 1) % n])) ud.krydser = true;
+    }
+    if (ud.krydser) ud.type = 'kryds';
+    else if (n === 3) ud.type = 'trekant';
+    else if (n === 4) ud.type = ud.retteVinkler === 4 ? (ud.ligeLange ? 'kvadrat' : 'rektangel') : 'firkant';
+    else ud.type = 'mangekant';
+    return ud;
+  }
+
+  // Passer den tegnede figur til opgaven? Et kvadrat og et rektangel er også firkanter; et kvadrat er også et rektangel.
+  function figurPasser(maal, type) {
+    if (maal === type) return true;
+    if (maal === 'firkant') return type === 'kvadrat' || type === 'rektangel';
+    if (maal === 'rektangel') return type === 'kvadrat';
+    return false;
+  }
+
+  // En tegnet streg passer, hvis den er højst 0,3 cm fra målet
+  const stregPasser = (maal, cm) => Number.isFinite(cm) && Math.abs(cm - maal) <= 0.3 + 1e-9;
+
+  // Et eksempel på figuren med startprikken som første hjørne (til hjælpen og «vis svaret»), eller null
+  function eksempelFigur(form, start, kol, raek) {
+    kol = kol || SOEMBRAET.kol; raek = raek || SOEMBRAET.raek;
+    const [sx, sy] = start;
+    const forslag = {
+      trekant: [[[2, 0], [0, 2]], [[2, 0], [1, 2]], [[1, 2], [-1, 2]], [[2, 0], [2, 2]]],
+      kvadrat: [[[2, 0], [2, 2], [0, 2]], [[1, 0], [1, 1], [0, 1]]],
+      rektangel: [[[3, 0], [3, 2], [0, 2]], [[2, 0], [2, 1], [0, 1]], [[3, 0], [3, 1], [0, 1]], [[1, 0], [1, 2], [0, 2]], [[1, 0], [1, 3], [0, 3]]],
+      firkant: [[[3, 0], [2, 2], [1, 2]], [[2, 0], [3, 2], [0, 2]], [[2, 0], [2, 2], [0, 1]], [[1, 0], [2, 2], [0, 2]]],
+    }[form];
+    if (!forslag) return null;
+    for (const f of forslag) for (const [mx, my] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) {
+      const pts = [[sx, sy]].concat(f.map(([dx, dy]) => [sx + mx * dx, sy + my * dy]));
+      if (pts.every(([x, y]) => x >= 0 && y >= 0 && x < kol && y < raek) && vurderFigur(pts).type === form) return pts;
+    }
+    return null;
+  }
+
   const G = {
     // ===== Tælleskoven: tal til 20 =====
     antal(niveau, rng, tingListe) {
@@ -370,6 +456,70 @@
         svar: svar,
         valg: lavValg(rng, svar, 0, 6, null, antalValg(niveau)),
         hjaelp: [{ art: 'kanter' }],
+      };
+    },
+
+    // ---------- Tegnebyen (B6): tegn og mål ----------
+    // Sømbræt: barnet trykker prikkerne i rækkefølge (den første er sat) og lukker figuren ved den første prik
+    tegnFigur(niveau, rng) {
+      const form = vaelg(rng, TEGNE_FIGURER[niveau]);
+      // Startprikken vælges, så figuren altid kan tegnes ud fra den (eksempelFigur finder en)
+      const muligeStart = [];
+      for (let y = 0; y < SOEMBRAET.raek; y++) for (let x = 0; x < SOEMBRAET.kol; x++) if (eksempelFigur(form, [x, y])) muligeStart.push([x, y]);
+      const start = vaelg(rng, muligeStart);
+      return {
+        emne: 'tegne', type: 'tegnFigur', niveau, noegle: 'tegnFigur:' + form + ':' + start.join(','), ikon: '📌',
+        tale: 'Tegn ' + FORMER[form].ubestemt + '. Start ved den grønne prik. Tryk på prikkerne, og slut ved den grønne prik.',
+        tekst: 'Tegn ' + FORMER[form].ubestemt,
+        vis: { art: 'soembraet', kol: SOEMBRAET.kol, raek: SOEMBRAET.raek, form: form, start: start },
+        svar: 'ok', interaktiv: 'soembraet',
+        hjaelp: [{ art: 'figurHjoerner', form: form }],
+      };
+    },
+
+    // Lineal: «Hvor lang er stregen?» (1 cm på linealen = 52 px på iPad)
+    maalStreg(niveau, rng) {
+      const [min, max] = STREG_CM[niveau];
+      const cm = heltal(rng, min, max);
+      const laengde = LINEAL_CM[niveau];
+      return {
+        emne: 'tegne', type: 'maalStreg', niveau, noegle: 'maalStreg:' + cm, ikon: '📏',
+        tale: 'Hvor lang er stregen? Se på linealen.',
+        tekst: 'Hvor mange cm?',
+        vis: { art: 'lineal', cm: cm, laengde: laengde },
+        svar: cm,
+        valg: lavValg(rng, cm, 1, laengde, null, antalValg(niveau)),
+        hjaelp: [{ art: 'cmHop' }],
+      };
+    },
+
+    // Lineal: «Tegn en streg på 5 cm» — træk fra 0 (±0,3 cm godkendes)
+    tegnStreg(niveau, rng) {
+      const [min, max] = STREG_CM[niveau];
+      const cm = heltal(rng, Math.max(2, min), max);
+      return {
+        emne: 'tegne', type: 'tegnStreg', niveau, noegle: 'tegnStreg:' + cm, ikon: '✏️',
+        tale: 'Tegn en streg på ' + cm + ' centimeter. Træk fra nul.',
+        tekst: 'Tegn ' + cm + ' cm',
+        vis: { art: 'linealTegn', cm: cm, laengde: LINEAL_CM[niveau] },
+        svar: 'ok', interaktiv: 'lineal',
+        hjaelp: [{ art: 'cmHop' }],
+      };
+    },
+
+    // Mål med klodser (ikke-standardiseret enhed): «Hvor mange klodser lang er blyanten?»
+    maalKlodser(niveau, rng) {
+      const [min, max] = KLODS_MAAL[niveau];
+      const antal = heltal(rng, min, max);
+      const ting = vaelg(rng, MAALE_TING);
+      return {
+        emne: 'tegne', type: 'maalKlodser', niveau, noegle: 'maalKlodser:' + ting.id + ':' + antal, ikon: '🧱',
+        tale: 'Hvor mange klodser lang er ' + ting.bestemt + '?',
+        tekst: 'Hvor mange klodser?',
+        vis: { art: 'maalKlodser', antal: antal, maaleTing: ting.id },
+        svar: antal,
+        valg: lavValg(rng, antal, 1, 10, null, antalValg(niveau)),
+        hjaelp: [{ art: 'tael' }],
       };
     },
 
@@ -915,6 +1065,14 @@
         3: ['findForm', 'hjoerner', 'kanter', 'formScene'],
       },
     },
+    tegne: {
+      navn: 'Tegn og mål', omraade: 'Geometri og måling', maxNiveau: 3,
+      niveauer: {
+        1: ['maalKlodser', 'tegnFigur', 'maalStreg'],
+        2: ['maalKlodser', 'tegnFigur', 'maalStreg', 'tegnStreg'],
+        3: ['tegnFigur', 'maalStreg', 'tegnStreg'],
+      },
+    },
     plus10: {
       navn: 'Plus til 10', omraade: 'Tal og algebra', maxNiveau: 3,
       niveauer: {
@@ -1147,6 +1305,10 @@
     const r = rest || '';
     const tekster = {
       antal: () => 'Tælle ' + r + ' ting',
+      tegnFigur: () => 'Tegne ' + (FORMER[r.split(':')[0]] ? FORMER[r.split(':')[0]].ubestemt : 'en figur') + ' på sømbrættet',
+      maalStreg: () => 'Måle en streg på ' + r + ' cm',
+      tegnStreg: () => 'Tegne en streg på ' + r + ' cm',
+      maalKlodser: () => 'Måle med klodser (' + r.split(':')[1] + ' lang)',
       terning: () => 'Terningøjne: ' + r,
       klodser: () => 'Tælle ' + r + ' klodser',
       streger: () => 'Tællestreger: ' + r,
@@ -1185,6 +1347,7 @@
   // Idéer til hjemmet pr. emne (egne formuleringer — inspireret af skolens «aktiviteter til hjemmet»)
   const HJEMME_IDEER = {
     taelle: 'Tæl ting i hverdagen: trappetrin, knapper, gulerødder. Slå med en terning og sig antallet uden at tælle. Stil sokker to og to: lige eller ulige?',
+    tegne: 'Mål ting med klodser, tændstikker eller en lineal: hvor mange klodser lang er skeen? Tegn trekanter og firkanter på ternet papir — og tæl hjørnerne bagefter.',
     former: 'Find cirkler, trekanter og firkanter i køkkenet og på gåturen. Tæl hjørner og kanter på en bog eller en pizzaskive.',
     plus10: 'Plus på fingrene: «Vis 3 — og 2 mere. Hvor mange i alt?» Slå med to terninger og læg øjnene sammen.',
     venner: "10'er-venner med fingrene: vis 7 — hvor mange mangler til 10? Læg 10 perler på en snor og skub nogle til siden.",
@@ -1201,6 +1364,7 @@
     antalOrd, antalValg, lavValg, lavValgTrin, lavValgTekst, talForvekslere, LYT_TYPER,
     lavOpgave, lavRunde, lavBlandetRunde, klemNiveau, opdaterNiveau, maerkeForRunde,
     beskrivNoegle, HJEMME_IDEER, klokkeNavn,
+    SOEMBRAET, MAALE_TING, vurderFigur, figurPasser, stregPasser, eksempelFigur,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Opgaver;

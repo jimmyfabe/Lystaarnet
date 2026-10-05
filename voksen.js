@@ -145,12 +145,121 @@
         topbar('Voksendel'),
         advarsel ? h('p', { class: 'voksen-advarsel' }, '⚠️ ' + advarsel) : null,
         h('div', { class: 'menu-gitter' },
+          kort('📘', 'Lær', 'Bogen afsnit for afsnit' + laerStatus(), visLaer),
           kort('🧠', 'Dagens dosis', '5 opgaver · ca. 5 min' + (dage ? ' · ' + dage + (dage === 1 ? ' dag' : ' dage') + ' trænet' : ''), () => visVerdensvalg('dosis')),
           kort('⏱️', 'Prøve', '8 opgaver fra én verden', () => visVerdensvalg('proeve')),
           kort('🤝', 'Familieduel', 'Barn og voksen · fælles mål', visDuelValg),
           ...BOERN.map((b) => kort(b.e, b.navn, 'Overblik', () => visOverblik(b))),
           kort('🎙️', 'Indtal', 'Bogstavlyde til dansk', visIndtal),
           kort('⚙️', 'Indstillinger', 'Lyd, stemme, emner, tidsgrænse, kopi', visIndstillinger))));
+    }
+
+    // =================================================================
+    //  📘 Lær (B7) — bogens kapitler og afsnit i præcis bogens rækkefølge (docs/VOKSEN-LAER.md)
+    //  Huskekort → et gennemregnet eksempel trin for trin → 3–5 opgaver → ✓.
+    //  Forkerte svar viser forklaringen og den typiske fejl og kommer igen i dagens dosis.
+    // =================================================================
+    const laerData = () => voksen.traening.laer || (voksen.traening.laer = {});
+    function laerStatus() {
+      if (!VO.AFSNIT) return '';
+      const n = VO.AFSNIT.filter((a) => laerData()[a.id] && laerData()[a.id].faerdig).length;
+      return n ? ' · ' + n + ' af ' + VO.AFSNIT.length + ' ✓' : '';
+    }
+
+    function visLaer() {
+      const L = laerData();
+      const kapitler = VO.KAPITLER.map((K) => {
+        const afsnit = VO.AFSNIT.filter((a) => a.kap === K.id);
+        const klaret = afsnit.filter((a) => L[a.id] && L[a.id].faerdig).length;
+        return h('button', { class: 'menu-kort laer-kapitel', type: 'button', 'data-kap': K.id, onclick: () => { Lyd.init(); Lyd.tryk(); visLaerKapitel(K.id); } },
+          h('span', { class: 'menu-ikon', 'aria-hidden': 'true' }, K.e),
+          h('b', null, K.id + '. ' + K.navn),
+          h('small', null, klaret + ' af ' + afsnit.length + ' afsnit' + (klaret === afsnit.length ? ' ✓' : '')));
+      });
+      skift(h('div', { class: 'skaerm voksen laer' },
+        topbar('📘 Lær', visMenu),
+        h('p', { class: 'voksen-hjaelp' }, 'Bogens kapitler i bogens rækkefølge. Vælg frit. Hvert afsnit: huskekort, et eksempel trin for trin og et par opgaver. Forkerte svar kommer igen i dagens dosis.'),
+        h('div', { class: 'menu-gitter' }, kapitler)));
+    }
+
+    function visLaerKapitel(kapId) {
+      const L = laerData();
+      const K = VO.KAPITLER.find((k) => k.id === kapId);
+      const afsnit = VO.AFSNIT.filter((a) => a.kap === kapId).map((a) => h('button', {
+        class: 'laer-afsnit' + (L[a.id] && L[a.id].faerdig ? ' faerdig' : ''), type: 'button', 'data-afsnit': a.id,
+        onclick: () => { Lyd.init(); Lyd.tryk(); visAfsnit(a.id); },
+      },
+      h('span', { class: 'laer-afsnit-nr' }, a.id),
+      h('span', { class: 'laer-afsnit-titel' }, a.titel, a.valgfri ? h('small', null, ' (valgfri)') : null),
+      h('span', { class: 'laer-afsnit-ok', 'aria-label': L[a.id] && L[a.id].faerdig ? 'Klaret' : '' }, L[a.id] && L[a.id].faerdig ? '✓' : '')));
+      skift(h('div', { class: 'skaerm voksen laer' },
+        topbar(K.e + ' ' + K.id + '. ' + K.navn, visLaer),
+        h('div', { class: 'laer-liste' }, afsnit)));
+    }
+
+    // Et afsnit: huskekort øverst, eksemplet vises ét trin ad gangen («Næste trin»), så opgaverne
+    function visAfsnit(id) {
+      const A = VO.AFSNIT.find((a) => a.id === id);
+      const K = VO.KAPITLER.find((k) => k.id === A.kap);
+      let vist = 1;
+      const trin = h('ol', { class: 'laer-trin' });
+      const naesteTrin = h('button', { class: 'voksen-valg-knap laer-naeste-trin', type: 'button', onclick: () => { Lyd.init(); Lyd.tryk(); vist++; tegn(); } }, 'Næste trin ▸');
+      const opgKnap = h('button', { class: 'stor-knap naeste-knap laer-start', type: 'button', 'aria-label': 'Start opgaverne', onclick: () => { Lyd.init(); Lyd.tryk(); startLaer(id); } }, '▶');
+      const tegn = () => {
+        trin.textContent = '';
+        A.eksempel.slice(0, vist).forEach((t) => trin.append(html('li', 'laer-trin-linje', t)));
+        const alle = vist >= A.eksempel.length;
+        naesteTrin.classList.toggle('skjult', alle);
+        opgKnap.classList.toggle('skjult', !alle);
+        if (alle) opgKnap.scrollIntoView({ block: 'nearest' });
+      };
+      skift(h('div', { class: 'skaerm voksen laer afsnit' },
+        topbar(A.id + ' ' + A.titel, () => visLaerKapitel(A.kap)),
+        h('div', { class: 'voksen-opgave laer-afsnit-side' },
+          h('h2', { class: 'huskekort-titel' }, 'Huskekort'),
+          h('ul', { class: 'huskekort-liste' }, A.husk.map((r) => html('li', 'huskekort-regel', r))),
+          h('h2', { class: 'huskekort-titel' }, 'Eksempel'),
+          trin,
+          naesteTrin,
+          opgKnap,
+          h('p', { class: 'voksen-hjaelp' }, K.e + ' Kapitel ' + K.id + (A.valgfri ? ' · valgfrit afsnit (ikke på prøvelisten)' : '')))),
+      (e) => {
+        if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowRight') {
+          e.preventDefault();
+          if (!naesteTrin.classList.contains('skjult')) naesteTrin.click(); else opgKnap.click();
+        }
+      });
+      tegn();
+    }
+
+    function startLaer(id) {
+      const A = VO.AFSNIT.find((a) => a.id === id);
+      // Niveauet følger verdenen (emnet) for afsnittets første opgavetype
+      const opgaver = VO.lavLaerOpgaver(id, 1, rng(), 4);
+      const e = opgaver.length ? voksen.traening.emner[opgaver[0].emne] : null;
+      const n = e ? e.niveau : 1;
+      const ud = n > 1 ? VO.lavLaerOpgaver(id, n, rng(), 4) : opgaver;
+      visVoksenOpgave({ opgaver: ud, i: 0, rigtige: 0, laer: A.id, tilbage: () => visAfsnit(A.id) });
+    }
+
+    function visLaerSlut(d) {
+      const L = laerData();
+      const A = VO.AFSNIT.find((a) => a.id === d.laer);
+      const tidl = L[A.id] || {};
+      L[A.id] = Object.assign({}, tidl, { faerdig: true, rigtige: d.rigtige, ialt: d.opgaver.length, dato: G.idag() });
+      gemV();
+      const i = VO.AFSNIT.indexOf(A);
+      const naeste = VO.AFSNIT[i + 1];
+      skift(h('div', { class: 'skaerm voksen' },
+        topbar('📘 ' + A.id + ' ' + A.titel, () => visLaerKapitel(A.kap)),
+        h('div', { class: 'voksen-midte' },
+          h('div', { class: 'dosis-resultat' }, '✓ ' + d.rigtige + ' af ' + d.opgaver.length),
+          h('p', { class: 'voksen-hjaelp' }, d.rigtige === d.opgaver.length ? 'Afsnittet er klaret.' : 'Afsnittet er klaret. Opgaverne, der drillede, kommer igen i dagens dosis.'),
+          h('div', { class: 'voksen-knaprad' },
+            naeste ? h('button', { class: 'voksen-valg-knap laer-videre', type: 'button', onclick: () => visAfsnit(naeste.id) }, 'Næste afsnit: ' + naeste.id) : null,
+            h('button', { class: 'voksen-valg-knap', type: 'button', onclick: () => startLaer(A.id) }, 'Øv igen'),
+            h('button', { class: 'voksen-valg-knap', type: 'button', onclick: () => visLaerKapitel(A.kap) }, 'Til afsnittene')))));
+      Lyd.fejring();
     }
 
     // =================================================================
@@ -223,11 +332,12 @@
     function visVoksenOpgave(d) {
       const T = voksen.traening;
       const o = d.opgaver[d.i];
+      window.Voksen.nu = o; // til test: opgaven på skærmen
       let svaret = false;
       const forklaring = h('div', { class: 'voksen-forklaring skjult' });
       const naeste = h('button', {
         class: 'stor-knap naeste-knap skjult', type: 'button', 'aria-label': 'Næste',
-        onclick: () => { Lyd.init(); Lyd.tryk(); d.i++; if (d.i < d.opgaver.length) visVoksenOpgave(d); else visDosisSlut(d); },
+        onclick: () => { Lyd.init(); Lyd.tryk(); d.i++; if (d.i < d.opgaver.length) visVoksenOpgave(d); else if (d.laer) visLaerSlut(d); else visDosisSlut(d); },
       }, '▶');
       // Eget taltastatur (slået til under Indstillinger): tal-svar tastes i stedet for at vælges
       const tastes = T.tastatur === true && VO.kanTastes(o);
@@ -327,7 +437,7 @@
         const t = setInterval(() => { if (!document.body.contains(ur)) { clearInterval(t); return; } ur.textContent = minSek(Date.now() - d.start); }, 1000);
       }
       skift(h('div', { class: 'skaerm voksen opgave' },
-        topbar([h('span', { class: 'titel-navn' }, E.e + ' ' + E.navn), h('span', { class: 'titel-tal' }, '· ' + (d.i + 1) + ' / ' + d.opgaver.length)], visMenu, ur),
+        topbar([h('span', { class: 'titel-navn' }, d.laer ? '📘 ' + d.laer : E.e + ' ' + E.navn), h('span', { class: 'titel-tal' }, '· ' + (d.i + 1) + ' / ' + d.opgaver.length)], d.tilbage || visMenu, ur),
         h('div', { class: 'voksen-opgave' },
           html('div', 'voksen-spoerg', o.spoerg),
           o.figur ? figurSvg(o.figur) : null,
@@ -921,6 +1031,7 @@
     }
 
     // Start: låst op i denne fane? Så direkte til menuen.
+    window.Voksen._visAfsnit = visAfsnit; // til test
     if (erAaben()) visMenu(); else visLaas();
   }
 

@@ -25,6 +25,7 @@
   const VERDENER = [
     { id: 'taelle', e: '🌲', navn: 'Tælleskoven', emne: 'taelle', tale: 'Tælleskoven. Her tæller vi til 20.' },
     { id: 'former', e: '🔺', navn: 'Formbyen', emne: 'former', tale: 'Formbyen. Cirkler, trekanter og firkanter.' },
+    { id: 'tegne', e: '✏️', navn: 'Tegnebyen', emne: 'tegne', tale: 'Tegnebyen. Her tegner vi figurer og måler med lineal og klodser.' },
     { id: 'plus10', e: '⛰️', navn: 'Plusbjerget', emne: 'plus10', tale: 'Plusbjerget. Her lægger vi sammen.' },
     { id: 'venner', e: '🏝️', navn: 'Venneøen', emne: 'venner', tale: "Venneøen. 5'er-venner og 10'er-venner." },
     { id: 'minus', e: '🌊', navn: 'Minussøen', emne: 'minus', tale: 'Minussøen. Vi tager væk og finder forskellen.' },
@@ -34,7 +35,8 @@
     { id: 'torvet', e: '🕰️', navn: 'Klokketorvet', emne: 'maaling', tale: 'Klokketorvet. Klokken og penge.' },
     { id: 'taarn', e: '🗼', svg: true, navn: 'Lystårnet', emne: 'taarn', blandet: true, tale: 'Lystårnet. Det hele blandet.' },
   ];
-  const AABNE_FRA_START = 4;
+  // De fem første er åbne fra start (Tegnebyen kom ind som nr. 3 i B6 — så Venneøen stadig er åben som før)
+  const AABNE_FRA_START = 5;
 
   // Den danske del (B4): verdener i rækkefølgen fra docs/DANSK-ANALYSE.md. De fire første er åbne fra start;
   // Små ord åbner ved Lydering trin 2; Historiebogen er åben (B5).
@@ -52,6 +54,7 @@
   // og en lille tegning med de repræsentationer, verdenen bruger (lektionTegning nedenfor).
   const LEKTIONER = {
     taelle: 'Her i Tælleskoven tæller vi. Vi peger på hver ting og siger et tal. Det sidste tal, vi siger, er, hvor mange der er.',
+    tegne: 'I Tegnebyen tegner og måler vi. Vi trykker på prikker og tegner trekanter og firkanter. Vi måler med en lineal i centimeter — og med klodser.',
     former: 'I Formbyen bor figurerne. En trekant har tre hjørner. En firkant har fire hjørner. En cirkel er rund og har ingen hjørner.',
     plus10: 'På Plusbjerget lægger vi sammen. Tre og to er fem i alt. Vi kan tælle på fingrene.',
     venner: "På Venneøen bor 10'er-vennerne. Syv og tre er 10'er-venner, for de er ti tilsammen.",
@@ -72,7 +75,7 @@
   // «Vælg selv» (🎒): alle emner som store ikoner, i grupper. Geometri står for sig.
   const VAELG_GRUPPER = [
     { e: '🔢', navn: 'Tal', verdener: ['taelle', 'plus10', 'venner', 'minus', 'tiere', 'tierbro', 'moenstre'] },
-    { e: '🔺', navn: 'Former', verdener: ['former'] },
+    { e: '🔺', navn: 'Former', verdener: ['former', 'tegne'] },
     { e: '🕰️', navn: 'Klokken og penge', verdener: ['torvet'] },
     { e: '🗼', navn: 'Det hele blandet', verdener: ['taarn'] },
     { e: '🔤', navn: 'Dansk', verdener: ['rim', 'lyde', 'alfabet', 'lydering', 'smaaord', 'historiebog'] },
@@ -81,6 +84,8 @@
   // Skolens ord bruges i oplæsningen (tælle videre, tage væk, forskel, 10'er-venner …)
   const HJAELP_TALE = {
     tael: 'Lad os tælle sammen.',
+    figurHjoerner: 'Lad os tælle hjørner og sider.',
+    cmHop: 'Lad os hoppe en centimeter ad gangen.',
     tallinje: 'Lad os hoppe på tallinjen.',
     fingre: 'Lad os tælle på fingrene.',
     fingreMangler: 'Lad os tælle videre på fingrene.',
@@ -832,20 +837,24 @@
       const frit = fritKnap.offsetWidth || 80;
       const ssMax = Math.max(...stationer.map((s) => s.offsetWidth || 100));
       let x0 = Math.min(90, w * 0.08), y0 = Math.min(80, hh * 0.08);
-      const beregn = () => liste.map((_, i) => {
-        const t = i / (n - 1);
-        // Den sidste station står altid i øverste række (liggende) / til venstre (højkant), så ▶ nederst til højre ikke dækker den
-        const top = (n - 1 - i) % 2 === 0;
-        if (liggende) {
-          // ▶-knappen har sin egen plads nederst til højre
-          const x1 = w - knap - 40;
-          return { x: x0 + (x1 - x0) * t, y: hh * (top ? 0.3 : 0.7) };
-        }
-        const y1 = hh - knap - 50;
-        return { x: w * (top ? 0.3 : 0.7), y: y0 + (y1 - y0) * t };
-      });
-      let punkter = beregn();
       const halv = Math.max(ssMax, 150) / 2; // navneskiltet kan være bredere end stationen
+      // Halvdelen af stationens bredde med navneskilt (navnene på låste verdener er skjult på små skærme)
+      const halvNavn = (i) => { const st = stationer[i], nv = st && st.querySelector('.station-navn'); return Math.max((st && st.offsetWidth || 80) / 2, nv ? nv.offsetWidth / 2 : 0); };
+      const beregn = () => {
+        // Den sidste station står altid i øverste række (liggende) / til venstre (højkant), så ▶ nederst til højre ikke dækker den.
+        // ▶ har sin egen plads nederst til højre: kun rækken/søjlen med ▶ skal stoppe før den — den anden må gå
+        // næsten helt ud til kanten. Så får stationerne mere plads (B6: 11 verdener).
+        const fri = liggende ? w - halvNavn(n - 1) - 8 : hh - ssMax / 2 - 40;                      // den sidste station (uden ▶)
+        const vedKnap = liggende ? w - knap - 24 - Math.max(16, halvNavn(n - 2)) : hh - knap - ssMax / 2 - 75;  // den næstsidste (rækken med ▶) — navnet under den og ▶'s lille ikon må ikke røre ▶
+        const start = liggende ? x0 : y0;
+        const trin = n > 2 ? Math.min((fri - start) / (n - 1), (vedKnap - start) / (n - 2)) : (vedKnap - start);
+        return liste.map((_, i) => {
+          const top = (n - 1 - i) % 2 === 0;
+          const pos = start + trin * i;
+          return liggende ? { x: pos, y: hh * (top ? 0.3 : 0.7) } : { x: w * (top ? 0.3 : 0.7), y: pos };
+        });
+      };
+      let punkter = beregn();
       const iHjoernet = (p) => p.x - halv < frit + 10 && p.y - ssMax / 2 - 30 < frit + 10;
       for (let k = 0; k < 12 && punkter.some(iHjoernet); k++) {
         if (liggende) x0 += 12; else y0 += 12;
@@ -883,6 +892,26 @@
       }
       vx = Math.max(vs * 0.5 + 2, Math.min(w - vs * 0.5 - 2, vx));
       if (vx - vs / 2 < frit + 8 && vy - vs / 2 < frit + 8) vx = Math.min(w - vs * 0.5 - 2, p.x + ss * 0.5 + vs * 0.6); // ikke oven på 🎒
+      // Dækker vennen et navn, en station, 🎒 eller ▶ (fx når kortet er trangt)? Så prøv pladser rundt om stationen
+      if (w && hh) {
+        const fr = flade.getBoundingClientRect();
+        const hindringer = [...flade.querySelectorAll('.station-navn, .station-ikon, .station-stjerner, .kort-frit, .kort-spil')].map((el) => {
+          const r = el.getBoundingClientRect();
+          return { l: r.left - fr.left, t: r.top - fr.top, r: r.right - fr.left, b: r.bottom - fr.top };
+        });
+        const halvV = vs / 2 + 10; // vennen svæver op og ned (animationen «svaev»)
+        const fri = (x, y) => x - halvV >= 0 && x + halvV <= w && y - halvV >= 0 && y + halvV <= hh &&
+          hindringer.every((o) => x + halvV <= o.l || x - halvV >= o.r || y + halvV <= o.t || y - halvV >= o.b);
+        if (!fri(vx, vy)) {
+          const kand = [];
+          for (const f of [1, 1.4, 1.9]) for (let k = 0; k < 16; k++) {
+            const v = -Math.PI / 2 - Math.PI / 4 + k * Math.PI / 8;
+            kand.push([p.x + Math.cos(v) * (ss * 0.5 + vs * 0.5) * f, p.y + Math.sin(v) * (ss * 0.5 + vs * 0.5) * f]);
+          }
+          const valgt = kand.find(([x, y]) => fri(x, y));
+          if (valgt) { vx = valgt[0]; vy = valgt[1]; }
+        }
+      }
       ven.style.left = vx + 'px';
       ven.style.top = vy + 'px';
     };
@@ -991,7 +1020,7 @@
 
   // En gemt opgave (afbrudt mission, «kommer igen») kan stamme fra en anden udgave af spillet: brug den kun,
   // hvis emnet, visningen og tingene stadig findes — ellers kan runden gå i stå
-  const KENDTE_VISNINGER = ['ting', 'terning', 'terninger', 'klodser', 'streger', 'fingre', 'haand', 'kugleramme', 'par', 'flest', 'forskel', 'lyt', 'talstreg', 'plus', 'regnestykke', 'mangler', 'stoerst', 'minus', 'raekke', 'staenger', 'form', 'formScene', 'ur', 'moenter', 'koeb', 'moenster'];
+  const KENDTE_VISNINGER = ['ting', 'terning', 'terninger', 'klodser', 'streger', 'fingre', 'haand', 'kugleramme', 'par', 'flest', 'forskel', 'lyt', 'talstreg', 'plus', 'regnestykke', 'mangler', 'stoerst', 'minus', 'raekke', 'staenger', 'form', 'formScene', 'ur', 'moenter', 'koeb', 'moenster', 'soembraet', 'lineal', 'linealTegn', 'maalKlodser'];
   const KENDTE_DANSK = ['ordBillede', 'lyt', 'lytLyd', 'bogstav', 'stortBogstav', 'alfabet', 'lydering', 'skrevetOrd', 'bygOrd', 'saetning', 'bygSaetning'];
   function opgaveKendt(o) {
     if (o && o.fag === 'dansk') return !!(D && D.EMNER[o.emne] && D.GEN[o.type] && o.vis && KENDTE_DANSK.indexOf(o.vis.art) >= 0);
@@ -1079,7 +1108,7 @@
     r.laast = false;
     r.visSvar = false;
     r.buffer = '';
-    r.opdaterDisplay = null; r.bygNulstil = null; r.byg = null;
+    r.opdaterDisplay = null; r.bygNulstil = null; r.byg = null; r.figur = null; r.lineal = null;
     S.spaertTil = performance.now() + 300; // et dobbelttryk på sidste svar må ikke besvare den nye opgave
     [...r.dom.prikker.querySelectorAll('.prik')].forEach((p, i) => p.classList.toggle('nu', i === r.i));
     r.dom.tekst.textContent = '';
@@ -1090,12 +1119,13 @@
     r.dom.hjaelp.parentNode.classList.remove('med-hjaelp');
     r.dom.svar.classList.remove('venter');
     r.dom.svar.textContent = '';
-    r.dom.svar.classList.toggle('tast', !opg.valg && !opg.byg);
+    r.dom.svar.classList.toggle('tast', !opg.valg && !opg.byg && !opg.interaktiv);
+    r.dom.krop.classList.toggle('tegne-opgave', !!opg.interaktiv); // svarpanelet er smalt — tegnefeltet får pladsen
     r.dom.svar.classList.toggle('byg', !!opg.byg);
     // «Hvor er der flest?»: grupperne i svarkortene ER opgaven — de får pladsen, vægten i midten bliver lille
     r.dom.krop.classList.toggle('gruppe-opgave', opg.valgArt === 'gruppe');
     r.dom.krop.classList.toggle('dansk-opgave', opg.fag === 'dansk');
-    r.dom.svar.append(opg.valg ? valgKnapper(opg) : opg.byg ? bygPanel(opg) : taltastatur(opg));
+    r.dom.svar.append(opg.valg ? valgKnapper(opg) : opg.byg ? bygPanel(opg) : opg.interaktiv ? interaktivPanel(opg) : taltastatur(opg));
     S.gentagTale = opg.tale;
     // Dansk: teksten, så de indtalte lyde (eller reserverne) — 🔊 gentager det hele
     S.gentagFn = opg.lyd ? () => sigOpgave(opg) : null;
@@ -1114,6 +1144,9 @@
       case 'terninger': return h('div', { class: 'terninger' }, terning(v.a, 'a'), h('span', { class: 'plus-tegn', 'aria-hidden': 'true' }, '+'), terning(v.b, 'b'));
       case 'klodser': return klodser(v.a, v.b);
       case 'streger': return streger(v.antal);
+      case 'soembraet': return soembraet(opg);
+      case 'lineal': case 'linealTegn': return linealVisning(opg);
+      case 'maalKlodser': return maalKlodserVisning(opg);
       case 'fingre': return haender(v.a, v.b, 10);
       case 'haand': return haender(v.a, 0, 5);
       case 'kugleramme': return kugleramme(v.a, v.hel, true);
@@ -1609,6 +1642,8 @@
     const bogstavSvar = !!(opg && (opg.valgArt === 'bogstav' || (opg.byg && !opg.byg.adskil)));
     if (e.key === ' ' || ((e.key === 'r' || e.key === 'R') && !bogstavSvar)) { e.preventDefault(); gentag(); return; }
     if (!opg || r.laast) return;
+    // Tegneopgaver (B6): piletaster, Enter og Backspace styrer sømbrættet eller linealen
+    if (opg.interaktiv) { const st = r.figur || r.lineal; if (st && st.taster) st.taster(e); return; }
     if (r.visSvar) {
       if (e.key === 'Enter') { const k = r.dom.svar.querySelector('.vis-svar'); if (k) k.click(); }
       return;
@@ -1700,7 +1735,7 @@
     const token = S.token;
     if (r.forsoeg > 0) {
       // Efter hjælp: sig svaret, når lyden er færdig
-      setTimeout(() => { if (token === S.token) Tale.sig(opg.valgArt ? 'Ja!' : 'Ja, det er ' + opg.svar + '!'); }, 350);
+      setTimeout(() => { if (token === S.token) Tale.sig(opg.valgArt || opg.interaktiv ? 'Ja!' : 'Ja, det er ' + opg.svar + '!'); }, 350);
     }
     setTimeout(() => {
       if (token !== S.token) return;
@@ -2218,6 +2253,8 @@
       return;
     }
 
+    if (art === 'figurHjoerner') { await figurHjaelp(opg, trin, levende); return; }
+    if (art === 'cmHop') { await cmHjaelp(opg, levende); return; }
     if (art === 'hjoerner' || art === 'kanter') {
       const dele = [...vis.querySelectorAll(art === 'hjoerner' ? '.hjoerne' : '.kant')];
       if (!dele.length) {
@@ -2234,9 +2271,291 @@
     }
   }
 
+  // =====================================================================
+  //  TEGNEBYEN (B6): sømbræt, lineal og klodser — finger, pen og mus (Pointer Events)
+  // =====================================================================
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const svgEl = (tag, a, forael) => { const n = document.createElementNS(SVG_NS, tag); for (const k in a) n.setAttribute(k, a[k]); if (forael) forael.append(n); return n; };
+  // Tegner igen, når feltet skifter størrelse (fx når iPad'en vendes midt i opgaven).
+  // fn kører i næste frame, ikke i selve ResizeObserver-kaldet: fn må gerne ændre feltets egen størrelse
+  // (klodserne gør det via --k) — ellers sender Safari «ResizeObserver loop completed with undelivered notifications»
+  const vedStoerrelse = (el, fn) => {
+    let ventende = 0;
+    const senere = () => { if (!ventende) ventende = requestAnimationFrame(() => { ventende = 0; fn(); }); };
+    if (window.ResizeObserver) new ResizeObserver(senere).observe(el); else window.addEventListener('resize', fn);
+    setTimeout(fn, 0);
+  };
+
+  // Sømbræt: prikkerne er knapper (≥ 52 px); stregerne tegnes i en SVG ovenpå. Den grønne prik er sat på forhånd.
+  function soembraet(opg) {
+    const v = opg.vis;
+    const r = S.runde;
+    const tavle = h('div', { class: 'soembraet', style: '--kol:' + v.kol + ';--raek:' + v.raek });
+    const svg = svgEl('svg', { class: 'soem-streger', 'aria-hidden': 'true' });
+    tavle.append(svg);
+    const prikker = {};
+    for (let y = 0; y < v.raek; y++) for (let x = 0; x < v.kol; x++) {
+      prikker[x + ',' + y] = h('button', { class: 'soem-prik', type: 'button', 'data-x': x, 'data-y': y, 'aria-label': 'Prik ' + (x + 1) + ', ' + (y + 1), onclick: () => trykPrik(x, y) }, h('i', { 'aria-hidden': 'true' }));
+      tavle.append(prikker[x + ',' + y]);
+    }
+    const st = { punkter: [v.start.slice()], lukket: false, markoer: v.start.slice(), vis: null, tast: false };
+    r.figur = st;
+    const center = ([x, y]) => {
+      const t = tavle.getBoundingClientRect(), q = prikker[x + ',' + y].getBoundingClientRect();
+      return [Math.round(q.left + q.width / 2 - t.left), Math.round(q.top + q.height / 2 - t.top)];
+    };
+    function tegn() {
+      const t = tavle.getBoundingClientRect();
+      svg.setAttribute('viewBox', '0 0 ' + Math.max(1, Math.round(t.width)) + ' ' + Math.max(1, Math.round(t.height)));
+      svg.textContent = '';
+      if (st.vis) svgEl('polygon', { points: st.vis.map((p) => center(p).join(',')).join(' '), class: 'soem-vis' }, svg);
+      // Hjælpen: de sider, der er talt, lyser
+      if (st.vis && st.taltSider) for (let k = 0; k < st.taltSider; k++) {
+        const a = center(st.vis[k]), b = center(st.vis[(k + 1) % st.vis.length]);
+        svgEl('line', { x1: a[0], y1: a[1], x2: b[0], y2: b[1], class: 'soem-talt-side' }, svg);
+      }
+      const pts = st.punkter.map(center);
+      if (st.lukket) pts.push(pts[0]);
+      if (pts.length > 1) svgEl('polyline', { points: pts.map((p) => p.join(',')).join(' '), class: 'soem-linje' + (st.lukket ? ' lukket' : '') }, svg);
+      for (const k in prikker) { prikker[k].classList.remove('valgt', 'foerste', 'markoer', 'vis-hjoerne'); prikker[k].removeAttribute('data-n'); }
+      st.punkter.forEach(([x, y], i) => prikker[x + ',' + y].classList.add(i === 0 ? 'foerste' : 'valgt'));
+      // «Vis svaret»: alle hjørner med nummer. Hjælpen: kun dem, der er talt indtil nu
+      if (st.vis) st.vis.forEach(([x, y], i) => {
+        if (st.iHjaelp && i >= st.taltHjoerner) return;
+        const b = prikker[x + ',' + y]; b.classList.add('vis-hjoerne'); b.setAttribute('data-n', i + 1);
+      });
+      if (st.tast) prikker[st.markoer.join(',')].classList.add('markoer');
+    }
+    function trykPrik(x, y) {
+      if (r.laast || st.lukket || S.runde !== r) return;
+      Lyd.init();
+      const [fx, fy] = st.punkter[0];
+      const sidst = st.punkter[st.punkter.length - 1];
+      if (x === sidst[0] && y === sidst[1]) return;
+      if (x === fx && y === fy) {
+        if (st.punkter.length < 3) { Lyd.blid(); return; }
+        // Figuren er lukket: vurderes (hjørner, sider, rette vinkler) — et kvadrat er også en firkant
+        st.lukket = true;
+        Lyd.tryk();
+        tegn();
+        const res = O.vurderFigur(st.punkter);
+        // Runden er låst, mens den lukkede figur vises — så vurderes den
+        r.laast = true;
+        setTimeout(() => { if (S.runde === r) { r.laast = false; svar(O.figurPasser(v.form, res.type) ? 'ok' : 'nej', null); } }, 450);
+        return;
+      }
+      if (st.punkter.some(([px, py]) => px === x && py === y)) { Lyd.blid(); return; }
+      Lyd.tryk();
+      st.punkter.push([x, y]);
+      tegn();
+    }
+    st.tryk = trykPrik;
+    st.fortryd = () => { if (r.laast || st.lukket || st.punkter.length < 2) return; Lyd.init(); Lyd.tryk(); st.punkter.pop(); tegn(); };
+    st.nulstil = () => { st.punkter = [st.punkter[0]]; st.lukket = false; tegn(); };
+    st.tegn = tegn;
+    r.bygNulstil = st.nulstil; // et forkert svar: tegn forfra fra den grønne prik
+    // Fysisk tastatur: piletaster flytter markøren, Enter trykker på prikken, Backspace fortryder
+    st.taster = (e) => {
+      const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+      if (d) {
+        e.preventDefault();
+        st.tast = true;
+        st.markoer = [Math.min(v.kol - 1, Math.max(0, st.markoer[0] + d[0])), Math.min(v.raek - 1, Math.max(0, st.markoer[1] + d[1]))];
+        tegn();
+      } else if (e.key === 'Enter') { e.preventDefault(); trykPrik(st.markoer[0], st.markoer[1]); }
+      else if (e.key === 'Backspace') { e.preventDefault(); st.fortryd(); }
+    };
+    vedStoerrelse(tavle, tegn);
+    return h('div', { class: 'soem-felt' }, h('div', { class: 'soem-maal', 'aria-hidden': 'true' }, formSvg(v.form, 2, 0, false)), tavle);
+  }
+
+  // Lineal: 1 cm = 52 px på iPad. Er der ikke plads, skaleres hele linealen — det er stadig «cm på linealen».
+  function linealVisning(opg) {
+    const v = opg.vis;
+    const r = S.runde;
+    const tegnMode = v.art === 'linealTegn';
+    const L = v.laengde;
+    const streg = h('div', { class: 'lineal-streg' + (tegnMode ? ' bruger' : '') });
+    const maal = h('div', { class: 'lineal-maal skjult', 'aria-hidden': 'true' });
+    const tal = [];
+    const skala = h('div', { class: 'lineal' });
+    for (let i = 0; i <= L; i++) {
+      skala.append(h('i', { class: 'lineal-cm', style: 'left:calc(var(--cm) * ' + i + ')' }));
+      if (i < L) skala.append(h('i', { class: 'lineal-halv', style: 'left:calc(var(--cm) * ' + (i + 0.5) + ')' }));
+      tal.push(h('span', { class: 'lineal-tal', style: 'left:calc(var(--cm) * ' + i + ')' }, String(i)));
+    }
+    tal.forEach((t) => skala.append(t));
+    const hop = h('div', { class: 'lineal-hop', 'aria-hidden': 'true' });
+    const flade = h('div', { class: 'lineal-flade', style: '--L:' + L }, hop, streg, maal, skala);
+    const felt = h('div', { class: 'lineal-felt' + (tegnMode ? ' tegn' : '') }, flade);
+    const st = { cm: tegnMode ? 0 : v.cm, cmPx: 52 };
+    r.lineal = st;
+    const tegn = () => { streg.style.width = 'calc(var(--cm) * ' + st.cm + ')'; streg.classList.toggle('tom', !st.cm); };
+    const maalCm = () => {
+      // Bredden til rådighed: højst 52 px pr. cm (1 cm på iPad), ellers så meget, der er plads til
+      const w = felt.clientWidth;
+      if (!w) return;
+      st.cmPx = Math.max(14, Math.min(52, Math.floor((w - 24) / (L + 0.8))));
+      felt.style.setProperty('--cm', st.cmPx + 'px');
+    };
+    st.nulstil = () => { if (tegnMode) { st.cm = 0; tegn(); } };
+    st.visMaal = () => { maal.style.left = 'calc(var(--cm) * ' + v.cm + ')'; maal.classList.remove('skjult'); };
+    st.hop = (k) => {
+      tal[k].classList.add('hop');
+      hop.append(h('i', { class: 'lineal-bue', style: 'left:calc(var(--cm) * ' + (k - 1) + ')' }));
+    };
+    if (tegnMode) {
+      // Træk fra 0: stregen følger fingeren/pennen (afrundet til 0,1 cm); ✔ afgiver svaret
+      const tilCm = (e) => {
+        const b = skala.getBoundingClientRect();
+        return Math.round(Math.min(L, Math.max(0, (e.clientX - b.left) / st.cmPx)) * 10) / 10;
+      };
+      let aktiv = false;
+      flade.addEventListener('pointerdown', (e) => {
+        if (r.laast || S.runde !== r) return;
+        e.preventDefault();
+        Lyd.init();
+        aktiv = true;
+        if (flade.setPointerCapture) flade.setPointerCapture(e.pointerId);
+        st.cm = tilCm(e);
+        tegn();
+      });
+      flade.addEventListener('pointermove', (e) => { if (!aktiv) return; st.cm = tilCm(e); tegn(); });
+      ['pointerup', 'pointercancel'].forEach((t) => flade.addEventListener(t, () => { if (aktiv) { aktiv = false; Lyd.tryk(); } }));
+      flade.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+      // Fysisk tastatur: → og ← en hel cm ad gangen, Enter = ✔
+      st.taster = (e) => {
+        if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+          e.preventDefault();
+          st.cm = Math.min(L, Math.max(0, Math.round(st.cm) + (e.key === 'ArrowRight' ? 1 : -1)));
+          Lyd.tryk();
+          tegn();
+        } else if (e.key === 'Enter') { e.preventDefault(); st.svar(); }
+      };
+      st.svar = () => {
+        if (r.laast || S.runde !== r) return;
+        Lyd.init();
+        if (!st.cm) { Lyd.blid(); Tale.sig('Træk fra nul og hen ad linealen.'); return; }
+        svar(O.stregPasser(v.cm, st.cm) ? 'ok' : 'nej', null);
+      };
+      r.bygNulstil = st.nulstil;
+    }
+    tegn();
+    vedStoerrelse(felt, maalCm);
+    return felt;
+  }
+
+  // Mål med klodser: tingen ligger over en række klodser, der er lige så lang
+  function maalKlodserVisning(opg) {
+    const v = opg.vis;
+    const ting = O.MAALE_TING.find((t) => t.id === v.maaleTing) || O.MAALE_TING[0];
+    const klodser = [];
+    for (let i = 0; i < v.antal; i++) klodser.push(h('span', { class: 'maale-klods taelbar' }));
+    const felt = h('div', { class: 'maale-felt', style: '--n:' + v.antal },
+      h('div', { class: 'maale-ting maale-' + ting.id }, h('span', { class: 'maale-ting-e', 'aria-hidden': 'true' }, ting.e)),
+      h('div', { class: 'maale-raekke' }, klodser));
+    vedStoerrelse(felt, () => {
+      const w = felt.clientWidth, hh = felt.parentElement ? felt.parentElement.clientHeight : 0;
+      if (!w) return;
+      const k = Math.max(22, Math.min(56, Math.floor((w - 16) / (v.antal + 0.3)), hh ? Math.floor(hh / 2.6) : 56));
+      felt.style.setProperty('--k', k + 'px');
+    });
+    return felt;
+  }
+
+  // Svarpanelet til tegneopgaverne: ↩️ og 🗑️ (sømbræt) eller ✔ (linealen)
+  function interaktivPanel(opg) {
+    const r = S.runde;
+    if (opg.interaktiv === 'soembraet') {
+      return h('div', { class: 'interaktiv-panel' },
+        ikonKnap('↩️', 'Fortryd', () => { if (r.figur) r.figur.fortryd(); }, 'soem-fortryd'),
+        ikonKnap('🗑️', 'Start forfra', () => { if (!r.laast && r.figur) { Lyd.init(); Lyd.tryk(); r.figur.nulstil(); } }, 'soem-forfra'));
+    }
+    return h('div', { class: 'interaktiv-panel' },
+      h('button', { class: 'stor-knap ok-knap lineal-ok', type: 'button', 'aria-label': 'Færdig', onclick: () => { if (r.lineal && r.lineal.svar) r.lineal.svar(); } }, '✔'));
+  }
+
+  // Sidste trin i en tegneopgave: et eksempel lyser, og barnet tegner efter det
+  function visSvaretTegn(opg) {
+    const r = S.runde;
+    r.visSvar = true;
+    let tekst = 'Prøv igen.';
+    if (opg.interaktiv === 'soembraet' && r.figur) {
+      r.figur.nulstil();
+      r.figur.vis = O.eksempelFigur(opg.vis.form, opg.vis.start, opg.vis.kol, opg.vis.raek);
+      r.figur.tegn();
+      tekst = 'Tryk på prikkerne, der lyser: en, to, tre … og slut ved den grønne prik.';
+    } else if (r.lineal) {
+      r.lineal.nulstil();
+      r.lineal.visMaal();
+      tekst = 'Træk stregen hen til den gule streg. Tryk så på den grønne knap.';
+    }
+    S.gentagFn = null;
+    S.gentagTale = tekst;
+    Tale.sig(tekst);
+  }
+
+  // Hjælp: et eksempel lyser på sømbrættet; hjørnerne tælles ét ad gangen, så siderne
+  async function figurHjaelp(opg, trin, levende) {
+    const st = S.runde.figur;
+    const eks = O.eksempelFigur(trin.form, opg.vis.start, opg.vis.kol, opg.vis.raek);
+    if (!st || !eks) return;
+    st.nulstil();
+    st.vis = eks;
+    st.iHjaelp = true;
+    st.taltHjoerner = 0;
+    st.taltSider = 0;
+    st.tegn();
+    const n = eks.length;
+    for (let k = 1; k <= n; k++) {
+      if (!levende()) return;
+      st.taltHjoerner = k;
+      st.tegn();
+      Lyd.tael();
+      Tale.sig(String(k));
+      await vent(800);
+    }
+    if (!levende()) return;
+    await Tale.sigVent(n + ' hjørner.');
+    for (let k = 1; k <= n; k++) {
+      if (!levende()) return;
+      st.taltSider = k;
+      st.tegn();
+      Lyd.tael();
+      Tale.sig(String(k));
+      await vent(800);
+    }
+    if (!levende()) return;
+    const ekstra = { kvadrat: ' Alle sider er lige lange, og alle hjørner er rette.', rektangel: ' Alle hjørnerne er rette. To sider er lange, og to er korte.' }[trin.form] || '';
+    await Tale.sigVent(n + ' sider.' + ekstra);
+    if (!levende()) return;
+    // Barnet tegner selv bagefter: eksemplet slukkes igen
+    st.vis = null;
+    st.iHjaelp = false;
+    st.taltHjoerner = st.taltSider = 0;
+    st.tegn();
+  }
+
+  // Hjælp: cm-hop tælles højt på linealen
+  async function cmHjaelp(opg, levende) {
+    const st = S.runde.lineal;
+    if (!st) return;
+    for (let k = 1; k <= opg.vis.cm; k++) {
+      if (!levende()) return;
+      st.hop(k);
+      Lyd.tael();
+      Tale.sig(String(k));
+      await vent(650);
+    }
+    if (!levende()) return;
+    if (opg.vis.art === 'linealTegn') st.visMaal();
+    await Tale.sigVent(opg.vis.cm + ' centimeter.');
+  }
+
   // ---------- Sidste trin: svaret lyser, og barnet trykker på det ----------
   function visSvaret(opg) {
     const r = S.runde;
+    if (opg.interaktiv) { visSvaretTegn(opg); return; }
     r.visSvar = true;
     if (opg.valg) {
       r.dom.svar.querySelectorAll('.valg-knap').forEach((k) => {
@@ -2525,6 +2844,7 @@
     switch (id) {
       case 'taelle': return [klodser(5, 0), streger(7)];
       case 'former': return ['trekant', 'kvadrat', 'cirkel'].map((f, i) => formSvg(f, i, 0, f !== 'cirkel'));
+      case 'tegne': return ['📌', '📏', '🧱'].map((e) => h('span', { class: 'lektion-emoji' }, e));
       case 'plus10': return haender(3, 2, 5);
       case 'venner': return kugleramme(7, 10, false);
       case 'minus': {

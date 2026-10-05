@@ -502,7 +502,8 @@
   function standardTraening() {
     // huskekort: vis reglerne før dagens dosis · proeveUr: vis et ur i prøven (begge kan slås fra)
     // tastatur: tal-svar tastes på eget taltastatur i stedet for at vælges (slået fra som standard)
-    return { valgt: 'regnetricks', emner: {}, gentag: [], dage: {}, huskekort: true, proeveUr: true, tastatur: false };
+    // laer (B7): afsnitsId → { faerdig, rigtige, ialt, dato } — hvor langt den voksne er nået i «📘 Lær»
+    return { valgt: 'regnetricks', emner: {}, gentag: [], dage: {}, huskekort: true, proeveUr: true, tastatur: false, laer: {} };
   }
 
   function normaliserVoksen(d) {
@@ -539,6 +540,20 @@
         const x = erObjekt(t.dage[k]) ? t.dage[k] : {};
         ud.traening.dage[k] = { opgaver: ikkeNeg(x.opgaver, 0), rigtige: ikkeNeg(x.rigtige, 0) };
       });
+    }
+    // «📘 Lær» (B7): kun afsnits-id'er som «I.1» eller «I.4a»; ukendte felter i et afsnit bevares
+    ud.traening.laer = {};
+    if (erObjekt(t.laer)) {
+      for (const k in t.laer) {
+        if (!/^[IVX]{1,4}\.\d{1,2}[a-z]?$/.test(k)) continue;
+        const x = erObjekt(t.laer[k]) ? t.laer[k] : {};
+        const a = Object.assign({}, x);
+        a.faerdig = x.faerdig === true;
+        a.ialt = ikkeNeg(x.ialt, 0);
+        a.rigtige = Math.min(ikkeNeg(x.rigtige, 0), a.ialt);
+        a.dato = typeof x.dato === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x.dato) ? x.dato : null;
+        ud.traening.laer[k] = a;
+      }
     }
     return ud;
   }
