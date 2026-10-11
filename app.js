@@ -10,12 +10,13 @@
   const D = window.Dansk; // den danske del (dansk-opgaver.js) — kun på børnenes og voksnes sider
 
   // ---------- Fælles indhold ----------
-  // Rejsevenner. Skallerne vælger hvilke fire, der vises (TEMA.figurer).
+  // Rejsevenner. Skallerne vælger hvilke fire, der vises (TEMA.figurer). De gemte id'er (data.figur) ændres aldrig —
+  // Jimmy 10-10: bobo er skildpadden Bobo, luna er enhjørningen Måne, rosa er natfuglen Fnug. Tegningerne står i grafik.js.
   const FIGURER = {
-    bobo:  { e: '🦕', navn: 'Bobo' },
+    bobo:  { e: '🐢', navn: 'Bobo' },
     rex:   { e: '🦖', navn: 'Rex' },
-    luna:  { e: '🦄', navn: 'Luna' },
-    rosa:  { e: '👸', navn: 'Rosa' },
+    luna:  { e: '🦄', navn: 'Måne' },
+    rosa:  { e: '🦉', navn: 'Fnug' },
     gnist: { e: '🐉', navn: 'Gnist' },
     rap:   { e: '🦊', navn: 'Rap' },
   };
@@ -112,6 +113,8 @@
     visUr: 'Se her.',
     stilHel: 'Lad os stille uret sammen.',
     stilFlyt: 'Lad os flytte den store viser.',
+    stilLille: 'Lad os kigge på den lille viser.',
+    stilKvarter: 'Lad os flytte den store viser et kvarter ad gangen.',
     moenter: 'Lad os tælle kronerne. Vi starter med den største mønt.',
     hoerIgen: 'Lyt godt efter.',
     visBogstav: 'Se her.',
@@ -125,6 +128,11 @@
     laesKort: 'Lyt til svarene.',
     foersteBrik: 'Se her. Den her kommer først.',
     skrivBogstav: 'Se, hvordan vi skriver det i hånden.',
+    alfabetVis: 'Se alfabetet.',
+    visPlads: 'Se her.',
+    lydFoerste: 'Lyt til lydene i det første ord.',
+    fortaelTil: 'Lyt til historien igen.',
+    naesteBrik: 'Se her.',
   };
 
   // Figurer i Formbyen som SVG (egen grafik). Hjørnerne får små prikker, som hjælpen kan tælle.
@@ -181,18 +189,98 @@
     return svg;
   }
 
-  // Lystårnet tegnet som inline SVG (egen grafik)
+  // Lystårnet tegnet som inline SVG (egen grafik) — bruges kun, hvis grafik.js mangler
   const FYRTAARN = '<svg viewBox="0 0 100 120" aria-hidden="true"><path d="M50 30 L6 14 L6 46 Z M50 30 L94 14 L94 46 Z" fill="#ffe680" opacity=".75"/>' +
     '<path d="M36 112 L40 40 L60 40 L64 112 Z" fill="#fffdf8" stroke="#4a2f1c" stroke-width="2"/>' +
     '<path d="M38.4 84 L61.6 84 L62.4 98 L37.6 98 Z M39.6 58 L60.4 58 L61 70 L39 70 Z" fill="#e5484d"/>' +
     '<rect x="38" y="26" width="24" height="14" rx="3" fill="#ffc83d" stroke="#4a2f1c" stroke-width="2"/>' +
     '<path d="M35 27 L50 12 L65 27 Z" fill="#e5484d" stroke="#4a2f1c" stroke-width="2"/>' +
     '<rect x="26" y="110" width="48" height="8" rx="4" fill="#4a2f1c" opacity=".5"/></svg>';
-  function fyrtaarn(klasse) {
+  // Lystårnet i fem lysstadier (grafik.taarn[0..4]) efter lysperlerne, der allerede gemmes (data.perler: én pr. mission i
+  // eventyret). Lanternen tændes ved den første perle, de to nederste vinduer og strålerne ved 5 og 12, alt lys og to
+  // stjerner ved 30 — samme sted, som tårnets glød er fuld (lysStyrke). Perlerne tælles kun op, så lys slukkes aldrig.
+  const TAARN_TAERSKLER = [0, 1, 5, 12, 30];
+  function taarnStadie(perler) {
+    let st = 0;
+    TAARN_TAERSKLER.forEach((t, i) => { if ((Number(perler) || 0) >= t) st = i; });
+    return st;
+  }
+  // stadie udeladt: barnets eget tårn (med tekst til skærmlæser). Startsiden (intet barn) viser et fast stadie.
+  function fyrtaarn(klasse, stadie) {
     const n = document.createElement('span');
     n.className = 'fyrtaarn ' + (klasse || '');
-    n.innerHTML = FYRTAARN;
+    const st = stadie === undefined ? taarnStadie(data ? data.perler : 0) : stadie;
+    const svg = GR && GR.taarn ? tegning(GR.taarn[st], 'taarn-tegning') : null;
+    if (!svg) { n.innerHTML = FYRTAARN; return n; }
+    n.classList.add('med-tegning');
+    n.setAttribute('data-stadie', st);
+    if (stadie === undefined) { n.setAttribute('role', 'img'); n.setAttribute('aria-label', 'Lystårnet: ' + st + ' af 4 lys tændt'); }
+    n.append(svg);
     return n;
+  }
+
+  // ---------- Tegningerne fra grafik.js (fase A) ----------
+  // Kun SVG-tekst fra grafik.js (tjekket af test/test-grafik.js) sættes ind. Mangler filen eller en tegning,
+  // viser spillet emojien som før. Farverne kommer fra skallernes variabler (--farve-1, --kontur …).
+  const GR = window.Grafik || null;
+  const SVG_SKABELON = document.createElement('template');
+  function tegning(tekst, klasse) {
+    if (typeof tekst !== 'string' || !tekst) return null;
+    SVG_SKABELON.innerHTML = tekst;
+    const svg = SVG_SKABELON.content.firstElementChild;
+    SVG_SKABELON.innerHTML = '';
+    if (!svg || svg.localName !== 'svg') return null;
+    svg.setAttribute('class', klasse);
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('focusable', 'false');
+    return svg;
+  }
+  // Rejsevennen med et udtryk — hvert udtryk er sin egen tegning (grafik.vennerUdtryk, ChatGPT/Codex 11-10):
+  // glad (standard), taenker (efter et forkert svar), jubler (fejringen), vinker (startskærmen og valg af ven), laeser og
+  // maler (Historiebogen), taeller (tællehjælpen), maler (Tegnebyen), udforsker (kortet og 🎒), regnvejr (bruges ikke p.t.)
+  // og hviler («Vi ses i morgen»). Mangler udtrykket, bruges den gamle tegning med tre udtryk (grafik.venner; CSS viser
+  // glad for de andre), og ellers emojien. data-ven og data-udtryk bruges af saetUdtryk (og testene).
+  function venTegning(id, udtryk) {
+    const u = udtryk || 'glad';
+    const alle = GR && GR.vennerUdtryk && GR.vennerUdtryk[id];
+    const svg = (alle ? tegning(alle[u], 'ven-tegning') : null) || (GR && GR.venner ? tegning(GR.venner[id], 'ven-tegning') : null);
+    if (!svg) return document.createTextNode((FIGURER[id] || FIGURER.bobo).e);
+    svg.setAttribute('data-ven', id);
+    svg.setAttribute('data-udtryk', u);
+    return svg;
+  }
+  // Skift udtryk ved at bytte hele tegningen (én SVG pr. udtryk) — intet sker, hvis vennen allerede har udtrykket
+  function saetUdtryk(el, udtryk) {
+    const svg = el && el.querySelector('.ven-tegning');
+    if (!svg || svg.getAttribute('data-udtryk') === udtryk) return;
+    const ny = venTegning(svg.getAttribute('data-ven'), udtryk);
+    if (ny.nodeType === 1) svg.replaceWith(ny);
+  }
+  // Vennens udtryk, mens barnet arbejder på en opgave: maler ved tegneopgaverne (Tegnebyen), ellers glad
+  const grundUdtryk = (opg) => (opg && opg.emne === 'tegne' ? 'maler' : 'glad');
+  // Verdenens ikon (de 18 verdener på kortet, i 🎒 Vælg selv og ved lektionen) — ellers emojien (Lystårnet: det gamle tårn)
+  function verdenIkon(v) {
+    const svg = GR && GR.verdener ? tegning(GR.verdener[v.id], 'verden-tegning') : null;
+    if (svg) return h('span', { class: 'station-ikon med-tegning', 'aria-hidden': 'true' }, svg);
+    return v.svg ? fyrtaarn('station-ikon') : h('span', { class: 'station-ikon', 'aria-hidden': 'true' }, v.e);
+  }
+  // Samledyret (grafik.samledyr: samme id'er og rækkefølge som MAERKER i opgaver.js) — ellers emojien
+  function dyrTegning(m) {
+    const svg = GR && GR.samledyr ? tegning(GR.samledyr[(T.samling || 'jungle') + '/' + m.id], 'dyr-tegning') : null;
+    return svg || document.createTextNode(m.e);
+  }
+  // Lille udgave til en tekstlinje (▶ på kortet, lektionens titel)
+  function verdenIkonLille(v, klasse) {
+    const svg = GR && GR.verdener ? tegning(GR.verdener[v.id], 'verden-tegning') : null;
+    return h('span', { class: klasse + (svg ? ' med-tegning' : ''), 'aria-hidden': 'true' }, svg || (v.svg ? '🗼' : v.e));
+  }
+  // C · minispil: tegningerne i Grafik.minispil (id = overskriften i docs/LYSTAARNET-GRAFIK-C.md). Mangler en, bruges emojien.
+  const MINI = (GR && GR.minispil) || {};
+  const erMinispil = (opg) => !!opg && O.MINISPIL.some((m) => m.id === opg.type);
+  function miniTegning(id, klasse) { return id && MINI[id] ? tegning(MINI[id], klasse || 'mini-tegning') : null; }
+  function miniBillede(id, e, klasse) {
+    const svg = miniTegning(id, 'mini-tegning');
+    return h('span', { class: 'mini-billede' + (klasse ? ' ' + klasse : '') + (svg ? ' med-tegning' : ''), 'aria-hidden': 'true' }, svg || e || '');
   }
 
   // ---------- Små hjælpere ----------
@@ -224,6 +312,8 @@
     const tid = () => new Promise((r) => setTimeout(r, ms * TEMPO));
     return Tale.foerst ? Tale.foerst.then(tid) : tid();
   };
+  // Bevægelse er pynt: med prefers-reduced-motion springer den direkte til slutbilledet
+  const udenBevaegelse = () => !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
   // ---------- Lager ----------
   let lager;
@@ -290,12 +380,15 @@
     },
   };
 
-  // ---------- Lyd (WebAudio) — toner og indtalte klip ----------
+  // ---------- Lyd (WebAudio) — effekter og indtalte klip ----------
+  // Effekterne spilles af lydpalet.js (fase B) på spillets egen AudioContext — Lyd er en tynd facade, så de mange
+  // Lyd.tryk()/Lyd.rigtig() i spillet ikke skal ændres. Feedback med tale går gennem Forloeb (docs/LYD-INTEGRATION.md).
   const Lyd = {
     ctx: null,
-    init() {
+    // Opret/væk konteksten i selve trykket (paletten kalder den også, når den låser op)
+    aabn() {
       const AC = window.AudioContext || window.webkitAudioContext;
-      if (!AC) return;
+      if (!AC) return null;
       try {
         if (!this.ctx) {
           this.ctx = new AC();
@@ -306,32 +399,18 @@
         }
         if (this.ctx.state === 'suspended') this.ctx.resume();
       } catch (e) { this.ctx = null; }
+      return this.ctx;
     },
-    tone(f, start, dur, type, vol, slutF) {
-      const c = this.ctx;
-      if (!c || !voksen.lyd) return;
-      try {
-        const t = c.currentTime + (start || 0);
-        const o = c.createOscillator();
-        const g = c.createGain();
-        o.type = type || 'sine';
-        o.frequency.setValueAtTime(f, t);
-        if (slutF) o.frequency.exponentialRampToValueAtTime(slutF, t + dur);
-        g.gain.setValueAtTime(0.0001, t);
-        g.gain.exponentialRampToValueAtTime(vol || 0.15, t + 0.012);
-        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-        o.connect(g); g.connect(c.destination);
-        o.start(t); o.stop(t + dur + 0.03);
-      } catch (e) { /* lyd er pynt — spillet virker uden */ }
-    },
-    tryk() { this.tone(560, 0, 0.06, 'sine', 0.07); },
-    rigtig() { [660, 880, 1320].forEach((f, i) => this.tone(f, i * 0.07, 0.18, 'triangle', 0.17)); },
-    blid() { this.tone(440, 0, 0.18, 'sine', 0.1); this.tone(370, 0.15, 0.28, 'sine', 0.09); },
-    tael() { if (!Tale.foerst) this.tone(780, 0, 0.07, 'sine', 0.07); }, // ikke oven i den blide lyd og hjælpens indledning
-    fejring() { [523, 659, 784, 1047, 784, 1047].forEach((f, i) => this.tone(f, i * 0.1, 0.24, 'triangle', 0.15)); },
-    pling() { this.tone(1568, 0, 0.5, 'sine', 0.13); this.tone(2093, 0.09, 0.6, 'sine', 0.09); this.tone(2637, 0.18, 0.7, 'sine', 0.06); },
-    knaek() { this.tone(240, 0, 0.09, 'square', 0.05, 140); this.tone(180, 0.1, 0.09, 'square', 0.05, 110); },
-    hop() { this.tone(260, 0, 0.22, 'sine', 0.13, 720); },
+    // Kaldes i hvert tryk: låser også paletten op (den vækker også fra iOS' 'interrupted')
+    init() { this.aabn(); Palet.unlock(); },
+    // Højst én effekt ad gangen; en vigtigere afløser en mindre vigtig (tryk < svar < fejring)
+    tryk() { if (!Forloeb.optaget()) Palet.tryk(); }, // intet klik oven i en igangværende feedback
+    rigtig() { Palet.rigtig(); },
+    blid() { Palet.forkertBlid(); },
+    tael() { if (!Tale.foerst) Palet.tryk(); }, // ikke oven i den blide lyd og hjælpens indledning
+    fejring() { Palet.fejring(); },
+    pling() { Palet.boblePop(); },
+    hop() { Palet.fodspor(); },
 
     // ---- Indtalte klip (fx bogstavlyde): optaget på denne enhed (IndexedDB) → lyd/<id>.wav, hvis id'et står
     // i lyd/liste.json → reserven med talesyntesen. En bogstavlyd må aldrig blive bogstavets navn: reserven er
@@ -366,20 +445,35 @@
     // Afspil et klip (eller sig reserven). Løftet holder, til lyden er færdig.
     async klip(id, reserve) {
       if (!voksen.tale) return;
+      const gen = this.klipGen;
       let buf = null;
       try { if (this.harKlip(id)) buf = await this.afkod(id); } catch (e) { buf = null; }
+      if (gen !== this.klipGen) return; // stoppet, mens klippet blev hentet/afkodet: hverken klip eller reserve
       if (buf && this.ctx) {
         return new Promise((res) => {
           try {
             const s = this.ctx.createBufferSource();
             s.buffer = buf; s.connect(this.ctx.destination);
-            s.onended = () => res();
+            const k = this.kilde = { s: s, res: res };
+            s.onended = () => { if (this.kilde === k) this.kilde = null; res(); };
             s.start(0);
             setTimeout(res, (buf.duration * 1000 + 400) * TEMPO + 200); // hvis onended aldrig kommer
           } catch (e) { res(); }
         });
       }
       if (reserve) return Tale.sigVent(reserve);
+    },
+    kilde: null,     // klippet, der spiller nu ({ s: AudioBufferSourceNode, res })
+    klipGen: 0,      // tælles op af stopKlip, så et klip, der stadig hentes/afkodes, aldrig starter bagefter
+    // Stop klippet, der spiller — og et, der stadig hentes/afkodes (et afbrudt feedback-forløb, eller 🔊 midt i det,
+    // så sætningen ikke starter oven i klippet). Klippets løfte afsluttes.
+    stopKlip() {
+      this.klipGen++;
+      const k = this.kilde;
+      if (!k) return;
+      this.kilde = null;
+      try { k.s.onended = null; k.s.stop(); } catch (e) { /* allerede stoppet */ }
+      k.res();
     },
   };
 
@@ -470,12 +564,38 @@
     },
   };
 
+  // ---------- Lydpalet og feedback-forløb (fase B: lydpalet.js og feedback-forloeb.js) ----------
+  // Uden de to filer (fx en gammel cache) bruges en tom palet (NAVNE: null, så forløbet ikke afviser effekternes navne) og
+  // et reserve-forløb, der afspiller klip og tale som før — spillet virker uden lyd, og en runde hænger aldrig.
+  const TOM_PALET = { NAVNE: null, unlock: () => Promise.resolve(false), stop() {}, onInterrupted: () => () => {}, vilSpille: () => false,
+    play: () => Promise.resolve({ status: 'skipped', reason: 'locked' }) };
+  ['tryk', 'rigtig', 'forkertBlid', 'fodspor', 'boblePop', 'niveauOp', 'pauseStart', 'fejring'].forEach((n) => { TOM_PALET[n] = TOM_PALET.play; });
+  const Palet = window.Lydpalet ? window.Lydpalet.lav({ vindue: window, aabnKontekst: () => Lyd.aabn(), lydTil: () => voksen.lyd }) : TOM_PALET;
+  // Uden dansk stemme tales der som i dag (Tale.sig med lang alene) — at kræve en dansk stemme er en åben B3-beslutning
+  const Forloeb = window.FeedbackForloeb
+    ? window.FeedbackForloeb.lav({ palet: Palet, vindue: window, tale: window.FeedbackForloeb.taleFraSpillet({ Tale: Tale, Lyd: Lyd, taleTil: () => voksen.tale }) })
+    : {
+      run: (o) => {
+        o = o || {};
+        if (o.lyd) Palet.play(o.lyd);
+        const p = o.klip ? Lyd.klip(o.klip, o.reserve) : (o.tekst || o.reserve) ? Tale.sigVent(o.tekst || o.reserve) : null;
+        return Promise.resolve(p).then(() => ({ status: 'completed', reason: 'reserve', effekt: '', tale: '', animation: '' }));
+      },
+      stop() {},
+      optaget: () => false,
+    };
+  // Vent mindst så længe (spillets gang efter et svar) — ikke vent(), der skalerer med ?hurtig og venter på Tale.foerst
+  const pause = (ms) => new Promise((res) => setTimeout(res, ms));
+
   // ---------- Tilstand ----------
   const S = {
     token: 0,          // tælles op ved hvert skærmskift, så gamle animationer stopper
     taster: null,      // tastatur-håndtering for den aktuelle skærm
     gentagTale: '',    // det 🔊-knappen læser op
+    oplaes: 0,         // tælles op ved svar og ny oplæsning: en gammel opgaveoplæsning (sigOpgave) holder op
     runde: null,
+    afbrudt: { pauset: null, pausetDansk: null }, // afbrudte runder pr. fag (▶ fortsætter dem) — se PAUSET_FELTER
+    ur: null,          // Historiebogens og Bogstavjagtens fælles ur (se startUr)
   };
 
   let data = null;     // barnets data
@@ -515,8 +635,11 @@
   }
 
   function skift(node, taster) {
+    Forloeb.stop(); // en igangværende feedback hører til den gamle skærm
+    gemUr(); // Historiebogens/Bogstavjagtens tid gemmes ved hvert skærmskift
     S.token++;
     S.spaertTil = performance.now() + 380; // et dobbelttryk må ikke ramme den nye skærm
+    S.oplaes++; // en oplæsning fra den gamle skærm (fx et klip efter talen) holder op
     Tale.stop();
     S.taster = taster || null;
     S.gentagFn = null; // 🔊 læser S.gentagTale — eller kalder S.gentagFn (dansk: tekst + indtalte lyde)
@@ -542,7 +665,7 @@
   function gentag() { if (S.gentagFn) S.gentagFn(); else Tale.sig(S.gentagTale); }
 
   function hoejttaler() {
-    return ikonKnap('🔊', 'Læs op igen', () => gentag(), 'hoejttaler');
+    return ikonKnap('🔊', 'Læs op igen', () => { Forloeb.stop(); gentag(); }, 'hoejttaler'); // ikke oven i en feedback
   }
 
   function minFigur() {
@@ -564,7 +687,7 @@
         h('span', { class: 'spiller-navn' }, 'Voksen')));
     }
     skift(h('div', { class: 'skaerm index' },
-      h('div', { class: 'index-titel' }, fyrtaarn(), 'Lystårnet'),
+      h('div', { class: 'index-titel' }, fyrtaarn('', 4), 'Lystårnet'),
       h('div', { class: 'spiller-liste' }, kort)));
   }
 
@@ -588,14 +711,14 @@
     };
     const taarn = h('button', {
       class: 'start-taarn-knap', type: 'button', 'aria-label': 'Hør historien om Lystårnet',
-      style: '--lys:' + lysStyrke(),
+      style: '--lysstyrke:' + lysStyrke(),
       onclick: () => { Lyd.init(); visHistorie(() => visStart()); },
     }, fyrtaarn('start-taarn'), data.perler ? h('span', { class: 'perle-tal' }, '✨ ' + data.perler) : null);
     skift(h('div', { class: 'skaerm start' },
       h('a', { class: 'ikon-knap hjem', href: 'index.html', 'aria-label': 'Skift spiller', title: 'Skift spiller' }, '🏠'),
       advarselKnap(),
       taarn,
-      h('div', { class: 'start-figur', 'aria-hidden': 'true' }, fig.e),
+      h('div', { class: 'start-figur', 'aria-hidden': 'true', 'data-ven': fig.id }, venTegning(fig.id, 'vinker')),
       h('div', { class: 'start-navn' }, data.navn),
       h('button', { class: 'stor-knap spil-knap puls', type: 'button', 'aria-label': 'Start', onclick: start }, '▶')),
     (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); start(); } });
@@ -632,7 +755,7 @@
       knapper[id] = h('button', {
         class: 'figur-knap' + (id === valgt ? ' valgt' : ''), type: 'button', 'aria-label': FIGURER[id].navn,
         onclick: () => vaelgFigur(id),
-      }, h('span', { class: 'figur-emoji', 'aria-hidden': 'true' }, FIGURER[id].e), h('span', { class: 'figur-navn' }, FIGURER[id].navn));
+      }, h('span', { class: 'figur-emoji', 'aria-hidden': 'true' }, venTegning(id, 'vinker')), h('span', { class: 'figur-navn' }, FIGURER[id].navn));
       return knapper[id];
     });
     S.gentagTale = 'Hvem skal med dig på rejsen? Tryk på en.';
@@ -699,9 +822,9 @@
     const aabne = liste.map((v, i) => i).filter((i) => verdenAaben(i, fag) && emneSlaaetTil(liste[i].emne));
     if (!aabne.length) return 0;
     // En afbrudt mission (🗺️ midt i runden) går forud, så de fyldte fodspor ikke tabes
-    const p = S.pausetRunde;
-    if (p) {
-      const pi = liste.findIndex((v) => v.id === p.verden.id);
+    for (const felt of PAUSET_FELTER) {
+      const p = S.afbrudt[felt];
+      const pi = p ? liste.findIndex((v) => v.id === p.verden.id) : -1;
       if (aabne.indexOf(pi) >= 0) return pi;
     }
     const sidst = liste.findIndex((v) => v.id === data.sidsteVerden);
@@ -796,12 +919,16 @@
   }
 
   function visKort(hils) {
+    stopUr();
     S.runde = null; // ingen runde i gang, så tid tælles ikke på kortet
     const fig = minFigur();
     const fag = fagNu();
     const liste = verdenerFor(fag);
     const anbefalet = anbefaletVerden(fag);
     const flade = h('div', { class: 'kort-flade' });
+    // Kortets baggrund (grafik.js): et roligt landskab bag stien og stationerne — kun pynt, ingen knapper
+    const bund = GR ? tegning(GR.kort, 'kort-baggrund') : null;
+    if (bund) { bund.setAttribute('preserveAspectRatio', 'xMidYMid slice'); flade.append(bund); }
     const sti = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     sti.setAttribute('class', 'kort-sti');
     sti.setAttribute('aria-hidden', 'true');
@@ -820,7 +947,7 @@
           else { Lyd.tryk(); Tale.sig(v.tale + (kommer ? ' Den kommer snart.' : ' Den åbner, når du har klaret verdenen før.')); }
         },
       },
-      v.svg ? fyrtaarn('station-ikon') : h('span', { class: 'station-ikon', 'aria-hidden': 'true' }, v.e),
+      verdenIkon(v),
       !aaben ? h('span', { class: 'station-laas', 'aria-hidden': 'true' }, '🔒') : null,
       h('span', { class: 'station-navn' }, v.navn),
       aaben ? h('span', { class: 'station-stjerner', 'aria-label': antalStj + (antalStj === 1 ? ' stjerne' : ' stjerner') },
@@ -833,7 +960,7 @@
     const ven = h('button', {
       class: 'kort-ven', type: 'button', 'aria-label': 'Skift ven: ' + fig.navn,
       onclick: () => { Lyd.init(); Lyd.tryk(); visFigurValg(false); },
-    }, fig.e);
+    }, venTegning(fig.id, 'udforsker'));
     flade.append(ven);
 
     // 🎒 Vælg selv: alle emner frit — eventyret (▶ og stationerne) er det samme som før
@@ -846,7 +973,7 @@
     const v = liste[anbefalet];
     const spil = () => { Lyd.init(); Lyd.tryk(); startRunde(v); };
     const spilKnap = h('button', { class: 'stor-knap spil-knap kort-spil puls', type: 'button', 'aria-label': 'Spil: ' + v.navn, onclick: spil },
-      h('span', { 'aria-hidden': 'true' }, '▶'), h('span', { class: 'kort-spil-ikon', 'aria-hidden': 'true' }, v.e));
+      h('span', { 'aria-hidden': 'true' }, '▶'), verdenIkonLille(v, 'kort-spil-ikon'));
     flade.append(spilKnap);
 
     S.gentagTale = 'Tryk på den store knap for at spille. Eller tryk på en verden.';
@@ -978,6 +1105,7 @@
   }
 
   function visTidBrugt() {
+    stopUr();
     const fig = minFigur();
     skift(h('div', { class: 'skaerm pause tid-brugt' },
       h('div', { class: 'topbar' },
@@ -985,9 +1113,9 @@
         h('div', { class: 'topbar-titel' }, 'Vi ses i morgen'),
         ikonKnap('🗺️', 'Til kortet', () => visKort(false))),
       h('div', { class: 'pause-midte' },
-        h('div', { class: 'pause-ven', 'aria-hidden': 'true' }, fig.e + '💤'),
-        h('div', { class: 'pause-tekst' }, 'Nu har vi spillet nok matematik i dag.'))));
-    S.gentagTale = 'Nu har vi spillet nok matematik i dag. ' + fig.navn + ' hviler sig. Vi ses i morgen!';
+        h('div', { class: 'pause-ven', 'aria-hidden': 'true' }, venTegning(fig.id, 'hviler'), '💤'),
+        h('div', { class: 'pause-tekst' }, 'Nu har vi spillet nok i dag.'))));
+    S.gentagTale = 'Nu har vi spillet nok i dag. ' + fig.navn + ' hviler sig. Vi ses i morgen!';
     Tale.sig(S.gentagTale);
   }
 
@@ -1001,9 +1129,10 @@
     opts = opts || {};
     if (tidOpbrugt()) { visTidBrugt(); return; }
     // Afbrudt med 🗺️? Så fortsætter vi samme mission med de fodspor, der allerede er fyldt
-    const p = S.pausetRunde;
-    if (p && p.verden.id === verden.id && p.i < p.opgaver.length) {
-      S.pausetRunde = null;
+    const fraFelt = PAUSET_FELTER.find((f) => S.afbrudt[f] && S.afbrudt[f].verden.id === verden.id);
+    const p = fraFelt ? S.afbrudt[fraFelt] : null;
+    if (p && p.i < p.opgaver.length) {
+      S.afbrudt[fraFelt] = null;
       S.runde = p;
       p.sidstAktiv = Date.now();
       try {
@@ -1012,7 +1141,7 @@
       } catch (e) {
         // Missionen kunne ikke tegnes (fx fra en anden udgave): glem den og start en ny
         S.runde = null;
-        data.pauset = null;
+        saetPauset(fraFelt, null);
       }
     }
     // Første gang i en verden: en kort lektion først
@@ -1026,8 +1155,9 @@
       return;
     }
     if (verden.emne === 'jagt') { visBogstavjagt(!!opts.frit); return; } // B10
-    S.pausetRunde = null;
-    data.pauset = null; // en ny mission i en anden verden erstatter den afbrudte
+    // En ny mission i en anden verden erstatter den afbrudte — men kun i samme fag
+    S.afbrudt[fagFelt(verden)] = null;
+    saetPauset(fagFelt(verden), null);
     const emne = verden.emne;
     if (Tale.opdaterStemmer) Tale.opdaterStemmer(); // stemmerne kan være kommet siden opstart (iOS)
     const udenLyt = !voksen.tale || !Tale.findes || Tale.udenDansk;
@@ -1056,39 +1186,54 @@
     S.runde = {
       verden: verden, emne: emne, opgaver: opgaver, i: 0, forsoeg: 0, frit: !!opts.frit,
       sidstAktiv: Date.now(), aktivMs: 0, niveauOp: false, registreret: -1,
-      maerke: O.maerkeForRunde(T.samling, data.runderIalt, minFigur().e), // dyret, vi hjælper — kendt fra start
+      maerke: O.maerkeForRunde(T.samling, data.runderIalt, minFigur().e, data.maerker), // dyret, vi hjælper — kendt fra start
     };
     visRundeSkaerm(false, opts.frit ? verden.navn + '.' : '');
+  }
+
+  // Hvert fag husker sin egen afbrudte mission (fund 5, Jimmy 11-10-2026): matematik i data.pauset (som altid),
+  // dansk i det valgfrie felt data.pausetDansk. En runde i det ene fag rører aldrig det andet fags mission.
+  // En mission, der er hentet fra et felt, bliver i det felt (r.pausetFelt) — også en dansk mission, der fra
+  // før lå i pauset (den flyttes ikke). Historiebogen, Bogstavjagt og 🤔 rører ingen af dem.
+  const PAUSET_FELTER = ['pauset', 'pausetDansk'];
+  const fagFelt = (verden) => (verden && verden.fag === 'dansk' ? 'pausetDansk' : 'pauset');
+  const rundeFelt = (r) => r.pausetFelt || fagFelt(r.verden);
+  function saetPauset(felt, p) {
+    if (felt === 'pauset') data.pauset = p || null;
+    else if (p) data[felt] = p;
+    else delete data[felt]; // valgfrit felt: ingen afbrudt dansk mission = intet felt
   }
 
   // Missionen gemmes undervejs, så den kan fortsætte, også hvis siden lukkes eller genindlæses
   function huskMission() {
     const r = S.runde;
     if (!r || r.test) return;
-    data.pauset = { verden: r.verden.id, i: r.i, opgaver: r.opgaver, niveauOp: r.niveauOp, registreret: r.registreret, maerke: r.maerke.id, frit: r.frit === true };
+    saetPauset(rundeFelt(r), { verden: r.verden.id, i: r.i, opgaver: r.opgaver, niveauOp: r.niveauOp, registreret: r.registreret, maerke: r.maerke.id, frit: r.frit === true });
   }
 
   // En gemt opgave (afbrudt mission, «kommer igen») kan stamme fra en anden udgave af spillet: brug den kun,
   // hvis emnet, visningen og tingene stadig findes — ellers kan runden gå i stå
-  const KENDTE_VISNINGER = ['ting', 'terning', 'terninger', 'klodser', 'streger', 'fingre', 'haand', 'kugleramme', 'par', 'flest', 'forskel', 'lyt', 'talstreg', 'plus', 'regnestykke', 'mangler', 'stoerst', 'minus', 'raekke', 'staenger', 'form', 'formScene', 'ur', 'moenter', 'koeb', 'moenster', 'soembraet', 'lineal', 'linealTegn', 'maalKlodser', 'scene', 'rute'];
-  const KENDTE_DANSK = ['ordBillede', 'lyt', 'lytLyd', 'bogstav', 'stortBogstav', 'alfabet', 'lydering', 'skrevetOrd', 'bygOrd', 'saetning', 'bygSaetning', 'scene', 'tryktBogstav', 'retOrd'];
+  const KENDTE_VISNINGER = ['ting', 'terning', 'terninger', 'klodser', 'streger', 'fingre', 'haand', 'kugleramme', 'par', 'flest', 'forskel', 'lyt', 'talstreg', 'plus', 'regnestykke', 'mangler', 'stoerst', 'minus', 'raekke', 'staenger', 'form', 'formScene', 'ur', 'moenter', 'koeb', 'moenster', 'soembraet', 'lineal', 'linealTegn', 'maalKlodser', 'scene', 'rute', 'kurv'];
+  const KENDTE_DANSK = ['ordBillede', 'lyt', 'lytLyd', 'bogstav', 'stortBogstav', 'alfabet', 'lydering', 'skrevetOrd', 'bygOrd', 'saetning', 'bygSaetning', 'scene', 'tryktBogstav', 'retOrd', 'bygAlfabet', 'ikkeSkilt', 'lydTog', 'sand'];
   function opgaveKendt(o) {
     if (o && o.fag === 'dansk') return !!(D && D.EMNER[o.emne] && D.GEN[o.type] && o.vis && KENDTE_DANSK.indexOf(o.vis.art) >= 0);
     return !!(o && O.EMNER[o.emne] && o.vis && KENDTE_VISNINGER.indexOf(o.vis.art) >= 0 && (!o.vis.ting || O.TING[o.vis.ting]) &&
       (!o.vis.form || O.FORMER[o.vis.form]));
   }
 
-  // Ved opstart: en gemt, afbrudt mission bliver til S.pausetRunde (▶ på kortet fortsætter den)
+  // Ved opstart: de gemte, afbrudte missioner (en pr. fag) bliver til S.afbrudt (▶ på kortet fortsætter dem)
   function hentMission() {
-    const p = data.pauset;
-    const verden = p && alleVerdener().find((v) => v.id === p.verden);
-    if (!verden || !p.opgaver.every(opgaveKendt)) { S.pausetRunde = null; data.pauset = null; return; }
     const pulje = O.MAERKER[T.samling] || O.MAERKER.jungle;
-    S.pausetRunde = {
-      verden: verden, emne: verden.emne, opgaver: p.opgaver, i: p.i, forsoeg: 0,
-      sidstAktiv: Date.now(), aktivMs: 0, niveauOp: p.niveauOp, registreret: p.registreret, frit: p.frit === true,
-      maerke: pulje.find((m) => m.id === p.maerke) || O.maerkeForRunde(T.samling, data.runderIalt, minFigur().e),
-    };
+    for (const felt of PAUSET_FELTER) {
+      const p = data[felt];
+      const verden = p && alleVerdener().find((v) => v.id === p.verden);
+      if (!verden || !p.opgaver.every(opgaveKendt)) { S.afbrudt[felt] = null; saetPauset(felt, null); continue; }
+      S.afbrudt[felt] = {
+        verden: verden, emne: verden.emne, opgaver: p.opgaver, i: p.i, forsoeg: 0, pausetFelt: felt,
+        sidstAktiv: Date.now(), aktivMs: 0, niveauOp: p.niveauOp, registreret: p.registreret, frit: p.frit === true,
+        maerke: pulje.find((m) => m.id === p.maerke) || O.maerkeForRunde(T.samling, data.runderIalt, minFigur().e, data.maerker),
+      };
+    }
   }
 
   function registrerAktivitet() {
@@ -1106,7 +1251,8 @@
   function forladRunde() {
     const r = S.runde;
     if (r && r.quiz) { S.runde = null; visHistorieSide(r.quiz.nr, r.quiz.frit); return; } // 🤔: tilbage til historien
-    registrerAktivitet(); gemTid(); S.pausetRunde = r;
+    registrerAktivitet(); gemTid();
+    if (r) S.afbrudt[rundeFelt(r)] = r;
     if (r && r.frit) visVaelgSelv(); else visKort(false);
   }
 
@@ -1115,7 +1261,7 @@
     // Fodspor, der fyldes undervejs, og dyret for enden af sporet
     const prikker = h('div', { class: 'fremdrift', 'aria-hidden': 'true', style: '--n:' + r.opgaver.length },
       r.opgaver.map(() => h('span', { class: 'prik' })),
-      h('span', { class: 'fremdrift-dyr' }, r.maerke.e));
+      h('span', { class: 'fremdrift-dyr' }, dyrTegning(r.maerke)));
     const fig = minFigur();
     r.dom = {
       prikker: prikker,
@@ -1123,7 +1269,7 @@
       hjaelp: h('div', { class: 'hjaelp-felt' }),
       tekst: h('div', { class: 'spoerg-tekst' }),
       svar: h('div', { class: 'svar-panel' }),
-      ven: h('div', { class: 'runde-ven', 'aria-hidden': 'true' }, fig.e),
+      ven: h('div', { class: 'runde-ven', 'aria-hidden': 'true' }, venTegning(fig.id, grundUdtryk(r.opgaver[r.i]))),
     };
     r.dom.krop = h('div', { class: 'runde-krop' },
       h('div', { class: 'visning-panel' }, r.dom.tekst, r.dom.visning, r.dom.hjaelp, r.dom.ven),
@@ -1160,6 +1306,7 @@
     r.visSvar = false;
     r.buffer = '';
     r.opdaterDisplay = null; r.bygNulstil = null; r.byg = null; r.figur = null; r.lineal = null; r.vendtOp = false;
+    r.hjaelpIntro = null; r.placer = null; r.trinvis = null; r.sand = null; // C · minispil
     S.spaertTil = performance.now() + 300; // et dobbelttryk på sidste svar må ikke besvare den nye opgave
     [...r.dom.prikker.querySelectorAll('.prik')].forEach((p, i) => p.classList.toggle('nu', i === r.i));
     r.dom.tekst.textContent = '';
@@ -1168,6 +1315,8 @@
     r.dom.visning.append(tegnVisning(opg));
     r.dom.hjaelp.textContent = '';
     r.dom.hjaelp.parentNode.classList.remove('med-hjaelp');
+    saetUdtryk(r.dom.ven, grundUdtryk(opg));
+    r.dom.ven.classList.remove('paa-broen'); // Skovbroens slutbillede: vennen var på broen
     r.dom.svar.classList.remove('venter');
     r.dom.svar.textContent = '';
     r.dom.svar.classList.toggle('tast', !opg.valg && !opg.byg && !opg.interaktiv);
@@ -1177,19 +1326,25 @@
     r.dom.krop.classList.toggle('gruppe-opgave', opg.valgArt === 'gruppe');
     r.dom.krop.classList.toggle('stil-opgave', opg.valgArt === 'stil'); // uret med målene ER svaret — det får pladsen
     r.dom.krop.classList.toggle('scene-opgave', opg.valgArt === 'scene'); // svarkort med små scener
-    r.dom.krop.classList.remove('kort-store'); // tilpasScener vælger kortenes opstilling igen
+    r.dom.krop.classList.remove('kort-store', 'kort-halv'); // tilpasScener vælger kortenes opstilling igen
     // Uret er opgaven: på en telefon på langs står hjælpen ved siden af uret, så uret ikke skrumper
     r.dom.krop.classList.toggle('ur-opgave', !!opg.vis && opg.vis.art === 'ur');
     r.dom.krop.classList.toggle('dansk-opgave', opg.fag === 'dansk');
-    r.dom.svar.append(opg.valg ? valgKnapper(opg) : opg.byg ? bygPanel(opg) : opg.interaktiv ? interaktivPanel(opg) : taltastatur(opg));
+    r.dom.svar.append(opg.valg ? valgKnapper(opg) : opg.byg ? (opg.byg.trinvis ? trinvisPanel(opg) : bygPanel(opg)) : opg.interaktiv ? interaktivPanel(opg) : taltastatur(opg));
+    fjernKopier();
+    // Slutbilledets lag (lysblomsten, rimparret) hører til den forrige opgave — det ligger uden for visningen (review, fund 1)
+    r.dom.visning.parentNode.querySelectorAll('.slut-lag').forEach((l) => l.remove());
+    if (placerMaal(opg)) placerFelt(opg);
     S.gentagTale = opg.tale;
     // Dansk: teksten, så de indtalte lyde (eller reserverne) — 🔊 gentager det hele
-    S.gentagFn = opg.lyd ? () => sigOpgave(opg) : null;
+    S.gentagFn = r.trinvis ? r.trinvis.gentag : opg.lyd ? () => sigOpgave(opg) : null;
     if (opg.valgArt === 'skjult') {
       // Huskekort: 🔊 vender kortene op, læser igen og vender dem igen (til hjælpen har vendt dem op for godt)
       S.gentagFn = () => { if (r.vendtOp) Tale.sig(opg.tale); else visSkjulteKort(opg); };
       visSkjulteKort(opg, forTale);
-    } else sigOpgave(opg, forTale);
+    } else if (opg.enAdGangen) enAdGangen(opg, forTale); // C · Rimhaven
+    else if (r.sand) (opg.lyd ? sigOpgave(opg, forTale) : Tale.sigVent((forTale ? forTale + ' ' : '') + opg.tale)).then(() => { if (S.runde === r && r.sand) r.sand.efterTale(); }); // forbilledet efter talen
+    else sigOpgave(opg, forTale);
     huskMission();
     gem();
   }
@@ -1259,8 +1414,9 @@
       case 'formScene': return h('div', { class: 'form-scene' }, v.former.map((f) =>
         h('span', { class: 'scene-form' + (f.form === v.spoerg ? ' taelbar' : '') }, formSvg(f.form, f.farve, f.drej, false))));
       case 'ur': return h('div', { class: 'ur-ramme' }, urSvg(v.klokke));
-      case 'scene': return tegnScene(v.dele, { lag: v.lag });
+      case 'scene': return tegnScene(v.dele, { lag: v.lag, tegninger: erMinispil(opg) });
       case 'rute': return rutebraet(opg);
+      case 'kurv': return froePost(opg);
       case 'moenter': return moentRaekke(v.moenter);
       case 'koeb': return h('div', { class: 'koeb' },
         h('div', { class: 'koeb-vare' }, h('span', { class: 'moent-plads' }, moentSvg(v.har)), h('span', { class: 'koeb-pris' }, v.har + ' kr')),
@@ -1320,18 +1476,25 @@
     while (x < fra) x += 720; // «kvart i et»: 12:45 → 1:00 fortsætter fremad
     return x;
   }
+  // C · Urværkstedet (vis.viser 'lille'): målene står ved timetallene, og kun den lille viser drejer — den store bliver på 12
   function stilUr(opg) {
     const ur = urSvg(opg.vis.start);
-    return h('div', { class: 'stil-ur', 'data-start': opg.vis.start, 'data-min': stilMin(opg.vis.start, opg.vis.start) },
+    // Den lille (tykke) viser tegnes øverst: ved klokken 12 lå den under den store og lignede én viser (ui-review 11-10).
+    // Nu ses den korte, tykke viser med den lange, tynde stikkende ud over den — uden at uret viser en anden tid
+    ur.insertBefore(ur.querySelector('.ur-time'), ur.querySelector('.ur-midte'));
+    const lille = opg.vis.viser === 'lille';
+    return h('div', { class: 'stil-ur' + (lille ? ' viser-lille' : ''), 'data-start': opg.vis.start, 'data-min': stilMin(opg.vis.start, opg.vis.start), 'data-viser': lille ? 'lille' : null },
       ur,
       opg.valg.map((x) => {
-        const tal = MAAL_TAL[Number(x.split(':')[1])];
+        const tal = lille ? (Number(x.split(':')[0]) % 12 || 12) : MAAL_TAL[Number(x.split(':')[1])];
         const under = ur.querySelector('.ur-tal[data-tal="' + tal + '"]');
         if (under) under.remove(); // knappen viser selv tallet — ellers skinner det igennem, når målet er dæmpet
         const v = (tal / 12) * 2 * Math.PI;
         return h('button', {
-          class: 'valg-knap stil-maal', type: 'button', 'data-v': x, 'aria-label': 'Den store viser på ' + tal,
-          style: '--x:' + (50 + 35 * Math.sin(v)).toFixed(1) + ';--y:' + (50 - 35 * Math.cos(v)).toFixed(1),
+          class: 'valg-knap stil-maal', type: 'button', 'data-v': x, 'aria-label': (lille ? 'Den lille viser på ' : 'Den store viser på ') + tal,
+          // Målet står lidt inden for tallenes ring (r 32, tallene står ved 35): så rører det hverken urets kant eller
+          // nabotallene (ui-review 11-10: ringen om 11 dækkede 10 og 12)
+          style: '--x:' + (50 + 32 * Math.sin(v)).toFixed(1) + ';--y:' + (50 - 32 * Math.cos(v)).toFixed(1),
           onclick: (e) => { Lyd.init(); stilViser(opg, x, e.currentTarget); },
         }, String(tal));
       }));
@@ -1342,12 +1505,14 @@
     const fra = Number(felt.getAttribute('data-min'));
     const til = stilMin(klokke, felt.getAttribute('data-start'));
     felt.setAttribute('data-min', til);
+    const lille = felt.getAttribute('data-viser') === 'lille'; // kun den lille viser drejer (hele timer)
     const saet = (x) => {
       ur.querySelector('.ur-time').setAttribute('transform', 'rotate(' + (x / 2) + ' 50 50)');
-      ur.querySelector('.ur-minut').setAttribute('transform', 'rotate(' + (x * 6) + ' 50 50)');
+      if (!lille) ur.querySelector('.ur-minut').setAttribute('transform', 'rotate(' + (x * 6) + ' 50 50)');
     };
-    const rolig = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-    const varighed = rolig ? 0 : (500 + Math.abs(til - fra) * 18) * TEMPO; // et kvarter ≈ 0,8 s, en hel omgang ≈ 1,6 s
+    const rolig = udenBevaegelse();
+    // et kvarter ≈ 0,8 s, en hel omgang ≈ 1,6 s — den lille viser alene højst 1,5 s
+    const varighed = rolig ? 0 : (lille ? Math.min(1500, 500 + Math.abs(til - fra) * 4) : 500 + Math.abs(til - fra) * 18) * TEMPO;
     if (!varighed || fra === til) { saet(til); return Promise.resolve(); }
     return new Promise((ok) => {
       const t0 = performance.now();
@@ -1583,7 +1748,7 @@
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('class', 'tl-buer');
     svg.setAttribute('aria-hidden', 'true');
-    linje.append(svg, skala, h('span', { class: 'tl-figur', 'aria-hidden': 'true' }, minFigur().e));
+    linje.append(svg, skala, h('span', { class: 'tl-figur', 'aria-hidden': 'true' }, venTegning(minFigur().id)));
     return linje;
   }
 
@@ -1607,12 +1772,25 @@
     }
     if (d.spredt) el.classList.add('spredt');
     if (d.taelbar === false) ting.forEach((t) => t.classList.remove('taelbar'));
+    // C · ting.billede: GRAFIK-C's tegning i stedet for emojien (Fortællebroen) — emojien, hvis tegningen mangler
+    if (d.billede && MINI[d.billede]) ting.forEach((t) => { t.textContent = ''; t.classList.add('med-tegning'); t.append(miniTegning(d.billede, 'ting-tegning')); });
+    // D2: maerk = synlig ring (dem, der flytter) · vaek = taget væk (stiplet + kryds, som i minus; tælles ikke)
     (d.under || []).forEach((u) => ting.slice(u.fra, u.til).forEach((t) => {
       t.setAttribute('data-del', u.id);
+      if (u.maerk) t.classList.add('maerk');
+      if (u.vaek) { t.classList.add('vaek'); if (u.taelbar !== true) t.classList.remove('taelbar'); }
       if (u.taelbar === true) t.classList.add('taelbar');
       else if (u.taelbar === false) t.classList.remove('taelbar');
     }));
+    // kommer: gruppen kommer til — en lille pil ind mod tingene
+    if (d.kommer) el.prepend(h('span', { class: 'sd-kommer', 'aria-hidden': 'true' }, pilSvg()));
     return el;
+  }
+  // Den fælles pil (som frisens): peger mod højre
+  function pilSvg() {
+    const svg = svgEl('svg', { viewBox: '0 0 40 40', 'aria-hidden': 'true' });
+    svgEl('path', { d: 'M3 14 H21 V5 L38 20 L21 35 V26 H3 Z', class: 'sd-pil-form' }, svg);
+    return svg;
   }
 
   // Et hus med n værelser i én række. De fyldte værelser har en emoji og et data-del; fra taelbarFra tælles de
@@ -1628,12 +1806,14 @@
 
   // Tierstænger og enere. Enerne står i søjler af højst 10 (over 9: to søjler). rammeOmTi: de første 10 enere
   // står i en stiplet ramme (data-del 'ti') — lige så høj som en tierstang
-  function sceneStaenger(d) {
+  function sceneStaenger(d, opts) {
     const ud = staenger(d.tiere, 0);
     const soejle = (n) => { const en = h('span', { class: 'enere' }); for (let k = 0; k < n; k++) en.append(h('i', { class: 'klods ener taelbar' })); return en; };
     let rest = d.enere || 0;
+    // I opgaven altid (D2), så hjælpen kan lyse dem. På et svarkort kun med rammeOmTi — ellers tænder et «tiere»-trin
+    // stængerne på alle kort (review #2, byt10)
+    if (d.rammeOmTi || !(opts && opts.kort)) ud.querySelectorAll('.stang').forEach((s) => s.setAttribute('data-del', 'tiere'));
     if (d.rammeOmTi) {
-      ud.querySelectorAll('.stang').forEach((s) => s.setAttribute('data-del', 'tiere'));
       if (rest >= 10) { ud.append(h('span', { class: 'sd-ti', 'data-del': 'ti' }, soejle(10))); rest -= 10; }
       if (rest) { const s = soejle(rest); s.setAttribute('data-del', 'rest'); ud.append(s); }
     } else {
@@ -1645,18 +1825,14 @@
   // Mønsterbrikker i en række. pil: her begynder mønstret. pakke k: brikkerne grupperes k ad gangen (data-del g0,
   // g1 …) uden synligt mellemrum — så gentagelsen ikke afsløres
   function sceneRaekke(d) {
-    const celler = d.celler.map((c) => h('span', { class: 'brik-celle taelbar', 'data-brik': c }, c));
+    // '?' er den tomme celle (klassen hul, som tal-delen)
+    const celler = d.celler.map((c) => (c === '?' ? h('span', { class: 'brik-celle hul' }, '?') : h('span', { class: 'brik-celle taelbar', 'data-brik': c }, c)));
     let indhold = celler;
     if (d.pakke) {
       indhold = [];
       for (let i = 0; i < celler.length; i += d.pakke) indhold.push(h('span', { class: 'sd-pakke', 'data-del': 'g' + (i / d.pakke) }, celler.slice(i, i + d.pakke)));
     }
-    let pil = null;
-    if (d.pil) {
-      const svg = svgEl('svg', { viewBox: '0 0 40 40', 'aria-hidden': 'true' });
-      svgEl('path', { d: 'M3 14 H21 V5 L38 20 L21 35 V26 H3 Z', class: 'sd-pil-form' }, svg);
-      pil = h('span', { class: 'sd-pil' }, svg);
-    }
+    const pil = d.pil ? h('span', { class: 'sd-pil' }, pilSvg()) : null;
     // Brikker pr. række, når frisen står i to rækker: med pakker brydes der kun mellem hele pakker (9 i pakker af 3
     // → 6 + 3), så den anden række ikke begynder midt i en pakke
     const halv = d.pakke ? Math.ceil(Math.ceil(d.celler.length / d.pakke) / 2) * d.pakke : Math.ceil(d.celler.length / 2);
@@ -1689,7 +1865,8 @@
     const svg = svgEl('svg', { viewBox: (-m) + ' ' + (-m) + ' ' + (d.b + 2 * m) + ' ' + (d.h + 2 * m), 'aria-hidden': 'true' });
     svgEl('rect', { x: 2 - m, y: 2 - m, width: d.b + 2 * m - 4, height: d.h + 2 * m - 4, rx: 10, class: 'pusle-bakke' }, svg);
     svgEl('path', { d: brikSti(d.fast, d.fast.x, d.fast.y), class: 'brik-fyld' }, svg);
-    svgEl('path', { d: brikSti(d.hul, d.hul.x, d.hul.y), class: 'pusle-hul', 'data-del': 'hul' }, svg);
+    // C · skygge: hullet er en mørk skygge (Skyggeatelieret trin 3) i stedet for den stiplede kontur
+    svgEl('path', { d: brikSti(d.hul, d.hul.x, d.hul.y), class: 'pusle-hul' + (d.skygge ? ' skygge' : ''), 'data-del': 'hul' }, svg);
     return h('span', { class: 'sd-pusle', style: '--vb-b:' + (d.b + 2 * m) + ';--vb-h:' + (d.h + 2 * m) }, svg);
   }
   // Én brik (svarkort) i samme målestok som puslespillet
@@ -1763,8 +1940,229 @@
     return h('span', { class: 'sd-placering beholder-' + (d.beholder || 'kasse') + ({ i: ' i', 'på': ' paa', bag: ' bag' })[rel], 'data-rel': rel }, bag, ting, foran);
   }
 
+  // =====================================================================
+  //  D2/D3 Regning: spejl, lineal, tårne, kø, mønstre, skilt, prikgitter og ur (docs/SCENE.md)
+  // =====================================================================
+  // Spejlet: motivet til venstre, en lodret stiplet spejllinje og et tomt felt til højre
+  function sceneSpejl(d) {
+    return h('div', { class: 'sd-spejl', 'data-del': 'spejl' },
+      h('span', { class: 'sd-motiv-e', 'aria-hidden': 'true' }, d.e),
+      h('span', { class: 'spejl-linje', 'aria-hidden': 'true' }),
+      h('span', { class: 'spejl-felt' }, '?'));
+  }
+  // Motivet spejlet vandret, som det er eller vendt på hovedet (svarkort)
+  const sceneMotiv = (d) => h('span', { class: 'sd-motiv vend-' + (['spejl', 'ingen', 'drej'].indexOf(d.vend) >= 0 ? d.vend : 'ingen') },
+    h('span', { class: 'sd-motiv-e', 'aria-hidden': 'true' }, d.e));
+
+  // Streg og lineal: 1 cm = --cm (5 --u). Stregen begynder 1,5 cm inde; linealens tal «start» står ud for den.
+  // Skråt: linealen drejes 12° om sit nul. Alle tre kort har samme højde (plads til den skrå), så intet afslører svaret
+  const sceneStreg = (d) => h('div', { class: 'sd-streg', style: '--cmn:' + d.cm }, h('span', { class: 'streg-linje' }));
+  function sceneLinealPlacering(d) {
+    const L = d.cm + 1, start = d.start === 1 ? 1 : 0;
+    const lineal = h('div', { class: 'sd-lineal' + (d.skraa ? ' skraa' : ''), style: '--x0:' + (1.5 - start) + ';--L:' + L });
+    for (let i = 0; i <= L; i++) {
+      const maerke = [h('i', { class: 'lineal-cm-s', style: 'left:calc(var(--cm) * ' + (i + 0.4) + ')' }),
+        h('b', { class: 'lineal-tal-s', style: 'left:calc(var(--cm) * ' + (i + 0.4) + ')' }, String(i))];
+      if (i === 0) lineal.append(h('span', { class: 'lineal-nul', 'data-del': 'nul' }, maerke));
+      else lineal.append(...maerke);
+      if (i < L) lineal.append(h('i', { class: 'lineal-halv-s', style: 'left:calc(var(--cm) * ' + (i + 0.9) + ')' }));
+    }
+    const fald = (L + 0.8) * 5 * Math.sin(12 * Math.PI / 180); // så meget længere ned når den skrå lineal
+    return h('div', { class: 'sd-linealplac', style: '--cmn:' + d.cm + ';--hoejde:' + (10.5 + fald).toFixed(1) },
+      h('span', { class: 'streg-linje' }), lineal);
+  }
+
+  // Klodser (to farver) i scenens mål
+  const sceneKlodser = (d) => klodser(d.a, d.b);
+
+  // To tårne på fælles bundlinje. De øverste «vaek» i hvert tårn er taget væk; i det høje tårn er klodserne over
+  // det lave tårns rest taelbar (dem uden makker)
+  function sceneTaarne(d) {
+    const hoej = Math.max(d.a, d.b), lav = Math.min(d.a, d.b), v = d.vaek || 0;
+    const taarn = (n, farve, erHoej) => {
+      const t = h('span', { class: 'sd-taarn' });
+      for (let i = 0; i < n; i++) {
+        const k = h('i', { class: 'klods ' + farve });
+        if (i >= n - v) { k.classList.add('vaek'); k.setAttribute('data-del', 'vaek'); }
+        else if (erHoej && i >= lav - v) k.classList.add('taelbar');
+        t.append(k);
+      }
+      return t;
+    };
+    return h('div', { class: 'sd-taarne' }, h('div', { class: 'taarne-par' }, taarn(hoej, 'rod', true), taarn(lav, 'blaa', false)), h('span', { class: 'taarne-bund', 'aria-hidden': 'true' }));
+  }
+
+  // Køen: vogne på række med et flag i den ene ende. Vognene nummereres fra flaget (v1 står ved flaget)
+  function sceneKoe(d) {
+    const flag = h('span', { class: 'koe-flag', 'data-del': 'flag', 'aria-hidden': 'true' }, '🚩');
+    const vogne = [];
+    for (let k = 1; k <= d.n; k++) vogne.push(h('span', { class: 'koe-vogn' + (d.maerk === k ? ' maerk' : ''), 'data-del': 'v' + k, 'aria-hidden': 'true' }, '🚃'));
+    const hoejre = d.flag === 'hoejre';
+    return h('div', { class: 'sd-koe' }, hoejre ? vogne.reverse().concat([flag]) : [flag].concat(vogne));
+  }
+
+  // Mønster i en figur: striber eller prikker (ikke kun farve). Mønstret er et <pattern> med et unikt id
+  let moensterNr = 0;
+  function moensterFyld(svg, moenster) {
+    const id = 'sd-moenster-' + (++moensterNr);
+    const defs = svgEl('defs', {}, svg);
+    const p = svgEl('pattern', Object.assign({ id: id, patternUnits: 'userSpaceOnUse', width: 16, height: 16 }, moenster === 'striber' ? { patternTransform: 'rotate(45)' } : {}), defs);
+    if (moenster === 'striber') svgEl('rect', { x: 0, y: 0, width: 7, height: 16, class: 'moenster-tegn' }, p);
+    else svgEl('circle', { cx: 8, cy: 8, r: 3.6, class: 'moenster-tegn' }, p);
+    return 'url(#' + id + ')';
+  }
+  // C · Skyggeatelieret: figurerne og skyggen er GRAFIK-C's tegninger (samme form på kortet og i skyggen). Kortet får
+  // sin egen farve (--form-N), skyggen er mørk (--kontur) og drejet drej grader om midten.
+  const SKYGGE_TEGNING = { cirkel: 'shadowCircle', trekant: 'shadowTriangle', kvadrat: 'shadowSquare', rektangel: 'shadowRectangle' };
+  function figurTegning(form, farve, skygge) {
+    const svg = miniTegning(SKYGGE_TEGNING[form], 'mini-tegning');
+    return svg ? h('span', { class: 'mini-form' + (skygge ? ' skygge-form' : ' form-farve-' + ((farve || 0) % 6)) }, svg) : null;
+  }
+  function sceneForm(d, opts) {
+    if (d.skygge || (opts && opts.tegninger)) {
+      const fig = figurTegning(d.form, d.farve, d.skygge);
+      const el = h('span', { class: 'sd-figur' + (fig ? ' mini' : '') + (d.skygge ? ' skygge' : ''), style: d.drej ? '--drej:' + d.drej + 'deg' : null },
+        fig || formSvg(d.form, d.farve, d.skygge ? d.drej : 0, false));
+      if (!fig && d.skygge) el.classList.add('skygge-reserve');
+      return el;
+    }
+    const svg = formSvg(d.form, d.farve, d.drej, false);
+    if (d.moenster === 'striber' || d.moenster === 'prikker') {
+      const figur = svg.querySelector('.form-figur');
+      const lag = figur.cloneNode(false);
+      lag.setAttribute('class', 'form-moenster');
+      lag.setAttribute('fill', moensterFyld(svg, d.moenster));
+      figur.after(lag);
+    }
+    return h('span', { class: 'sd-figur' }, svg);
+  }
+
+  // Skiltet med to regler: antal hjørner som billede (små vinkler; 0 = en rund ring) og en prøve af mønstret
+  function sceneSkilt(d) {
+    const svg = svgEl('svg', { viewBox: '0 0 200 100', 'aria-hidden': 'true' });
+    svgEl('rect', { x: 3, y: 3, width: 194, height: 94, rx: 14, class: 'skilt-plade' }, svg);
+    svgEl('line', { x1: 100, y1: 16, x2: 100, y2: 84, class: 'skilt-skille' }, svg);
+    const hj = d.hjoerner || 0;
+    if (!hj) svgEl('circle', { cx: 50, cy: 50, r: 24, class: 'skilt-vinkel' }, svg);
+    else {
+      // Hvert hjørne er en spids vinkel (^) med en prik i spidsen — som hjørneprikkerne i Formbyen
+      const pladser = hj === 3 ? [[50, 22], [28, 56], [72, 56]] : [[30, 22], [70, 22], [30, 56], [70, 56]];
+      pladser.forEach(([x, y]) => {
+        svgEl('path', { d: 'M' + (x - 13) + ' ' + (y + 20) + ' L' + x + ' ' + y + ' L' + (x + 13) + ' ' + (y + 20), class: 'skilt-vinkel' }, svg);
+        svgEl('circle', { cx: x, cy: y, r: 5, class: 'skilt-hjoerne' }, svg);
+      });
+    }
+    const fyld = moensterFyld(svg, d.moenster);
+    svgEl('rect', { x: 122, y: 22, width: 56, height: 56, rx: 14, class: 'skilt-proeve' }, svg);
+    svgEl('rect', { x: 122, y: 22, width: 56, height: 56, rx: 14, fill: fyld }, svg);
+    return h('span', { class: 'sd-skilt' }, svg);
+  }
+
+  // Prikgitter med en vej: prikkerne og vejstykkerne er spans (så hjælpen kan sætte tal-mærker på stykkerne).
+  // punkter i gitterenheder; vejens stykker er taelbar
+  function prikGitter(kol, raek, punkter, klasse) {
+    const felt = h('div', { class: 'sd-gitter ' + klasse, style: '--kol:' + (kol - 1) + ';--raek:' + (raek - 1) });
+    for (let y = 0; y < raek; y++) for (let x = 0; x < kol; x++) felt.append(h('i', { class: 'gitter-prik', style: '--x:' + x + ';--y:' + y }));
+    for (let i = 1; i < punkter.length; i++) {
+      const [a, b] = [punkter[i - 1], punkter[i]];
+      const vandret = a[1] === b[1];
+      felt.append(h('span', { class: 'vej-stykke taelbar ' + (vandret ? 'vandret' : 'lodret'), style: '--x:' + Math.min(a[0], b[0]) + ';--y:' + Math.min(a[1], b[1]) }));
+    }
+    return felt;
+  }
+  function sceneGitterRute(d) {
+    const skridt = { hoejre: [1, 0], venstre: [-1, 0], op: [0, -1], ned: [0, 1] };
+    const pkt = [[0, 0]];
+    // En ukendt retning er en fejl i opgaven — den må ikke tegnes som et stykke på stedet (review #10)
+    (d.opskrift || []).forEach(([ret, n]) => {
+      const s = skridt[ret];
+      if (!s) throw new Error('gitterRute: ukendt retning «' + ret + '»');
+      for (let k = 0; k < n; k++) { const p = pkt[pkt.length - 1]; pkt.push([p[0] + s[0], p[1] + s[1]]); }
+    });
+    const minX = Math.min(...pkt.map((p) => p[0])), minY = Math.min(...pkt.map((p) => p[1]));
+    const norm = pkt.map((p) => [p[0] - minX + 1, p[1] - minY + 1]); // én prik luft hele vejen rundt
+    const kol = Math.max(...norm.map((p) => p[0])) + 2, raek = Math.max(...norm.map((p) => p[1])) + 2;
+    const el = prikGitter(kol, raek, norm, 'g-rute');
+    el.setAttribute('data-del', 'vej');
+    el.append(h('i', { class: 'gitter-start', style: '--x:' + norm[0][0] + ';--y:' + norm[0][1] }));
+    return el;
+  }
+  // En lige vej på en prikrække (svarkort). Altid mindst 8 prikker, så kortene har samme målestok
+  function sceneGitterStreg(d) {
+    const l = d.laengde || 1, kol = Math.max(8, l + 2);
+    const pkt = Array.from({ length: l + 1 }, (_, i) => [1 + i, 0]);
+    const el = prikGitter(kol, 1, pkt, 'g-lige');
+    el.append(h('i', { class: 'gitter-start', style: '--x:1;--y:0' }));
+    return el;
+  }
+
+  // =====================================================================
+  //  D2/D3 Dansk: lydprikker og ordstrimlen (docs/SCENE.md)
+  // =====================================================================
+  // Lydprikker: én stor prik for hver lyd i ordet (svarkort — ingen bogstaver). Prikkerne er taelbar
+  const scenePrikker = (d) => h('div', { class: 'lyd-prikker' }, Array.from({ length: Math.max(0, d.n || 0) }, () => h('i', { class: 'lyd-prik taelbar' })));
+  // Ordstrimlen: bogstaverne som brikker, der rører hinanden (ingen mellemrum). skille p: en tydelig lodret
+  // streg mellem brik p−1 og p, der stikker op over og ned under strimlen. Brikkerne har data-i (hjælpen lydFoerste)
+  function sceneStrimmel(d) {
+    const ord = String(d.ord || '');
+    const el = h('div', { class: 'strimmel' });
+    ord.split('').forEach((b, i) => {
+      if (d.skille && i === d.skille) el.append(h('span', { class: 'strimmel-skille', 'aria-hidden': 'true' }));
+      el.append(h('span', { class: 'strimmel-b', 'data-i': i }, b));
+    });
+    return el;
+  }
+
+  // C · Skovbroen: broåbningen og brobrikkerne i GRAFIK-C's målestok (24 enheder pr. felt). Tegningerne fra grafik.js
+  // bruges, hvor de findes (åbning 5, 10, 13; brik 1–5, 7, 8) — de andre længder tegnes med præcis samme opbygning.
+  const TAL_ID = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen'];
+  const svgHoved = (b, hh) => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + b + ' ' + hh + '" fill="none" stroke="var(--kontur,#33493C)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">';
+  // Åbningen: vand, broens dæk med et stiplet skel pr. felt; femmergrænsen er en forlænget streg, tiermærket to streger
+  function broAabningTekst(n) {
+    if (MINI['forestBridgeGap' + TAL_ID[n]]) return MINI['forestBridgeGap' + TAL_ID[n]];
+    const B = 24 * n + 8;
+    let s = svgHoved(B, 84) + '<rect x="4" y="8" width="' + 24 * n + '" height="68" rx="8" fill="var(--vand,#CBDDE0)" stroke="none"/>' +
+      '<path d="M12 65Q' + B / 2 + ' 75 ' + (B - 12) + ' 65" fill="none" stroke="var(--papir,#FFFEF8)"/>' +
+      '<rect x="4" y="30" width="' + 24 * n + '" height="24" rx="0" fill="var(--papir,#FFFEF8)"/>';
+    for (let k = 1; k <= n; k++) {
+      const x = 24 * k + 4;
+      if (k % 10 === 0) s += '<path d="M' + (x - 2) + ' 24V60M' + (x + 2) + ' 24V60" fill="none" stroke-width="2"/>';
+      else if (k === n) continue;
+      else if (k % 5 === 0) s += '<path d="M' + x + ' 26V58" fill="none" stroke-width="3"/>';
+      else s += '<path d="M' + x + ' 31V53" fill="none" stroke-width="2" stroke-dasharray="3 3"/>';
+    }
+    return s + '<path d="M4 23V61M' + (24 * n + 4) + ' 23V61" fill="none" stroke-width="4"/></svg>';
+  }
+  function broBrikTekst(n) {
+    if (MINI['forestBridgePiece' + TAL_ID[n]]) return MINI['forestBridgePiece' + TAL_ID[n]];
+    let s = svgHoved(24 * n + 8, 40) + '<rect x="4" y="8" width="' + 24 * n + '" height="24" rx="5" fill="var(--farve-2,#EDB561)"/>';
+    for (let k = 1; k < n; k++) s += '<path d="M' + (24 * k + 4) + ' 9V31" fill="none" stroke-width="' + (k % 5 === 0 ? 4 : 2) + '"/>';
+    return s + '</svg>';
+  }
+  // En brik (felterne fra..fra+n i åbningen): tegningen stikker 4 enheder ud til hver side og 8 op, som i GRAFIK-C
+  function broBrik(n, klasse, del) {
+    return h('span', { class: 'bro-brik ' + (klasse || ''), 'data-del': del || null, style: '--n:' + n }, tegning(broBrikTekst(n), 'brik-tegning'));
+  }
+  // Åbningen: den faste brik ligger fra venstre (data-del fast); de tomme felter op til tiermærket er «tomme» (taelbar),
+  // felterne efter tiermærket «efterTi». Felterne er HTML oven på tegningen, så hjælpen kan tælle og lyse dem.
+  function sceneBro(d) {
+    const n = d.n, fast = Math.min(n, d.fast || 0);
+    const felt = (k) => h('span', { class: 'bro-felt' + (k < 10 ? ' taelbar' : '') });
+    const raekke = h('span', { class: 'bro-felter' });
+    if (fast) raekke.append(broBrik(fast, 'fast', 'fast'));
+    const tomme = [], efter = [];
+    for (let k = fast; k < n; k++) (k < 10 ? tomme : efter).push(felt(k));
+    if (tomme.length) raekke.append(h('span', { class: 'bro-gruppe', 'data-del': 'tomme', style: '--n:' + tomme.length }, tomme));
+    if (efter.length) raekke.append(h('span', { class: 'bro-gruppe efter-ti', 'data-del': 'efterTi', style: '--n:' + efter.length }, efter));
+    return h('span', { class: 'sd-bro', style: '--bn:' + n }, tegning(broAabningTekst(n), 'bro-tegning'), raekke);
+  }
+  // Brobrikken på et svarkort: samme målestok som broen (længden er svaret — aldrig samme bredde)
+  function sceneBroBrik(d) {
+    return h('span', { class: 'sd-brobrik', style: '--n:' + d.n }, tegning(broBrikTekst(d.n), 'brik-tegning'));
+  }
+
   const SCENE_DEL = {
-    gruppe: (d) => h('div', { class: 'sd-gruppe ramme-' + (RAMMER.indexOf(d.ramme) >= 0 ? d.ramme : 'boks') }, (d.dele || []).map(sceneDel)),
+    gruppe: (d, opts) => h('div', { class: 'sd-gruppe ramme-' + (RAMMER.indexOf(d.ramme) >= 0 ? d.ramme : 'boks') }, (d.dele || []).map((x) => sceneDel(x, opts))),
     ting: sceneTing,
     tegn: (d) => h('span', { class: 'sd-tegn', 'aria-hidden': 'true' }, d.s),
     tal: (d) => h('span', { class: 'sd-tal' + (d.s === '?' ? ' hul' : '') + (d.ret ? ' ret' : '') }, String(d.s),
@@ -1776,16 +2174,32 @@
     moent: (d) => h('span', { class: 'moent-plads' }, moentSvg(d.kr)),
     vare: (d) => h('div', { class: 'koeb-vare' }, h('span', { class: 'koeb-emoji', 'aria-hidden': 'true' }, d.e), h('span', { class: 'koeb-pris' }, d.pris + ' kr')),
     digital: (d) => h('div', { class: 'sd-digital-ur' }, h('span', { class: 'sd-digital-tal' }, d.klokke)),
-    form: (d) => h('span', { class: 'sd-figur' }, formSvg(d.form, d.farve, d.drej, false)),
+    form: sceneForm,
     puslespil: scenePuslespil,
     brik: sceneBrik,
     placering: scenePlacering,
+    spejl: sceneSpejl,
+    motiv: sceneMotiv,
+    streg: sceneStreg,
+    linealPlacering: sceneLinealPlacering,
+    klodser: sceneKlodser,
+    taarne: sceneTaarne,
+    koe: sceneKoe,
+    skilt: sceneSkilt,
+    gitterRute: sceneGitterRute,
+    gitterStreg: sceneGitterStreg,
+    ur: (d) => h('div', { class: 'sd-ur' }, urSvg(d.klokke)),
+    prikker: scenePrikker,
+    strimmel: sceneStrimmel,
+    bro: sceneBro,
+    brobrik: sceneBroBrik,
   };
 
   // Én del: elementet får klassen sd-<t> og data-del; et navn står som en lille etiket under delen
-  function sceneDel(d) {
+  // opts.kort: delen står på et svarkort
+  function sceneDel(d, opts) {
     const lav = SCENE_DEL[d.t];
-    let el = lav ? lav(d) : h('span');
+    let el = lav ? lav(d, opts || {}) : h('span');
     el.classList.add('sd', 'sd-' + d.t);
     if (d.id) el.setAttribute('data-del', d.id);
     if (d.navn) el = h('div', { class: 'sd-navngivet' }, el, h('span', { class: 'sd-navn' }, d.navn));
@@ -1796,8 +2210,9 @@
   function tegnScene(dele, opts) {
     opts = opts || {};
     const scene = h('div', { class: 'scene lag-' + (opts.lag === 'stak' ? 'stak' : 'raekke') + (opts.kort ? ' kort-scene' : '') });
-    scene._dele = (dele || []).map(sceneDel);
+    scene._dele = (dele || []).map((d) => sceneDel(d, opts));
     scene._lag = opts.lag === 'stak' ? 'stak' : 'raekke';
+    scene._kort = !!opts.kort;
     arrangerScene(scene, 0);
     setTimeout(() => foelgScene(scene), 0);
     return scene;
@@ -1832,8 +2247,13 @@
     return rader.every((r) => r.length) ? rader : null;
   }
   const kombinationer = (liste, k) => (k === 0 ? [[]] : [].concat.apply([], liste.map((x, i) => kombinationer(liste.slice(i + 1), k - 1).map((r) => [x].concat(r)))));
+  // Mange mønter på et svarkort kan lægges tæt som en bunke (bytMoent: op til 4 mønter, som ikke kan blive mindre end
+  // 80 px — på en telefon er der ellers ikke plads, og kortet klipper dem). Bunken ligger vandret (1) eller — på
+  // smalle, høje kort — lodret (2)
+  const kanBunke = (scene) => !!scene._kort && !!scene.querySelector('.sd-moenter .moent-plads:nth-child(3)');
   // Hvor mange gange kan scenen brydes (0 = kun én opstilling)? Rækker af dele: op til to brud (tre rækker)
   function maksBrud(scene) {
+    if (kanBunke(scene)) return 2;
     if (harFrise(scene)) return 1;
     if (scene._lag === 'stak') return kanVendes(scene) ? 1 : 0;
     return scene._dele.length > 1 ? Math.min(2, brudSteder(scene._dele).length) : 0;
@@ -1845,6 +2265,15 @@
   function arrangerScene(scene, to) {
     to = Number(to) || 0;
     const dele = scene._dele;
+    // Mønter på et svarkort: «tæt» (to > 0) lægger dem som en bunke — hver mønt dækker lidt af den næste, og den
+    // første ligger øverst (en 10'er står altid først, så dens tal ses helt). Lodret (to = 2): den nederste ligger
+    // øverst, så tallet i den øverste del af hver mønt ses
+    scene.querySelectorAll('.sd-moenter').forEach((m) => {
+      const taet = to > 0 && !!scene._kort, lodret = taet && to > 1;
+      m.classList.toggle('taet', taet);
+      m.classList.toggle('lodret', lodret);
+      [...m.children].forEach((p, i, l) => { p.style.zIndex = taet ? String(lodret ? i + 1 : l.length - i) : ''; });
+    });
     dele.forEach((d) => [d].concat([...d.querySelectorAll('.sd-raekke')]).forEach((x) => {
       if (x.classList.contains('sd-raekke')) x.classList.toggle('to-rader', to > 0 && x.classList.contains('frise') && x.querySelectorAll('.brik-celle').length > 2);
     }));
@@ -1932,9 +2361,14 @@
     let to = 0, u = proev(0);
     const maks = Math.max.apply(null, scener.map(maksBrud));
     for (let k = 1; k <= maks; k++) {
+      // Mønterne lægges kun tæt, når de ellers ikke kan være der i fuld størrelse (mindst 80 px — tallet er 17 px)
+      if (u > U_MIN + 0.01 && scener.some(kanBunke)) break;
       const uk = proev(k);
       if (uk > u * 1.15) { to = k; u = uk; }
     }
+    // Kan mønterne ikke være der i nogen opstilling (fx når «vis svaret» giver et smalt kort en ramme), ligger de
+    // alligevel i en bunke — lodret på et højt kort, ellers vandret — så de stikker mindst muligt ud
+    if (u <= U_MIN + 0.01 && scener.some(kanBunke)) { const [B, H] = sceneBoks(scener[0]); to = H > B ? 2 : 1; }
     scener.forEach((s) => { if (s._to !== to) arrangerScene(s, to); saetU(s, u); });
     return u;
   }
@@ -1958,9 +2392,11 @@
     const alle = [...document.querySelectorAll('#app .runde .scene')];
     const kort = alle.filter((s) => s.closest('.valg-knap'));
     const opgave = alle.filter((s) => !s.closest('.valg-knap'));
-    // Puslespil og mønter: opgaven og svarkortene tegnes i samme størrelse (hullet = brikken, 1 kr = 1 kr)
-    const samme = opgave.find((s) => s.querySelector('.sd-pusle, .sd-moenter'));
-    const sammeKort = !!samme && kort.some((s) => s.querySelector('.sd-brik, .sd-moent'));
+    // Puslespil, mønter, prikgitre og klodsrækker: opgaven og svarkortene tegnes i samme størrelse (hullet = brikken,
+    // 1 kr = 1 kr, en vejlængde = en vejlængde, en klods = en klods — review #3: retVej, sammeSum, bytMoent)
+    // C: broåbningen og brobrikkerne, skyggen og figurerne — også i samme målestok (en brik på 3 = tre felter i broen)
+    const samme = opgave.find((s) => s.querySelector('.sd-pusle, .sd-moenter, .sd-gitter, .sd-klodser, .sd-bro, .sd-figur.skygge'));
+    const sammeKort = !!samme && kort.some((s) => s.querySelector('.sd-brik, .sd-moent, .sd-moenter, .sd-gitter, .sd-klodser, .sd-brobrik' + (samme.querySelector('.skygge') ? ', .sd-figur' : '')));
     // Mønsterfrisen: brikkerne på svarkortene er aldrig større end frisens (opgaven er det, der skal ses)
     const friseKort = opgave.some(harFrise) && kort.some((s) => s.querySelector('.sd-raekke'));
     // Tilpas det hele; giver den mindste --u (opgave eller kort) — den, der bestemmer, hvor godt det kan ses
@@ -1978,16 +2414,31 @@
     // Høje kort (fx tierstænger) får desuden prøvet «store» kort: på en iPad på langs side om side i en bredere
     // kolonne (normalt står de under hinanden i en smal), på højkant højere kort. Den opstilling, hvor det mindste
     // står størst, vælges (den første, hvis de er lige gode). Telefonen på langs har sin egen opstilling.
+    // «store-stak» (iPad på langs): de store korts brede kolonne, men kortene under hinanden — til brede, lave kort
+    // som en kø af vogne eller en ordstrimmel, der ellers står småt i den smalle kolonne (D2/D3).
+    // «halv-stak» (iPad på langs): som store-stak, men opgave og kort deler bredden lige — når opgaven er den samme slags
+    // brede tegning som kortene (køen, strimlen), står de så i samme målestok (ui-review #2: køen stod i 70 % af kortenes).
     // Valget ligger fast for skærmens størrelse — kortene må ikke springe, når hjælpen tager plads i opgavefeltet.
     const skaerm = window.innerWidth + 'x' + window.innerHeight;
     if (valg._stakFor === skaerm) { tilpasAlt(); return; }
     valg._stakFor = skaerm;
     const krop = valg.closest('.runde-krop');
-    const saet = (o) => { valg.classList.toggle('kort-stak', o === 'stak'); if (krop) krop.classList.toggle('kort-store', o === 'store'); };
+    const saet = (o) => {
+      valg.classList.toggle('kort-stak', o === 'stak' || o === 'store-stak' || o === 'halv-stak');
+      if (krop) krop.classList.toggle('kort-store', o === 'store' || o === 'store-stak' || o === 'halv-stak');
+      if (krop) krop.classList.toggle('kort-halv', o === 'halv-stak');
+    };
     const muligheder = ['side', 'stak'];
     if (krop && (window.innerHeight > window.innerWidth || window.innerHeight > 500)) muligheder.push('store');
+    if (krop && window.innerWidth > window.innerHeight && window.innerHeight > 500) muligheder.push('store-stak', 'halv-stak');
+    // Højkant: «store-stak» er kortene under hinanden, men højere — til små tegninger, der ellers står småt i lave kort
+    // (ui-review #3: bamsen i laesPlacering var ca. 20 px på en iPhone)
+    else if (krop && window.innerHeight > window.innerWidth) muligheder.push('store-stak');
     let valgt = null, bedst = 0;
-    muligheder.forEach((o) => { saet(o); const u = tilpasAlt(); if (!valgt || u > bedst * 1.1) { valgt = o; bedst = u; } });
+    // Mønter i en bunke (tæt) er en nødløsning: en opstilling uden bunke vælges, hvis den er næsten lige så god —
+    // og en lodret bunke kun, når den vandrette ikke kan være der
+    const straf = () => (valg.querySelector('.moenter.taet.lodret') ? 0.65 : valg.querySelector('.moenter.taet') ? 0.75 : 1);
+    muligheder.forEach((o) => { saet(o); const u = tilpasAlt() * straf(); if (!valgt || u > bedst * 1.1) { valgt = o; bedst = u; } });
     saet(valgt);
     tilpasAlt();
   }
@@ -1998,11 +2449,11 @@
     return h('span', { class: 'bogstav-kort' }, kunLille ? null : h('span', { class: 'bogstav-stort' }, b.toUpperCase()), h('span', { class: 'bogstav-lille' }, b));
   }
   // En emoji, der siger sit ord, når man trykker på den (ikke et svar)
-  function ordEmoji(ord, e, klasse) {
+  function ordEmoji(ord, e, klasse, billede) {
     return h('button', {
       class: 'ord-emoji ' + (klasse || ''), type: 'button', 'aria-label': ord,
       onclick: () => { Lyd.init(); Tale.sig(ord); },
-    }, h('span', { 'aria-hidden': 'true' }, e));
+    }, billede && MINI[billede] ? miniBillede(billede, e, 'ord-tegning') : h('span', { 'aria-hidden': 'true' }, e));
   }
   function lytKnap(opg) {
     return h('button', {
@@ -2022,13 +2473,13 @@
     const dele = opg.byg.dele;
     // «Hvad skete der?»: pladserne er nummererede (1 2 3), og brikkerne er billeder
     return h('div', { class: 'byg-felter' + (opg.byg.adskil ? ' ord' : '') + (nummereret ? ' nummereret' : '') },
-      Array.from({ length: dele }, (_, k) => h('span', { class: 'byg-felt', 'data-nr': nummereret ? k + 1 : null })));
+      Array.from({ length: dele }, (_, k) => h('span', { class: 'byg-felt', 'data-nr': nummereret ? k + 1 : null, 'data-plads': opg.byg.trinvis ? k : null })));
   }
 
   function tegnDanskVisning(opg) {
     const v = opg.vis;
     switch (v.art) {
-      case 'ordBillede': return h('div', { class: 'dansk-billede' }, ordEmoji(v.ord, v.e, 'stor'));
+      case 'ordBillede': return h('div', { class: 'dansk-billede' }, ordEmoji(v.ord, v.e, 'stor', erMinispil(opg) && D.BILLEDE[v.ord]));
       case 'lyt': case 'lytLyd': return lytKnap(opg);
       case 'bogstav': return h('div', { class: 'dansk-billede' }, lytKnap(opg), bogstavKort(v.bogstav));
       case 'stortBogstav': return h('div', { class: 'dansk-billede' }, h('span', { class: 'bogstav-kort enkelt' }, h('span', { class: 'bogstav-stort kun' }, v.bogstav.toUpperCase())));
@@ -2050,15 +2501,28 @@
       case 'saetning': return lytKnap(opg);
       case 'bygSaetning': return h('div', { class: 'dansk-billede byg' }, lytKnap(opg), bygFelter(opg));
       case 'bygHistorie': return h('div', { class: 'dansk-billede byg' }, lytKnap(opg), bygFelter(opg, true));
+      case 'lydTog': return lydTogVisning(opg); // C · Lydtoget
+      case 'sand': return sandVisning(opg); // C · Spor i sandet
       // D1: scener (fx «i» og «på»), det trykte bogstav og ordet med ét forkert bogstav
       case 'scene': return tegnScene(v.dele, { lag: v.lag });
       case 'tryktBogstav': return h('div', { class: 'dansk-billede trykt' }, h('span', { class: 'trykt-bogstav' }, v.bogstav));
       case 'retOrd': {
         const ord = skrevetOrd(v.vist);
         const ret = ord.children[v.plads];
-        if (ret) ret.classList.add('ret'); // brikken, der skal rettes (stiplet ring)
+        // Brikken, der skal rettes (stiplet ring). D2 skjulPlads: ringen kommer først med hjælpen visPlads
+        if (ret && !v.skjulPlads) ret.classList.add('ret');
         return h('div', { class: 'dansk-billede' }, ordEmoji(v.ord, v.e, 'mellem'), ord);
       }
+      // D2: tomme pladser til bogstaverne i alfabetets rækkefølge — pilen under dem viser, at man begynder fra venstre
+      case 'bygAlfabet': return h('div', { class: 'dansk-billede byg' },
+        h('div', { class: 'byg-retning' }, bygFelter(opg), h('span', { class: 'byg-retning-pil', 'aria-hidden': 'true' })));
+      // D3: skiltet «Her er ikke en 🐈» — ordet på plads fremhaev lyser gult. Ordene er ikke knapper (de skal læses)
+      case 'ikkeSkilt': return h('div', { class: 'dansk-billede ikke-skilt-ramme' },
+        h('div', { class: 'ikke-skilt', role: 'img', 'aria-label': v.ord.join(' ') + ' ' + (v.dyr || '') },
+          h('div', { class: 'ikke-skilt-plade' },
+            v.ord.map((w, i) => h('span', { class: 'skilt-ord' + (i === v.fremhaev ? ' fremhaev' : '') }, w)),
+            h('span', { class: 'skilt-e', 'aria-hidden': 'true' }, v.e)),
+          h('span', { class: 'ikke-skilt-pael', 'aria-hidden': 'true' })));
       default: return h('div');
     }
   }
@@ -2071,7 +2535,12 @@
   }
 
   function danskValgIndhold(opg, x) {
-    if (opg.valgArt === 'emoji') { const o = D.ORD[x]; return h('span', { class: 'valg-emoji', 'aria-hidden': 'true' }, o ? o.e : x); }
+    if (opg.valgArt === 'emoji') {
+      const o = D.ORD[x];
+      // C · Rimhaven: GRAFIK-C's tegninger af billedordene, hvor de findes (ellers emojien)
+      if (erMinispil(opg) && MINI[D.BILLEDE[x]]) return miniBillede(D.BILLEDE[x], o.e, 'valg-emoji valg-tegning');
+      return h('span', { class: 'valg-emoji', 'aria-hidden': 'true' }, o ? o.e : x);
+    }
     // Huskekort: forsiden (billedet) og bagsiden — kortet vendes af visSkjulteKort
     if (opg.valgArt === 'skjult') {
       const o = D.ORD[x];
@@ -2105,8 +2574,11 @@
       if (r.laast || r.byg.indexOf(i) >= 0 || r.byg.length >= B.dele) return;
       Lyd.init(); Lyd.tryk();
       r.byg.push(i);
-      // Hver brik siger sin lyd (bogstav) eller sit ord
-      if (B.tale) Tale.sig(B.tale[i]); else if (B.adskil) Tale.sig(B.brikker[i]); else Lyd.klip(D.lydId(B.brikker[i]), '');
+      // Hver brik siger sin lyd (bogstav) eller sit ord — i alfabetet (byg.navn) bogstavets navn
+      if (B.tale) Tale.sig(B.tale[i]);
+      else if (B.adskil) Tale.sig(B.brikker[i]);
+      else if (B.navn) Lyd.klip(D.navnId(B.brikker[i]), D.NAVNE[B.brikker[i]] || B.brikker[i]);
+      else Lyd.klip(D.lydId(B.brikker[i]), '');
       tegn();
       if (r.byg.length === B.dele) {
         const svarTekst = r.byg.map((k) => B.brikker[k]).join(B.adskil);
@@ -2124,15 +2596,17 @@
   // Spørgsmålet læses op: tekst → (indtalte lyde eller reserver) → evt. de mulige svar
   async function sigOpgave(opg, forTale, langsomt) {
     const token = S.token;
+    const oplaes = ++S.oplaes;
+    const levende = () => token === S.token && oplaes === S.oplaes; // ikke efter et svar eller en ny oplæsning
     const tekst = (forTale ? forTale + ' ' : '') + opg.tale;
     if (!opg.lyd) { Tale.sig(tekst); return; }
     await Tale.sigVent(tekst);
     for (const l of opg.lyd) {
-      if (token !== S.token) return;
+      if (!levende()) return;
       await Lyd.klip(l.klip, l.reserve);
       await vent((l.pause || 250) * (langsomt ? 2.2 : 1));
     }
-    if (token !== S.token) return;
+    if (!levende()) return;
     if (opg.efterTale) await Tale.sigVent(opg.efterTale);
   }
 
@@ -2168,7 +2642,7 @@
     if (opg.valgArt === 'gruppe') return tingGruppe(x === 'a' ? v.a : v.b, O.TING[v.ting].e, x, 'knap');
     if (opg.valgArt === 'ur') return urSvg(x, true);
     if (opg.valgArt === 'tid') return h('span', { class: 'tid-tekst' }, x);
-    if (opg.valgArt === 'scene') return tegnScene(opg.kort[x].dele, { kort: true });
+    if (opg.valgArt === 'scene') return tegnScene(opg.kort[x].dele, { kort: true, tegninger: erMinispil(opg) });
     if (opg.valgArt === 'ord') {
       // lige: alle har en makker · ulige: én står alene
       const ikon = h('span', { class: 'ord-ikon', 'aria-hidden': 'true' }, x === 'lige' ? '●● ●●' : '●● ●');
@@ -2180,11 +2654,16 @@
   function valgKnapper(opg) {
     if (opg.valgArt === 'stil') return stilUr(opg);
     const indhold = (x) => valgIndhold(opg, x);
-    return h('div', { class: 'valg' + (opg.valgArt ? ' valg-' + opg.valgArt : '') + ' antal-' + opg.valg.length }, opg.valg.map((x) => h('button', {
-      class: 'valg-knap', type: 'button', 'data-v': x,
-      'aria-label': opg.valgArt === 'gruppe' ? (x === 'a' ? 'Venstre gruppe' : 'Højre gruppe') : opg.valgArt === 'scene' ? opg.kort[x].navn : String(x),
-      onclick: (e) => { Lyd.init(); svar(x, e.currentTarget); },
-    }, indhold(x))));
+    const placer = !!placerMaal(opg); // C: løft kortet og læg det på broen/skyggen
+    return h('div', { class: 'valg' + (opg.valgArt ? ' valg-' + opg.valgArt : '') + ' antal-' + opg.valg.length + (placer ? ' placer' : '') }, opg.valg.map((x) => {
+      const k = h('button', {
+        class: 'valg-knap', type: 'button', 'data-v': x, 'aria-pressed': placer ? 'false' : null,
+        'aria-label': opg.valgArt === 'gruppe' ? (x === 'a' ? 'Venstre gruppe' : 'Højre gruppe') : opg.valgArt === 'scene' ? opg.kort[x].navn : String(x),
+        onclick: (e) => { Lyd.init(); if (placer) loeftKort(x, e.currentTarget); else svar(x, e.currentTarget); },
+      }, indhold(x));
+      if (placer) traekbar(k, x);
+      return k;
+    }));
   }
 
   // ---------- Svar: eget taltastatur (intet <input>) ----------
@@ -2238,6 +2717,14 @@
       if (e.key === 'Enter') { const k = r.dom.svar.querySelector('.vis-svar'); if (k) k.click(); }
       return;
     }
+    // C · trinvis byg: bogstavtasten (Lydtoget) eller 1, 2, 3 vælger et af kortene til den aktive plads
+    if (r.trinvis) {
+      const kort = [...r.dom.svar.querySelectorAll('.trinvis-kort:not(:disabled)')];
+      const n = Number(e.key);
+      const k = n >= 1 && n <= 3 ? r.dom.svar.querySelectorAll('.trinvis-kort')[n - 1] : kort.find((x) => x.getAttribute('data-b') === e.key.toLowerCase());
+      if (k && !k.disabled) k.click();
+      return;
+    }
     // Dansk: byg et ord (bogstavtaster, Backspace) eller en sætning (1, 2, 3 vælger brikken efter plads)
     if (opg.byg) {
       const k = e.key.toLowerCase();
@@ -2263,13 +2750,25 @@
       else if (e.key === 'Enter') r.tast('✔');
       return;
     }
-    // Stil viserne: tasterne følger tallene på målene — 3, 6, 9, og 1 eller 0 for 12. Andre taster gør intet
+    // Stil viserne: tasterne følger tallene på målene — 3, 6, 9, og 1 eller 0 for 12. Andre taster gør intet.
+    // C · Urværkstedet med den lille viser: 1–9 er timetallet (1 er ikke 12); 10 og 11 nås med ← → (eller Tab) og Enter
     if (opg.valgArt === 'stil') {
-      const tal = e.key === '1' || e.key === '0' ? '12' : e.key;
-      const k = [...r.dom.svar.querySelectorAll('.stil-maal')].find((b) => b.textContent === tal);
-      if (k && !k.disabled) k.click();
+      const maal = [...r.dom.svar.querySelectorAll('.stil-maal')].filter((b) => !b.disabled);
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        const i = maal.indexOf(document.activeElement);
+        const ny = maal[i < 0 ? (e.key === 'ArrowRight' ? 0 : maal.length - 1) : (i + (e.key === 'ArrowRight' ? 1 : -1) + maal.length) % maal.length];
+        if (ny) ny.focus();
+        return;
+      }
+      const lille = opg.vis && opg.vis.viser === 'lille';
+      const tal = !lille && (e.key === '1' || e.key === '0') ? '12' : e.key;
+      const k = maal.find((b) => b.textContent === tal);
+      if (k) k.click();
       return;
     }
+    // C · løft og læg: Enter lægger det løftede kort på stedet (1, 2, 3 løfter — se nedenfor)
+    if (r.placer && e.key === 'Enter') { if (r.placer.x !== null) { e.preventDefault(); laegKort(); } return; }
     // Figurer, grupper, ord og mønsterbrikker: 1, 2, 3 vælger knappen efter plads
     if (opg.valgArt) {
       const n = Number(e.key);
@@ -2306,6 +2805,8 @@
     const opg = r.opgaver[r.i];
     registrerAktivitet();
     clearTimeout(r.mindTimer);
+    S.oplaes++; // opgavens oplæsning holder op — et klip, der spiller (fx den sidste brik), spiller færdigt
+    Forloeb.stop(); // et nyt svar afløser den gamle feedback (dobbelttryk stoppes af r.laast og disabled)
     Tale.stop();
     if (v === opg.svar) rigtigtSvar(opg, knap);
     else forkertSvar(opg, knap);
@@ -2314,6 +2815,12 @@
   function hop(el, klasse) {
     if (!el) return;
     el.classList.remove(klasse); void el.offsetWidth; el.classList.add(klasse);
+  }
+  // Vennens ene jubel (fejr-en-gang, 480 ms) — først når lyd og tale er færdige. Reduceret bevægelse: kun udtrykket (CSS)
+  function fejrEnGang(el) {
+    const svg = el && el.querySelector('.ven-tegning');
+    if (!svg) return;
+    svg.classList.remove('fejr-en-gang'); void svg.getBoundingClientRect(); svg.classList.add('fejr-en-gang');
   }
 
   // Rigtigt: én rolig hændelse — en lille lyd og et fodspor, der fyldes. Ingen tale oveni.
@@ -2325,35 +2832,42 @@
       knap.classList.remove('vis-svar'); // ellers bliver svaret hvid tekst på guld
       knap.classList.add('rigtig');
     }
-    Lyd.rigtig();
+    // Lyden og (efter hjælp) svaret i ét forløb: lyd → ro → tale. Fodsporet fyldes straks (nedenfor).
+    // C: en opgave, der ikke bedømmes (Spor i sandet), får en blød boble — ikke «rigtigt»-lyden. Et minispil med
+    // et slutbillede siger selv «Ja!» eller sin egen sætning (slutBillede), så forløbet har ingen tekst dér.
+    const tekst = r.forsoeg > 0 && !opg.slut ? (opg.valgArt || opg.interaktiv ? 'Ja!' : 'Ja, det er ' + opg.svar + '!') : '';
+    const fb = Forloeb.run({ lyd: O.taellerMed(opg) ? 'rigtig' : 'boblePop', tekst });
     // Ret bogstavet (D1): det rigtige bogstav kommer på plads i ordet
     if (opg.vis && opg.vis.art === 'retOrd') {
       const b = r.dom.visning.querySelectorAll('.ord-bogstav')[opg.vis.plads];
       if (b) { b.textContent = opg.svar; b.classList.remove('ret'); b.classList.add('rettet'); }
     }
+    saetUdtryk(r.dom.ven, 'glad');
     const prik = r.dom.prikker.querySelectorAll('.prik')[r.i];
     prik.classList.add('fuld');
     hop(prik, 'pop');
     const token = S.token;
-    if (r.forsoeg > 0) {
-      // Efter hjælp: sig svaret, når lyden er færdig
-      setTimeout(() => { if (token === S.token) Tale.sig(opg.valgArt || opg.interaktiv ? 'Ja!' : 'Ja, det er ' + opg.svar + '!'); }, 350);
-    }
-    setTimeout(() => {
+    const videre = () => {
       if (token !== S.token) return;
       r.i++;
       if (r.i < r.opgaver.length) visOpgave();
       else afslutRunde();
-    }, r.forsoeg === 0 ? 900 : 1700);
+    };
+    // C · minispil: et kort, roligt slutbillede efter lyden (bedømmes ikke) — så videre
+    if (opg.slut) { fb.then(() => slutBillede(opg, knap, token)).then(() => { if (token === S.token) setTimeout(videre, 350 * TEMPO); }); return; }
+    // Næste opgave, når forløbet er færdigt — og tidligst som før (uanset forløbets status)
+    Promise.all([fb, pause(r.forsoeg === 0 ? 900 : 1700)]).then(videre);
   }
 
   // Forkert: blid lyd, knappen toner ned, og hjælpetrappen tager næste trin
   function forkertSvar(opg, knap) {
     const r = S.runde;
     r.forsoeg++;
-    Lyd.blid();
+    // Først: run() stopper anden tale (Tale.stop nulstiller Tale.foerst) — så hjælpens Tale.sigFoerst skal komme efter
+    Forloeb.run({ lyd: 'forkertBlid' });
     hop(r.dom.ven, 'taenk');
-    if (knap && knap.classList && knap.classList.contains('valg-knap')) {
+    saetUdtryk(r.dom.ven, 'taenker');
+    if (knap && knap.classList && (knap.classList.contains('valg-knap') || knap.classList.contains('trinvis-kort'))) {
       knap.classList.add('forkert');
       knap.disabled = true;
     } else {
@@ -2373,10 +2887,13 @@
   function registrer(opg, rigtig) {
     const r = S.runde;
     if (r.quiz) return; // 🤔 gemmer intet
+    // C: Spor i sandet bedømmes aldrig (bedoemmes: false) — ingen statistik, intet niveau, ingen gentagelse, ingen fejl
+    if (!O.taellerMed(opg)) return;
     // En opgave tæller kun én gang — også når en afbrudt mission fortsætter ved samme opgave
     if (r.registreret === r.i) return;
     r.registreret = r.i;
-    if (data.pauset && !r.test) data.pauset.registreret = r.i;
+    const mission = r.test ? null : data[rundeFelt(r)];
+    if (mission) mission.registreret = r.i;
     const emne = opg.emne;
     const lagerE = emneLager(emne);
     const ed = G.normaliserEmne(lagerE[emne]);
@@ -2384,7 +2901,7 @@
     if (rigtig) ed.rigtige++;
     const res = O.opdaterNiveau(ed, rigtig, emneDef(emne).maxNiveau);
     lagerE[emne] = res.data;
-    if (res.aendring > 0) { r.niveauOp = true; if (data.pauset && !r.test) data.pauset.niveauOp = true; }
+    if (res.aendring > 0) { r.niveauOp = true; if (mission) mission.niveauOp = true; }
     const d = G.dag(data);
     d.opgaver++;
     if (rigtig) d.rigtige++;
@@ -2410,7 +2927,12 @@
     const plusVidere = trin.art === 'tael' && erPlusVisning(opg) && taelVidere(opg);
     // Den blide lyd først, så indledningen. Animationen går i gang med det samme, så barnet ser
     // noget ske; dens tal og pauser venter, til indledningen er sagt færdig (Tale.sigFoerst).
-    const intro = Tale.sigFoerst(plusVidere ? 'Lad os tælle videre fra det største tal.' : (HJAELP_TALE[trin.art] || 'Lad os se.'), 250 * TEMPO);
+    // r.hjaelpIntro (C): opgaven har selv sagt, hvad der gik galt («Der er 7 frø i kurven …») — det er indledningen
+    const introTekst = r.hjaelpIntro || (plusVidere ? 'Lad os tælle videre fra det største tal.' : (HJAELP_TALE[trin.art] || 'Lad os se.'));
+    r.hjaelpIntro = null;
+    const intro = Tale.sigFoerst(introTekst, 250 * TEMPO);
+    // Tællehjælpen («Lad os tælle …»): vennen tænker først, og tæller med (taeller), fra indledningen er sagt, til hjælpen er færdig
+    if (/^Lad os tælle/.test(introTekst)) intro.then(() => { if (levende()) saetUdtryk(r.dom.ven, 'taeller'); });
     try {
       await hjaelpAnimation(opg, trin, levende);
     } catch (e) { /* hjælp er pynt — spillet fortsætter */ }
@@ -2419,7 +2941,8 @@
     r.dom.visning.classList.remove('hjaelp');
     r.dom.svar.classList.remove('venter');
     r.laast = false;
-    if (visSvarBagefter) { visSvaret(opg); return; }
+    if (visSvarBagefter) { saetUdtryk(r.dom.ven, 'taenker'); visSvaret(opg); return; }
+    saetUdtryk(r.dom.ven, grundUdtryk(opg)); // hjælpen er færdig — nu prøver barnet igen
     Tale.sig('Prøv igen.');
     S.gentagTale = 'Prøv igen. ' + opg.tale;
   }
@@ -2493,7 +3016,8 @@
         if (!levende()) return;
         if (t.tael) {
           const omr = vis.querySelector('[data-del="' + t.tael + '"]');
-          if (omr) await taelOp([...omr.querySelectorAll('.taelbar')], 1, levende);
+          // Vennen tæller med, som i tællehjælpen (fase A) — fx frøene i Frøpostens kurv (review, fund 6)
+          if (omr) { saetUdtryk(r.dom.ven, 'taeller'); await taelOp([...omr.querySelectorAll('.taelbar')], 1, levende); }
         }
         await vent(300);
       }
@@ -2509,6 +3033,25 @@
       ur.querySelectorAll('.lyser').forEach((el) => el.classList.remove('lyser'));
       minut.classList.add('lyser');
       await vent(300);
+      // D3 (spring): tæl 5, 10, 15 … fra viserens plads og «spring» minutter frem — tallene lyser undervejs
+      if (trin.spring) {
+        const fra = Math.round(m / 5);
+        await Tale.sigVent('Den store viser peger på ' + (fra || 12) + '. Nu tæller vi ' + trin.spring + ' minutter frem.');
+        for (let k = 1; k <= Math.round(trin.spring / 5); k++) {
+          if (!levende()) return;
+          const tx = ur.querySelector('.ur-tal[data-tal="' + (((fra + k - 1) % 12) + 1) + '"]');
+          if (tx) tx.classList.add('lyser');
+          Lyd.tael();
+          // Vent, til tallet er sagt — et langt tal («femoghalvtreds») må ikke klippes af det næste (review #7)
+          await Promise.all([Tale.sigVent(String(k * 5)), vent(trin.spring > 30 ? 500 : 800)]);
+        }
+        if (!levende()) return;
+        const slut = (m + trin.spring) % 60;
+        // Præcis på 12 (fx 1:30 + 30, 4:00 + 60) er viseren ikke «gået forbi» 12 (review #5)
+        await Tale.sigVent(m + trin.spring === 60 ? 'Nu peger den store viser på 12. Så er klokken hel, og den lille viser er rykket hen til næste time.'
+          : m + trin.spring > 60 ? 'Den store viser er gået forbi 12. Så er timen gået, og den lille viser er rykket videre.' : 'Nu peger den store viser på ' + (slut / 5) + '.');
+        return;
+      }
       for (let k = 1; k <= Math.round(m / 5); k++) {
         if (!levende()) return;
         const tx = ur.querySelector('.ur-tal[data-tal="' + k + '"]');
@@ -2876,6 +3419,45 @@
         : 'Den lille viser peger på ' + t + '. Så er klokken ' + O.klokkeNavn(opg.svar) + '.');
       return;
     }
+    // C · Urværkstedet trin 1: den lille viser lyser, og målet ved timetallet lyser (det bliver ved med at lyse)
+    if (art === 'stilLille') {
+      const felt = r.dom.svar.querySelector('.stil-ur');
+      if (!felt) return;
+      felt.querySelectorAll('.lyser').forEach((el) => el.classList.remove('lyser'));
+      const t = Number(String(trin.klokke).split(':')[0]) % 12 || 12;
+      await vent(150);
+      if (!levende()) return;
+      felt.querySelector('.ur-time').classList.add('lyser');
+      const maal = [...felt.querySelectorAll('.stil-maal')].find((k) => k.textContent === String(t));
+      if (maal) maal.classList.add('lyser');
+      await Tale.sigVent('Den lille viser skal pege på ' + t + '.');
+      return;
+    }
+    // C · Urværkstedet trin 3: den store viser flyttes ét kvarter ad gangen fra «fra» og tilbage igen — så vælger barnet
+    if (art === 'stilKvarter') {
+      const felt = r.dom.svar.querySelector('.stil-ur');
+      if (!felt) return;
+      felt.querySelectorAll('.lyser').forEach((el) => el.classList.remove('lyser'));
+      const [t0, m0] = String(trin.fra).split(':').map(Number);
+      const tid = (k) => { const x = t0 * 60 + m0 + 15 * k; return (((Math.floor(x / 60) - 1) % 12) + 1) + ':' + String(x % 60).padStart(2, '0'); };
+      const ORD = ['Et kvarter.', 'To kvarterer. Det er en halv time.', 'Tre kvarterer.', 'Fire kvarterer. Det er en hel time.'];
+      await vent(150);
+      if (!levende()) return;
+      await drejUr(felt, trin.fra);
+      const minut = felt.querySelector('.ur-minut');
+      minut.classList.add('lyser');
+      for (let k = 1; k <= (trin.kvarterer || 2); k++) {
+        if (!levende()) return;
+        await drejUr(felt, tid(k));
+        if (!levende()) return;
+        await Tale.sigVent(ORD[k - 1] || '');
+      }
+      if (!levende()) return;
+      await vent(300);
+      await drejUr(felt, trin.fra);
+      minut.classList.remove('lyser');
+      return;
+    }
     // Stil viserne: trin 1 stiller uret på den hele time, der nævnes; trin 2 flytter derfra til facit
     if (art === 'stilHel' || art === 'stilFlyt') {
       const felt = r.dom.svar.querySelector('.stil-ur');
@@ -2945,7 +3527,31 @@
 
     // ---- Dansk (B4): hør igen langsomt → vis bogstavet med et billede → (svaret lyser) ----
     if (art === 'hoerIgen') {
+      // C · Lydtoget: den AKTIVE vogns lyd (ikke kun den første) — to gange med en pause
+      const tv = r.trinvis && opg.byg && opg.byg.vogne ? opg.byg.vogne[r.trinvis.aktiv()] : null;
+      if (tv && tv.lyd) {
+        await vent(200);
+        for (let k = 0; k < 2 && levende(); k++) { await Lyd.klip(tv.lyd.klip, tv.lyd.reserve); await vent(700); }
+        return;
+      }
       await sigOpgave(opg, '', !!trin.langsomt);
+      return;
+    }
+    // C · Fortællebroen: historien genfortælles kun frem til og med den aktive plads
+    if (art === 'fortaelTil') {
+      const k = r.trinvis ? r.trinvis.aktiv() : 0;
+      await vent(200);
+      if (levende()) await Tale.sigVent((opg.vis.historie || []).slice(0, k + 1).join(' '));
+      return;
+    }
+    // C · Fortællebroen: billedet til den aktive plads lyser, og dets sætning siges (det bliver ved med at lyse)
+    if (art === 'naesteBrik') {
+      const k = r.trinvis ? r.trinvis.aktiv() : 0;
+      const b = opg.svar.split(opg.byg.adskil)[k];
+      const brik = [...r.dom.svar.querySelectorAll('.trinvis-kort')].find((x) => x.getAttribute('data-b') === b);
+      if (brik) brik.classList.add('lyser');
+      await vent(200);
+      if (levende()) await Tale.sigVent((opg.vis.historie || [])[k] || '');
       return;
     }
     if (art === 'visBogstav') {
@@ -2955,7 +3561,47 @@
       if (!levende()) return;
       if (opg.emne === 'alfabet') { await Tale.sigVent('Sådan ser det ud.'); return; }
       await Lyd.klip(D.lydId(trin.bogstav), D.lydReserve(trin.bogstav));
-      if (levende() && trin.ord) await Tale.sigVent(stort(trin.ord) + (trin.midt ? ' har den lyd i midten.' : opg.type === 'udlyd' ? ' slutter med den lyd.' : ' starter med den lyd.'));
+      if (levende() && trin.ord) await Tale.sigVent(stort(trin.ord) + (trin.midt ? ' har den lyd i midten.' : trin.slut || opg.type === 'udlyd' ? ' slutter med den lyd.' : ' starter med den lyd.'));
+      return;
+    }
+    // D2: hele alfabetet (ikke knapper) — de nævnte bogstaver er markeret og lyser op ét ad gangen.
+    // Store bogstaver, når opgaven viser det store bogstav (hylderne A–G …), ellers små som brikkerne
+    if (art === 'alfabetVis') {
+      const naevnt = trin.bogstaver || [];
+      const store = opg.vis && opg.vis.art === 'stortBogstav';
+      const felt = hjaelpeFelt(h('div', { class: 'alfabet-vis', 'aria-hidden': 'true' },
+        D.ALFABET.map((b) => h('span', { class: 'alfabet-vis-b' + (naevnt.indexOf(b) >= 0 ? ' naevnt' : ''), 'data-b': b }, store ? b.toUpperCase() : b))));
+      await vent(300);
+      for (const c of felt.querySelectorAll('.naevnt')) {
+        if (!levende()) return;
+        hop(c, 'pop');
+        Lyd.tael();
+        await vent(550);
+      }
+      if (levende()) await Tale.sigVent(naevnt.length > 1 ? 'Se, hvor de står i alfabetet.' : 'Se, hvor det står i alfabetet.');
+      return;
+    }
+    // D2 (skiftBogstav): pladsen, der skal skiftes, får sin stiplede ring først nu
+    if (art === 'visPlads') {
+      const b = vis.querySelectorAll('.ord-bogstav')[opg.vis.plads];
+      if (b) { b.classList.add('ret'); hop(b, 'pop'); }
+      await vent(300);
+      if (levende()) await Tale.sigVent('Det er det bogstav, der skal skiftes.');
+      return;
+    }
+    // D3 (delOrd): lydene i det første ord ét ad gangen, mens bogstavet lyser i strimlen (resten af svaret siges ikke)
+    if (art === 'lydFoerste') {
+      const strimmel = vis.querySelector('.strimmel');
+      const bogstaver = trin.bogstaver || [];
+      await vent(200); // indledningen først — et indtalt klip venter ikke selv på den
+      for (let k = 0; k < bogstaver.length; k++) {
+        if (!levende()) return;
+        const el = strimmel ? strimmel.querySelector('.strimmel-b[data-i="' + k + '"]') : null;
+        if (el) el.classList.add('lyser');
+        await Lyd.klip(D.lydId(bogstaver[k]), D.lydReserve(bogstaver[k]));
+        if (el) el.classList.remove('lyser');
+        await vent(250);
+      }
       return;
     }
     // Svarkort med scener (Historiebogen): hvert kort læses op, mens det lyser
@@ -3022,7 +3668,7 @@
       return;
     }
     if (art === 'rimLyt') {
-      const knapper = [...r.dom.svar.querySelectorAll('.valg-knap:not(.forkert)')];
+      const knapper = [...r.dom.svar.querySelectorAll('.valg-knap:not(.forkert)')].filter((k) => k.getAttribute('data-v') !== trin.stik);
       for (const k of knapper) {
         if (!levende()) return;
         k.classList.add('lytter');
@@ -3069,11 +3715,19 @@
   // Tegner igen, når feltet skifter størrelse (fx når iPad'en vendes midt i opgaven).
   // fn kører i næste frame, ikke i selve ResizeObserver-kaldet: fn må gerne ændre feltets egen størrelse
   // (klodserne gør det via --k) — ellers sender Safari «ResizeObserver loop completed with undelivered notifications»
+  // Et felt, der er væk fra skærmen (næste opgave, kortet), holder op med at lytte: når det opdager det selv, og når
+  // det næste felt begynder at lytte — ellers hobede ResizeObservere og resize-lyttere sig op opgave for opgave
+  const stoerrelsesVagter = new Set();
   const vedStoerrelse = (el, fn) => {
-    let ventende = 0;
-    const senere = () => { if (!ventende) ventende = requestAnimationFrame(() => { ventende = 0; fn(); }); };
-    if (window.ResizeObserver) new ResizeObserver(senere).observe(el); else window.addEventListener('resize', fn);
-    setTimeout(fn, 0);
+    stoerrelsesVagter.forEach((v) => { if (v.vist && !v.el.isConnected) v.stop(); });
+    let ventende = 0, ro = null;
+    const v = { el: el, vist: false };
+    const koer = () => { if (el.isConnected) { v.vist = true; fn(); } else if (v.vist) v.stop(); };
+    const senere = () => { if (!ventende) ventende = requestAnimationFrame(() => { ventende = 0; koer(); }); };
+    v.stop = () => { if (ro) ro.disconnect(); else window.removeEventListener('resize', koer); stoerrelsesVagter.delete(v); };
+    stoerrelsesVagter.add(v);
+    if (window.ResizeObserver) { ro = new ResizeObserver(senere); ro.observe(el); } else window.addEventListener('resize', koer);
+    setTimeout(() => { if (el.isConnected) v.vist = true; fn(); }, 0);
   };
 
   // Sømbræt: prikkerne er knapper (≥ 52 px); stregerne tegnes i en SVG ovenpå. Den grønne prik er sat på forhånd.
@@ -3347,6 +4001,8 @@
   // Svarpanelet til tegneopgaverne: ↩️ og 🗑️ (sømbræt) eller ✔ (linealen)
   function interaktivPanel(opg) {
     const r = S.runde;
+    if (opg.interaktiv === 'kurv') return kurvPanel(opg);
+    if (opg.interaktiv === 'sand') return r.sand.panel();
     if (opg.interaktiv === 'soembraet' || opg.interaktiv === 'rute') {
       return h('div', { class: 'interaktiv-panel' },
         ikonKnap('↩️', 'Fortryd', () => { if (r.figur) r.figur.fortryd(); }, 'soem-fortryd'),
@@ -3361,7 +4017,9 @@
     const r = S.runde;
     r.visSvar = true;
     let tekst = 'Prøv igen.';
-    if (opg.interaktiv === 'soembraet' && r.figur) {
+    if (opg.interaktiv === 'kurv' && r.figur) {
+      tekst = r.figur.visSvaret();
+    } else if (opg.interaktiv === 'soembraet' && r.figur) {
       r.figur.nulstil();
       r.figur.vis = O.eksempelFigur(opg.vis.form, opg.vis.start, opg.vis.kol, opg.vis.raek);
       r.figur.tegn();
@@ -3471,10 +4129,725 @@
     await Tale.sigVent(opg.vis.cm + ' centimeter.');
   }
 
+  // =====================================================================
+  //  C · MINISPIL (docs/MINISPIL.md). Et minispil er én af rundens opgaver: samme fodspor, samme hjælpetrappe og
+  //  samme registrering som alle andre. Generatorerne bestemmer indhold og facit; her tegnes de.
+  // =====================================================================
+  const ventMs = (ms) => new Promise((ok) => setTimeout(ok, ms * TEMPO));
+  // Står fokus på en knap (Tab), aktiverer Enter den knap — ikke opgavens genvej
+  const fokusPaaKnap = () => !!document.activeElement && document.activeElement.tagName === 'BUTTON';
+
+  // ---------- Frøposten (interaktiv 'kurv'): pak præcis det bestilte antal frø med ➕ / ➖ / ✔ ----------
+  // Frøene ligger i et roligt gitter på en lys flade i kurven: rækker à fem (trin 1: én række med en plads pr. bestilt
+  // frø, op til seks) og luft efter hver ti. Pladserne og frøene er to lag oven i hinanden, så frø nr. k ligger på plads
+  // nr. k. Fladen har plads til bestillingen fra start og vokser kun, hvis barnet lægger flere i — så intet hopper.
+  const froeDyr = (v) => (O.FROE_DYR.find((d) => d.id === v.dyr) || { bestemt: 'dyret' });
+  function froePost(opg) {
+    const v = opg.vis;
+    const r = S.runde;
+    const Dyr = stort(froeDyr(v).bestemt);
+    const st = { antal: v.start, pladser: v.pladser || 0 };
+    r.figur = st;
+    const froeLag = h('div', { class: 'froe-lag froe-kurvlag', 'data-del': 'kurv' });
+    const pladsLag = h('div', { class: 'froe-lag froe-pladser', 'data-del': 'pladser' });
+    const indhold = h('div', { class: 'kurv-indhold' }, pladsLag, froeLag);
+    const kurv = h('div', { class: 'froe-kurv' }, miniTegning('seedPostBasket', 'kurv-tegning') || h('span', { class: 'kurv-reserve' }), indhold);
+    // Bestillingen: dyret og tallet med lige så mange prikker (rækker à fem)
+    const prikker = h('span', { class: 'bestil-prikker', 'aria-hidden': 'true' }, Array.from({ length: v.maal }, () => h('i')));
+    const bestilling = h('div', { class: 'froe-bestilling', role: 'img', 'aria-label': Dyr + ' skal have ' + v.maal + ' frø' },
+      miniBillede(v.billede, v.e, 'froe-dyr'),
+      h('div', { class: 'bestil-boble' }, h('span', { class: 'bestil-tal' }, String(v.maal)), prikker));
+    const kol = Math.max(5, v.pladser || 0);
+    indhold.style.setProperty('--kol', kol);
+    function tegn() {
+      st.raekker = Math.max(st.raekker || 2, Math.ceil(Math.max(st.antal, v.maal, v.start, st.pladser) / kol));
+      indhold.style.setProperty('--rk', st.raekker);
+      indhold.classList.toggle('mange', st.raekker > 2);
+      while (froeLag.children.length < st.antal) froeLag.append(h('span', { class: 'froe taelbar' }, miniTegning('seedPostSeed', 'froe-tegning') || '🌰'));
+      while (froeLag.children.length > st.antal) froeLag.lastElementChild.remove();
+      while (pladsLag.children.length < st.pladser) pladsLag.append(h('span', { class: 'froe-plads taelbar' }, miniTegning('seedPostSlot', 'plads-tegning')));
+      kurv.setAttribute('aria-label', 'Kurven: ' + st.antal + ' frø');
+      if (st.knapper) {
+        st.knapper.minus.disabled = st.antal <= 0;
+        st.knapper.plus.disabled = st.antal >= O.KURV_MAX;
+      }
+    }
+    // ➕/➖ (og piletasterne) ændrer med ét — aldrig under 0, aldrig over kurven. Et tryk siger ikke tallet.
+    st.tryk = (handling) => {
+      if (r.laast || S.runde !== r) return;
+      Lyd.init();
+      const ny = O.froeTryk(st.antal, handling);
+      if (ny === st.antal) return; // tom eller fuld kurv: intet sker (og ingen fejl-lyd)
+      Lyd.tryk();
+      st.antal = ny;
+      tegn();
+      const sidste = handling === 'tilfoej' ? froeLag.lastElementChild : null;
+      if (sidste) hop(sidste, 'land');
+    };
+    // ✔ Færdig: præcis bestillingen → rigtigt. Ellers tømmes kurven IKKE — barnet hører, hvad der er, og retter videre
+    st.faerdig = () => {
+      if (r.laast || S.runde !== r) return;
+      Lyd.init();
+      if (O.froePasser(v, st.antal)) { svar('ok', null); return; }
+      // «et frø» (ikke «1 frø»: en dansk stemme siger «en frø» — dyret) (review, fund 5)
+      r.hjaelpIntro = (st.antal ? 'Der er ' + (st.antal === 1 ? 'et' : st.antal) + ' frø i kurven. ' : 'Der er ingen frø i kurven. ') + Dyr + ' skal have ' + v.maal + '.';
+      svar('nej', null);
+    };
+    // Sidste trin på hjælpetrappen: en plads pr. bestilt frø, så frøene kan lægges én til én
+    st.visSvaret = () => {
+      st.pladser = v.maal;
+      tegn();
+      const p = kurv.querySelector('.froe-pladser');
+      if (p) hop(p, 'pop');
+      return Dyr + ' skal have ' + v.maal + '. ' + (st.antal > v.maal ? 'Tag de frø op, der ikke har en plads.' : 'Læg et frø på hver plads.') + ' Tryk så på den grønne knap.';
+    };
+    st.taster = (e) => {
+      if (['ArrowRight', 'ArrowUp', '+'].indexOf(e.key) >= 0) { e.preventDefault(); st.tryk('tilfoej'); }
+      else if (['ArrowLeft', 'ArrowDown', '-'].indexOf(e.key) >= 0) { e.preventDefault(); st.tryk('fjern'); }
+      else if (e.key === 'Enter' && !fokusPaaKnap()) { e.preventDefault(); st.faerdig(); }
+    };
+    st.tegn = tegn;
+    setTimeout(tegn, 0);
+    tegn();
+    return h('div', { class: 'froe-post' }, bestilling, kurv);
+  }
+  function kurvPanel(opg) {
+    const r = S.runde;
+    const st = r.figur;
+    const plus = h('button', { class: 'kurv-knap kurv-plus', type: 'button', 'aria-label': 'Læg et frø i kurven', onclick: () => st.tryk('tilfoej') }, '➕');
+    const minus = h('button', { class: 'kurv-knap kurv-minus', type: 'button', 'aria-label': 'Tag et frø op', onclick: () => st.tryk('fjern') }, '➖');
+    const ok = h('button', { class: 'stor-knap ok-knap kurv-ok', type: 'button', 'aria-label': 'Færdig', onclick: () => st.faerdig() }, '✔');
+    st.knapper = { plus: plus, minus: minus };
+    st.tegn();
+    return h('div', { class: 'interaktiv-panel kurv-panel' }, plus, minus, ok);
+  }
+
+  // ---------- Løft og læg (Skovbroen, Skyggeatelieret): tryk på kortet (det løftes), tryk på stedet — eller træk ----------
+  // Stedet er scenens bro eller skygge. Et træk, der slippes over stedet, gør det samme som tryk–tryk; præcision kræves
+  // ikke (bred tolerance). Tastatur: 1/2/3 (eller Tab + Enter) løfter et kort, Enter lægger det.
+  const PLACER_NAVN = { bro: 'Broen', skygge: 'Skyggen', puslespil: 'Vinduet' };
+  function placerMaal(opg) {
+    if (!opg || opg.valgArt !== 'scene' || !opg.vis || opg.vis.art !== 'scene') return null;
+    const d = (opg.vis.dele || []).find((x) => x.t === 'bro' || x.skygge);
+    return d && d.id ? d.id : null;
+  }
+  // Stedet får en gennemsigtig knap (mindst 64 px) oven på tegningen
+  function placerFelt(opg) {
+    const r = S.runde;
+    const id = placerMaal(opg);
+    const del = id && r.dom.visning.querySelector('[data-del="' + id + '"]');
+    if (!del) return;
+    r.placer = { x: null, knap: null, maal: del };
+    del.classList.add('placer-sted');
+    del.append(h('button', { class: 'placer-felt', type: 'button', 'aria-label': PLACER_NAVN[id] || 'Læg den her', onclick: () => laegKort() }));
+  }
+  function saetLoeftet(x, knap) {
+    const r = S.runde;
+    r.placer.x = x; r.placer.knap = knap;
+    r.dom.svar.querySelectorAll('.valg-knap').forEach((k) => { k.classList.toggle('loeftet', k === knap); k.setAttribute('aria-pressed', k === knap ? 'true' : 'false'); });
+    r.placer.maal.classList.toggle('klar', x !== null);
+  }
+  function loeftKort(x, knap) {
+    const r = S.runde;
+    if (!r || r.laast || !r.placer) return;
+    Lyd.init();
+    if (r.visSvar) { svar(x, knap); return; } // sidste trin på hjælpetrappen: det kort, der lyser, vælges direkte
+    if (knap._traek && performance.now() - knap._traek < 450) return; // klikket efter et træk
+    Lyd.tryk();
+    saetLoeftet(r.placer.x === x ? null : x, r.placer.x === x ? null : knap);
+  }
+  // En kopi af kortets tegning flyver fra kortet til stedet (og tilbage, hvis den ikke passer)
+  // traek: kopien følger fingeren (direkte styring — også med prefers-reduced-motion)
+  function flyvKopi(knap, traek) {
+    const sc = knap.querySelector('.scene');
+    if (!sc || (!traek && udenBevaegelse())) return null;
+    const r0 = sc.getBoundingClientRect();
+    const kopi = h('div', { class: 'flyv-kopi', 'aria-hidden': 'true', style: 'left:' + r0.left + 'px;top:' + r0.top + 'px;width:' + r0.width + 'px;height:' + r0.height + 'px' }, sc.cloneNode(true));
+    document.getElementById('app').append(kopi);
+    return kopi;
+  }
+  // Kopiens midte flyttes til stedets midte (regnet fra kopiens udgangspunkt — også midt i et træk)
+  function flyvTil(kopi, rekt) {
+    if (!kopi) return Promise.resolve();
+    const st = kopi.style;
+    const cx = parseFloat(st.left) + parseFloat(st.width) / 2, cy = parseFloat(st.top) + parseFloat(st.height) / 2;
+    st.transition = udenBevaegelse() ? 'none' : 'transform ' + Math.round(300 * TEMPO) + 'ms ease-in-out';
+    st.transform = 'translate(' + Math.round(rekt.left + rekt.width / 2 - cx) + 'px,' + Math.round(rekt.top + rekt.height / 2 - cy) + 'px)';
+    return ventMs(udenBevaegelse() ? 0 : 320);
+  }
+  const fjernKopier = () => document.querySelectorAll('.flyv-kopi').forEach((k) => k.remove());
+  async function laegKort(kopi) {
+    const r = S.runde;
+    if (!r || r.laast || !r.placer || r.placer.x === null) { if (kopi) kopi.remove(); return; }
+    const opg = r.opgaver[r.i];
+    const { x, knap } = r.placer;
+    const token = S.token, i = r.i;
+    saetLoeftet(null, null);
+    r.laast = true;
+    const k = kopi || flyvKopi(knap);
+    await flyvTil(k, r.placer.maal.getBoundingClientRect());
+    if (token !== S.token || S.runde !== r || r.i !== i) return;
+    r.laast = false;
+    if (x === opg.svar) { svar(x, knap); return; } // kopien ligger, til slutbilledet tager over
+    // Passer ikke: brikken glider tilbage (ingen falder ned), og hjælpetrappen tager næste trin
+    svar(x, knap);
+    if (k) { k.style.transform = 'none'; setTimeout(() => k.remove(), 330 * TEMPO); }
+  }
+  // Træk: kortet kan trækkes til stedet. Under 10 px bevægelse er det et almindeligt tryk (løft).
+  function traekbar(knap, x) {
+    knap.addEventListener('pointerdown', (e) => {
+      const r = S.runde;
+      if (!r || r.laast || r.visSvar || !r.placer || e.button > 0) return;
+      const x0 = e.clientX, y0 = e.clientY;
+      let kopi = null;
+      const flyt = (ev) => {
+        if (!kopi && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 10) return;
+        if (!kopi) {
+          kopi = flyvKopi(knap, true);
+          if (!kopi) return;
+          kopi.classList.add('traekkes');
+          saetLoeftet(x, knap);
+        }
+        kopi.style.transform = 'translate(' + (ev.clientX - x0) + 'px,' + (ev.clientY - y0) + 'px)';
+      };
+      const slip = (ev) => {
+        knap.removeEventListener('pointermove', flyt);
+        knap.removeEventListener('pointerup', slip);
+        knap.removeEventListener('pointercancel', slip);
+        if (!kopi) return;
+        knap._traek = performance.now();
+        kopi.classList.remove('traekkes');
+        const m = r.placer && r.placer.maal.getBoundingClientRect();
+        const tol = 40; // bred tolerance: et træk, der slipper i nærheden, tæller
+        const over = m && ev.type === 'pointerup' && ev.clientX > m.left - tol && ev.clientX < m.right + tol && ev.clientY > m.top - tol && ev.clientY < m.bottom + tol;
+        if (over) laegKort(kopi);
+        else {
+          // Sluppet et andet sted: kopien glider tilbage, kortet bliver løftet (så et tryk på stedet stadig virker)
+          kopi.style.transition = 'transform ' + Math.round(250 * TEMPO) + 'ms ease-out';
+          kopi.style.transform = 'none';
+          setTimeout(() => kopi.remove(), 280 * TEMPO);
+        }
+      };
+      try { knap.setPointerCapture(e.pointerId); } catch (er) { /* ældre Safari */ }
+      knap.addEventListener('pointermove', flyt);
+      knap.addEventListener('pointerup', slip);
+      knap.addEventListener('pointercancel', slip);
+    });
+  }
+
+  // ---------- Lydtoget (vis.art 'lydTog'): billedet og toget — én vogn pr. bogstav, kun én er aktiv ----------
+  // Den aktive vogn er markeret med en stiplet ramme og står højere (ikke kun farve). Trin 3: ordet (fra) står i
+  // vognene, og den første lyd skal byttes — det gamle bogstav står stiplet, til det nye kommer.
+  function lydTogVisning(opg) {
+    const v = opg.vis, B = opg.byg;
+    const ord = v.fra || v.ord;
+    const billede = h('button', { class: 'ord-emoji lydtog-billede', type: 'button', 'aria-label': ord, onclick: () => { Lyd.init(); Tale.sig(ord); } },
+      miniBillede(v.fra ? v.fraBillede : v.billede, v.fra ? v.fraE : v.e, 'lydtog-tegning'));
+    const vogne = B.vogne.map((vg, i) => h('span', { class: 'lydtog-vogn' + (vg.fast ? ' fast' : ''), 'data-plads': i },
+      miniTegning('soundTrainWagon', 'vogn-tegning') || h('span', { class: 'vogn-reserve' }),
+      h('span', { class: 'vogn-bogstav' + (v.fra && i === 0 ? ' gammel' : '') }, vg.fast ? vg.bogstav : v.fra && i === 0 ? v.fra[0] : '')));
+    const tog = h('div', { class: 'lydtog-tog', style: '--vogne:' + vogne.length, role: 'img', 'aria-label': 'Et tog med ' + vogne.length + ' vogne' },
+      h('span', { class: 'lydtog-lok' }, miniTegning('soundTrainEngine', 'vogn-tegning') || h('span', { class: 'vogn-reserve lok' }, '🚂')), vogne);
+    return h('div', { class: 'lydtog' }, billede, tog);
+  }
+
+  // ---------- Trinvis byg (Lydtoget, Fortællebroen): én plads ad gangen, og hver plads tjekkes for sig ----------
+  // Rigtigt: brikken bliver på pladsen, og næste plads bliver aktiv. Forkert: kun den aktive plads standser (kortet
+  // hviler), de lagte bliver liggende; første fejl er et forkert første forsøg, og hjælpetrappen tager næste trin.
+  function trinvisPanel(opg) {
+    const r = S.runde;
+    const B = opg.byg;
+    const tog = !!B.vogne;
+    const pladser = tog ? B.vogne.map((v, i) => (v.fast ? -1 : i)).filter((i) => i >= 0) : Array.from({ length: B.dele }, (_, i) => i);
+    const st = { nr: 0, lagt: {} };
+    r.trinvis = st;
+    st.aktiv = () => pladser[Math.min(st.nr, pladser.length - 1)];
+    const facit = (p) => (B.adskil ? opg.svar.split(B.adskil) : opg.svar.split(''))[p];
+    const lagte = () => Object.keys(st.lagt).map((k) => st.lagt[k]);
+    const kortTil = () => (tog ? B.vogne[st.aktiv()].kort : B.brikker.filter((b) => lagte().indexOf(b) < 0));
+    const saetning = (b) => (B.tale ? B.tale[B.brikker.indexOf(b)] : b);
+    const panel = h('div', { class: 'byg-panel trinvis' + (tog ? ' tog' : ' billeder') });
+    function tegn() {
+      panel.textContent = '';
+      kortTil().forEach((b) => panel.append(h('button', {
+        class: 'byg-brik trinvis-kort' + (tog ? '' : ' billede'), type: 'button', 'data-b': b, 'aria-label': tog ? b : saetning(b),
+        onclick: (e) => vaelg(b, e.currentTarget),
+      }, tog ? b : miniBillede(B.billeder && B.billeder[b], b, 'trinvis-billede'))));
+      r.dom.visning.querySelectorAll('[data-plads]').forEach((el) => el.classList.toggle('aktiv', Number(el.getAttribute('data-plads')) === st.aktiv() && st.nr < pladser.length));
+      if (r.visSvar) lysSvar();
+    }
+    function lysSvar() {
+      panel.querySelectorAll('.trinvis-kort').forEach((k) => {
+        const ja = k.getAttribute('data-b') === facit(st.aktiv());
+        k.classList.toggle('vis-svar', ja);
+        k.disabled = !ja;
+        k.classList.toggle('forkert', !ja);
+      });
+    }
+    // Brikken lægges på sin plads i opgavefeltet (bogstavet i vognen / billedet i rækken)
+    function laeg(p, b) {
+      st.lagt[p] = b;
+      const el = r.dom.visning.querySelector('[data-plads="' + p + '"]');
+      if (!el) return;
+      el.classList.add('fyldt');
+      el.classList.remove('aktiv');
+      if (tog) {
+        const t = el.querySelector('.vogn-bogstav');
+        t.textContent = b;
+        t.classList.remove('gammel');
+      } else {
+        el.textContent = '';
+        el.append(miniBillede(B.billeder && B.billeder[b], b, 'felt-billede'));
+      }
+      hop(el, 'pop');
+    }
+    async function vaelg(b, knap) {
+      if (r.laast || S.runde !== r || st.nr >= pladser.length) return;
+      Lyd.init();
+      const p = st.aktiv();
+      if (!D.trinvisPasser(opg, p, b)) { svar(null, knap); return; } // kortet glider tilbage, hjælpen tager over
+      Lyd.tryk();
+      laeg(p, b);
+      st.nr++;
+      const token = S.token, i = r.i;
+      const levende = () => token === S.token && S.runde === r && r.i === i;
+      r.laast = true; // én hændelse ad gangen: sætningen/lyden, så næste plads
+      if (!tog) await Tale.sigVent(saetning(b));
+      // Fortællebroen: er der kun ét billede tilbage, lægger det sig selv
+      if (levende() && !tog && st.nr === pladser.length - 1) {
+        const sidst = kortTil()[0];
+        await ventMs(250);
+        if (!levende()) return;
+        laeg(st.aktiv(), sidst);
+        st.nr++;
+        await Tale.sigVent(saetning(sidst));
+      }
+      if (!levende()) return;
+      r.laast = false;
+      if (st.nr >= pladser.length) { svar(opg.svar, null); return; }
+      tegn();
+      r.laast = true;
+      // 🔊 under sætningen tager over (st.gentag siger den igen og spiller lyden) — så spilles lyden ikke to gange
+      if (tog) { const mit = ++S.oplaes; await Tale.sigVent('Lyt til den næste lyd.'); const v = B.vogne[st.aktiv()]; if (levende() && mit === S.oplaes) await Lyd.klip(v.lyd.klip, v.lyd.reserve); }
+      else {
+        // Overskriften følger med (ui-review 9): «Hvad sker først?» passer kun til den første plads
+        const tn = r.dom.tekst.lastChild;
+        if (tn && tn.nodeType === 3 && /Hvad sker først\?$/.test(tn.textContent)) tn.textContent = tn.textContent.replace(/først\?$/, 'så?');
+        await Tale.sigVent('Hvad sker så?');
+      }
+      if (levende()) r.laast = false;
+    }
+    // 🔊: den første plads som opgaven selv — ellers «Lyt til den næste lyd.» + den aktive vogns lyd (Fortællebroen: historien)
+    st.gentag = () => {
+      if (st.nr === 0) { sigOpgave(opg); return; }
+      // Fortællebroen efter første billede: historien og «Hvad sker så?» — ikke «Hvad sker først?» igen (ui-review 9)
+      if (!tog) { sigOpgave(Object.assign({}, opg, { tale: opg.tale.replace(/Hvad sker først\?$/, 'Hvad sker så?') })); return; }
+      const v = B.vogne[st.aktiv()];
+      const mit = ++S.oplaes, nr = st.nr, token = S.token; // review, fund 2: ikke efter et valg eller et svar
+      Tale.sigVent('Lyt til den næste lyd.').then(() => { if (mit === S.oplaes && st.nr === nr && token === S.token) Lyd.klip(v.lyd.klip, v.lyd.reserve); });
+    };
+    // Sidste trin på hjælpetrappen: kortet til den aktive plads lyser (også på de næste pladser)
+    st.visSvaret = () => {
+      r.visSvar = true;
+      lysSvar();
+      const tekst = 'Det er den, der lyser. Tryk på den.';
+      S.gentagFn = null;
+      S.gentagTale = tekst;
+      Tale.sig(tekst);
+    };
+    setTimeout(tegn, 0);
+    tegn();
+    return panel;
+  }
+
+  // ---------- Rimhaven (enAdGangen): kortene vises ét ad gangen, mens deres ord siges — så åbnes de til valg ----------
+  // Samme ord hver gang (mus, aldrig markmus). Intet flyver, ingen tid; senest efter ca. 8 s er alle kort åbne.
+  function enAdGangen(opg, forTale) {
+    const r = S.runde, i = r.i, token = S.token;
+    const levende = () => token === S.token && S.runde === r && r.i === i;
+    // Hver gennemgang får sit eget oplæsningsnummer (som sigOpgave): et svar eller et nyt 🔊 tæller S.oplaes op, og så
+    // holder den gamle gennemgang op — ellers slugte den 🔊's spørgsmål og talte videre efter svaret (review, fund 2)
+    const lever = () => { const mit = ++S.oplaes; return () => levende() && mit === S.oplaes; };
+    const valg = r.dom.svar.querySelector('.valg');
+    if (!valg) { sigOpgave(opg, forTale); return; }
+    const knapper = [...valg.querySelectorAll('.valg-knap')];
+    knapper.forEach((k) => k.classList.add('skjult-kort'));
+    r.laast = true;
+    let aaben = false;
+    const aabn = () => {
+      if (aaben || !levende()) return;
+      aaben = true;
+      knapper.forEach((k) => { k.classList.remove('skjult-kort', 'lytter'); });
+      r.laast = false;
+    };
+    const sigKortene = async (skjul, ok) => {
+      for (const k of knapper) {
+        if (!ok() || (skjul && aaben)) return;
+        k.classList.remove('skjult-kort');
+        k.classList.add('lytter');
+        await Tale.sigVent(stort(k.getAttribute('data-v')) + '.');
+        k.classList.remove('lytter');
+        await ventMs(250);
+      }
+    };
+    // Én gennemgang: spørgsmålet, så kortene. Er kortene ikke åbnet endnu (🔊 tidligt), kommer de stadig ét ad gangen,
+    // og senest ca. 8 s efter spørgsmålet er alle åbne. Talen holder op ved 🔊, 👂, et svar eller et skærmskift; kortene
+    // åbnes af den nyeste gennemgang (et eget nummer — 👂 tæller også S.oplaes op, og så må runden ikke hænge).
+    let nyeste = 0;
+    const gennemgang = async (tekst) => {
+      const nr = ++nyeste, ok = lever(), skjul = !aaben;
+      await Tale.sigVent(tekst);
+      const loft = skjul && ok() ? setTimeout(aabn, 8000 * TEMPO) : 0;
+      await sigKortene(skjul, ok); // stopper straks, hvis ok() er falsk
+      clearTimeout(loft);
+      if (nr === nyeste) aabn(); // efter et svar er kortene allerede åbne — så gør aabn intet
+    };
+    gennemgang((forTale ? forTale + ' ' : '') + opg.tale);
+    S.gentagFn = () => { gennemgang(opg.tale); }; // 🔊: spørgsmålet og kortene igen
+    stregFraBillede(opg);
+  }
+  // Stryg en linje fra billedordet til et kort (bred tolerance) — et almindeligt tryk på kortet er ligeværdigt
+  function stregFraBillede(opg) {
+    const r = S.runde;
+    const kilde = r.dom.visning.querySelector('.dansk-billede .ord-emoji');
+    if (!kilde) return;
+    kilde.style.touchAction = 'none';
+    kilde.addEventListener('click', (e) => { if (kilde._traek && performance.now() - kilde._traek < 450) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
+    kilde.addEventListener('pointerdown', (e) => {
+      if (r.laast || r !== S.runde) return;
+      const k0 = kilde.getBoundingClientRect();
+      const x0 = k0.left + k0.width / 2, y0 = k0.top + k0.height / 2;
+      let lag = null, linje = null;
+      const flyt = (ev) => {
+        if (!lag && Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) < 12) return;
+        if (!lag) {
+          lag = svgEl('svg', { class: 'streg-lag', 'aria-hidden': 'true' });
+          linje = svgEl('line', { x1: x0, y1: y0, x2: x0, y2: y0 }, lag);
+          document.getElementById('app').append(lag);
+        }
+        linje.setAttribute('x2', ev.clientX); linje.setAttribute('y2', ev.clientY);
+      };
+      const slip = (ev) => {
+        kilde.removeEventListener('pointermove', flyt);
+        kilde.removeEventListener('pointerup', slip);
+        kilde.removeEventListener('pointercancel', slip);
+        if (!lag) return;
+        kilde._traek = performance.now();
+        lag.remove();
+        if (ev.type !== 'pointerup' || r.laast || r !== S.runde) return;
+        const tol = 30;
+        const k = [...r.dom.svar.querySelectorAll('.valg-knap:not(:disabled)')].find((b) => {
+          const q = b.getBoundingClientRect();
+          return ev.clientX > q.left - tol && ev.clientX < q.right + tol && ev.clientY > q.top - tol && ev.clientY < q.bottom + tol;
+        });
+        if (k) k.click();
+      };
+      try { kilde.setPointerCapture(e.pointerId); } catch (er) { /* ældre Safari */ }
+      kilde.addEventListener('pointermove', flyt);
+      kilde.addEventListener('pointerup', slip);
+      kilde.addEventListener('pointercancel', slip);
+    });
+  }
+
+  // ---------- Spor i sandet (interaktiv 'sand'): tegn et bogstav eller et tal i sandet — BEDØMMES ALDRIG ----------
+  // Forbilledet er Dansk.sporModel(tegn) i samme kasse (100 × 100) som ✍️ Spor, tegnet som en blød, fuld streg efter
+  // talen. Trin 1 (bane): en bred, lys bane at følge · trin 2 (ved): forbilledet ved siden af feltet · trin 3 (husk):
+  // forbilledet i feltet, til barnet skjuler det (👁️) — det kan altid hentes frem igen. ✔ → «Tak for din tegning.»
+  // Ingen maskinel vurdering (intet vurderSpor, ingen tælling af streger), og tegningen gemmes ikke.
+  // Streger med pen eller finger i en SVG (koordinater i SVG'ens viewBox, som ✍️ Spor). maa(): må der tegnes nu?
+  function fingerStreger(svg, gruppe, maa) {
+    let streger = [], aktiv = null;
+    const punkter = (s) => s.map((q) => q.join(',')).join(' ');
+    const tegnAlt = () => {
+      gruppe.textContent = '';
+      streger.forEach((s) => svgEl('polyline', { points: punkter(s), class: 'sand-streg' }, gruppe));
+    };
+    const tilPunkt = (e) => {
+      const m = svg.getScreenCTM();
+      if (!m) return [0, 0];
+      const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+      const q = pt.matrixTransform(m.inverse());
+      return [Math.round(q.x * 10) / 10, Math.round(q.y * 10) / 10];
+    };
+    svg.addEventListener('pointerdown', (e) => {
+      if (!maa()) return;
+      e.preventDefault();
+      try { svg.setPointerCapture(e.pointerId); } catch (er) { /* ældre Safari */ }
+      aktiv = [tilPunkt(e)];
+      streger.push(aktiv);
+      tegnAlt();
+    });
+    svg.addEventListener('pointermove', (e) => {
+      if (!aktiv) return;
+      const p = tilPunkt(e), sidst = aktiv[aktiv.length - 1];
+      if (Math.abs(p[0] - sidst[0]) + Math.abs(p[1] - sidst[1]) < 0.8) return;
+      aktiv.push(p);
+      tegnAlt();
+    });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach((t) => svg.addEventListener(t, () => { aktiv = null; }));
+    svg.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+    return { ryd() { streger = []; aktiv = null; tegnAlt(); } };
+  }
+  function sandVisning(opg) {
+    const v = opg.vis;
+    const r = S.runde;
+    const model = D.sporModel(v.tegn) || [];
+    const st = { tast: false, modelVist: v.model === 'husk' };
+    r.sand = st;
+    const punkter = (s) => s.map((q) => q.join(',')).join(' ');
+    const svg = svgEl('svg', { class: 'sand-svg', viewBox: '0 0 100 100', role: 'img', 'aria-label': 'Sandfelt — tegn ' + v.tegn });
+    const bane = svgEl('g', { class: 'sand-bane skjult-model' }, svg);
+    const iFelt = svgEl('g', { class: 'sand-model skjult-model' }, svg);
+    if (v.model === 'bane') model.forEach((s) => svgEl('polyline', { points: punkter(s) }, bane));
+    if (v.model === 'husk') model.forEach((s) => svgEl('polyline', { points: punkter(s) }, iFelt));
+    const visLag = svgEl('g', { class: 'sand-vis' }, svg); // «Vis mig» tegner forbilledet her, strøg for strøg
+    const tegnet = svgEl('g', { class: 'sand-tegnet' }, svg);
+    const prik = miniTegning('sandStartDot', 'sand-start');
+    if (prik) {
+      prik.setAttribute('x', v.start[0] - 10); prik.setAttribute('y', v.start[1] - 10);
+      prik.setAttribute('width', 20); prik.setAttribute('height', 20);
+      svg.append(prik);
+    } else svgEl('circle', { cx: v.start[0], cy: v.start[1], r: 5, class: 'sand-start-reserve' }, svg);
+    const felt = h('div', { class: 'sand-felt' }, miniTegning('sandDrawingBoard', 'sand-tegning') || h('span', { class: 'sand-reserve' }), svg);
+    // Trin 2: forbilledet ved siden af feltet
+    let ved = null;
+    if (v.model === 'ved') {
+      const alle = [].concat.apply([], model);
+      const xs = alle.map((q) => q[0]), ys = alle.map((q) => q[1]);
+      const side = Math.max(Math.max.apply(null, xs) - Math.min.apply(null, xs), Math.max.apply(null, ys) - Math.min.apply(null, ys)) + 16;
+      const cx = (Math.max.apply(null, xs) + Math.min.apply(null, xs)) / 2, cy = (Math.max.apply(null, ys) + Math.min.apply(null, ys)) / 2;
+      const m = svgEl('svg', { class: 'sand-ved-svg', viewBox: (cx - side / 2) + ' ' + (cy - side / 2) + ' ' + side + ' ' + side, 'aria-hidden': 'true' });
+      const g = svgEl('g', { class: 'sand-model skjult-model' }, m);
+      model.forEach((s) => svgEl('polyline', { points: punkter(s) }, g));
+      ved = h('div', { class: 'sand-ved' }, m);
+    }
+    const streger = fingerStreger(svg, tegnet, () => !r.laast && S.runde === r);
+    // Efter talen: banen (trin 1), forbilledet ved siden af (trin 2) eller i feltet (trin 3)
+    // (Trin 2: kortet ved siden af kommer først frem her — ellers står en tom hvid firkant der under talen, ui-review 11-10)
+    st.efterTale = () => { [bane, iFelt].concat(ved ? [ved.querySelector('.sand-model')] : []).forEach((g) => g.classList.remove('skjult-model')); if (!st.modelVist) iFelt.classList.add('skjult-model'); if (ved) ved.classList.add('vis'); };
+    st.proevIgen = () => { if (r.laast) return; Lyd.init(); Lyd.tryk(); streger.ryd(); };
+    st.faerdig = () => { if (r.laast || S.runde !== r) return; Lyd.init(); svar('ok', null); };
+    st.oeje = (knap) => {
+      Lyd.init(); Lyd.tryk();
+      st.modelVist = !st.modelVist;
+      iFelt.classList.toggle('skjult-model', !st.modelVist);
+      knap.setAttribute('aria-pressed', st.modelVist ? 'true' : 'false');
+    };
+    // «Vis mig» (= hjælpen skrivBogstav, med tallene fra sporModel): forbilledet tegnes langsomt, strøg for strøg, oven på
+    st.visMig = async () => {
+      if (r.laast || S.runde !== r) return;
+      Lyd.init();
+      const token = S.token, i = r.i;
+      const levende = () => token === S.token && S.runde === r && r.i === i;
+      r.laast = true;
+      r.dom.svar.classList.add('venter');
+      visLag.textContent = '';
+      const linjer = model.map((s) => svgEl('polyline', { points: punkter(s) }, visLag));
+      const laengde = linjer.map((l) => (l.getTotalLength ? l.getTotalLength() : 100) || 1);
+      linjer.forEach((l, k) => { l.style.strokeDasharray = laengde[k] + ' ' + laengde[k]; l.style.strokeDashoffset = String(laengde[k]); });
+      await Tale.sigVent('Se, hvordan vi tegner det.');
+      for (let k = 0; k < linjer.length && levende(); k++) {
+        const ms = Math.max(500, laengde[k] * 14);
+        linjer[k].style.transition = udenBevaegelse() ? 'none' : 'stroke-dashoffset ' + Math.round(ms * TEMPO) + 'ms linear';
+        void linjer[k].getBoundingClientRect();
+        linjer[k].style.strokeDashoffset = '0';
+        await ventMs(ms + 250);
+      }
+      if (!levende()) return;
+      await Tale.sigVent('Prøv selv. Start ved prikken.');
+      if (!levende()) return;
+      r.dom.svar.classList.remove('venter');
+      r.laast = false;
+    };
+    // Tastatur (uden pen/finger): find tegnet blandt 2–3 skrevne kort — bogstavarbejde, ikke håndskrift, tæller ikke
+    st.visTastatur = () => {
+      const T2 = opg.tastatur;
+      st.tast = true;
+      r.dom.svar.textContent = '';
+      r.dom.svar.append(h('div', { class: 'valg valg-skrevet antal-' + T2.valg.length }, T2.valg.map((x) => h('button', {
+        class: 'valg-knap', type: 'button', 'data-v': x, 'aria-label': x,
+        onclick: (e) => {
+          if (r.laast) return;
+          Lyd.init();
+          if (x === T2.svar) { svar('ok', null); return; }
+          Lyd.blid();
+          e.currentTarget.classList.add('forkert');
+          e.currentTarget.disabled = true;
+        },
+      }, h('span', { class: 'valg-skrevet' }, x)))));
+      const navn = /^\d$/.test(T2.svar) ? null : { klip: D.navnId(T2.svar), reserve: D.NAVNE[T2.svar] || T2.svar };
+      S.gentagFn = () => { const mit = ++S.oplaes; Tale.sigVent(T2.tale).then(() => { if (navn && mit === S.oplaes) Lyd.klip(navn.klip, navn.reserve); }); };
+      S.gentagFn();
+    };
+    st.taster = (e) => {
+      if (e.key === 'Enter') { if (!st.tast && !fokusPaaKnap()) { e.preventDefault(); st.faerdig(); } return; }
+      const k = e.key.toLowerCase();
+      if (!/^[a-zæøå0-9]$/.test(k)) return;
+      if (!st.tast) { st.visTastatur(); return; }
+      const knapper = [...r.dom.svar.querySelectorAll('.valg-knap')];
+      const b = knapper.find((x) => x.getAttribute('data-v') === k) || (Number(k) >= 1 && Number(k) <= knapper.length && !knapper.some((x) => /^\d$/.test(x.getAttribute('data-v'))) ? knapper[Number(k) - 1] : null);
+      if (b && !b.disabled) b.click();
+    };
+    st.panel = () => {
+      const knapper = [
+        h('button', { class: 'kurv-knap sand-vis-mig', type: 'button', 'aria-label': 'Vis mig', onclick: () => st.visMig() }, '💡'),
+        v.model === 'husk' ? h('button', { class: 'kurv-knap sand-oeje', type: 'button', 'aria-label': 'Vis eller skjul forbilledet', 'aria-pressed': 'true', onclick: (e) => st.oeje(e.currentTarget) }, '👁️') : null,
+        h('button', { class: 'kurv-knap sand-igen', type: 'button', 'aria-label': 'Prøv igen', onclick: () => st.proevIgen() }, '🗑️'),
+        h('button', { class: 'stor-knap ok-knap sand-ok', type: 'button', 'aria-label': 'Færdig', onclick: () => st.faerdig() }, '✔'),
+      ];
+      return h('div', { class: 'interaktiv-panel kurv-panel sand-panel' }, knapper);
+    };
+    r.figur = st; // tastaturet (rundeTaster → r.figur.taster)
+    return h('div', { class: 'sand-post' + (ved ? ' med-ved' : '') }, felt, ved);
+  }
+
+  // ---------- Slutbilledet (slut, bedømmes ikke): lyd → (efter hjælp «Ja!») → én rolig bevægelse → evt. tale ----------
+  // Højst ca. 1,5 s bevægelse, ingen konfetti. Med prefers-reduced-motion står slutbilledet der med det samme (CSS).
+  function slutLag(node) {
+    const r = S.runde;
+    const lag = h('div', { class: 'slut-lag', 'aria-hidden': 'true' }, node);
+    r.dom.visning.parentNode.append(lag);
+    return lag;
+  }
+  // Rimhaven: de to ord, der rimer (billedordet og facit — på trin 3 de to kort, der ikke er facit)
+  function rimPar(opg) {
+    if (opg.type !== 'rimHave') return [];
+    return opg.vis.art === 'ordBillede' ? [opg.vis.ord, opg.svar] : opg.valg.filter((x) => x !== opg.svar);
+  }
+  const SLUT = {
+    // Fortællebroen trin 3: «Vil du tegne, hvad der sker bagefter?» — et sandfelt til en fri fortsættelse (bedømmes
+    // ikke, gemmes ikke, ingen mikrofon). ✔ fører videre, når barnet vil.
+    async tegnSelv(opg, knap, levende) {
+      const r = S.runde;
+      const svg = svgEl('svg', { class: 'sand-svg', viewBox: '0 0 100 100', role: 'img', 'aria-label': 'Sandfelt — tegn, hvad der sker bagefter' });
+      fingerStreger(svg, svgEl('g', { class: 'sand-tegnet' }, svg), () => levende());
+      const ok = h('button', { class: 'stor-knap ok-knap tegn-selv-ok', type: 'button', 'aria-label': 'Videre' }, '✔');
+      r.dom.visning.textContent = '';
+      r.dom.visning.append(h('div', { class: 'tegn-selv' },
+        h('div', { class: 'sand-felt' }, miniTegning('sandDrawingBoard', 'sand-tegning') || h('span', { class: 'sand-reserve' }), svg), ok));
+      const videre = new Promise((ja) => ok.addEventListener('click', () => { Lyd.init(); Lyd.tryk(); ja(); }));
+      if (opg.slut.tale) await Tale.sigVent(opg.slut.tale);
+      if (levende()) ok.focus({ preventScroll: true });
+      await videre;
+      return true;
+    },
+    // Lydtoget: hele ordet siges (trin 3: det nye billede kommer frem) — så kører toget
+    async tog(opg, knap, levende) {
+      const r = S.runde;
+      const v = opg.vis;
+      const b = r.dom.visning.querySelector('.lydtog-billede');
+      if (v.fra && b) {
+        b.textContent = '';
+        b.append(miniBillede(v.billede, v.e, 'lydtog-tegning'));
+        b.setAttribute('aria-label', v.ord);
+        hop(b, 'pop');
+      }
+      if (opg.slut.tale) await Tale.sigVent(opg.slut.tale);
+      if (!levende()) return true;
+      const tog = r.dom.visning.querySelector('.lydtog-tog');
+      if (tog) { tog.classList.add('koerer'); await ventMs(1200); }
+      return true;
+    },
+    // Skyggeatelieret trin 1–2: figuren glider ind og drejer langsomt ned i skyggen, til den dækker den
+    async drejInd(opg) {
+      const r = S.runde;
+      const skygge = r.dom.visning.querySelector('.sd-figur.skygge');
+      if (!skygge) return false;
+      const kort = opg.kort[opg.svar].dele[0];
+      const fig = figurTegning(kort.form, kort.farve, false) || h('span', { class: 'mini-form' }, formSvg(kort.form, kort.farve, 0, false));
+      fig.classList.add('drej-ind');
+      fig.style.setProperty('--drej', (opg.slut.drej || 0) + 'deg');
+      skygge.append(fig);
+      fjernKopier();
+      void fig.offsetWidth;
+      fig.classList.add('vis');
+      await ventMs(1100);
+      return false;
+    },
+    // Skyggeatelieret trin 3: vinduet er repareret (shadowRepairedWindow over puslespillet)
+    async vindue() {
+      const r = S.runde;
+      const pusle = r.dom.visning.querySelector('.sd-pusle');
+      const vindue = miniTegning('shadowRepairedWindow', 'vindue-tegning');
+      fjernKopier();
+      if (!pusle || !vindue) return false;
+      const lag = h('span', { class: 'vindue-lag' }, vindue);
+      pusle.append(lag);
+      void lag.offsetWidth;
+      lag.classList.add('vis');
+      await ventMs(1000);
+      return false;
+    },
+    // Skovbroen: brikken lægger sig i åbningen (trin 3: så resten og regningen), og rejsevennen går over broen
+    async bro(opg, knap, levende) {
+      const r = S.runde;
+      const bro = r.dom.visning.querySelector('.sd-bro');
+      if (!bro) return false;
+      const f = opg.vis.fakta;
+      const n = opg.kort[opg.svar].fakta.n;
+      const raekke = bro.querySelector('.bro-felter');
+      const laeg = (len, fra) => {
+        const b = broBrik(len, 'lagt');
+        b.style.setProperty('--fra', fra);
+        raekke.append(b);
+        void b.offsetWidth;
+        b.classList.add('vis');
+      };
+      laeg(n, f.fast);
+      fjernKopier();
+      await ventMs(450);
+      let sagt = false;
+      if (opg.slut.rest) {
+        if (!levende()) return true;
+        laeg(opg.slut.rest, f.fast + n);
+        await ventMs(450);
+        if (!levende()) return true;
+        if (opg.slut.tale) { await Tale.sigVent(opg.slut.tale); sagt = true; }
+      }
+      if (!levende()) return true;
+      const ven = h('span', { class: 'bro-ven', 'aria-hidden': 'true' }, venTegning(minFigur().id));
+      // Vennen går selv over broen — så står den ikke også i hjørnet (to ens venner, ui-review 11-10). visOpgave viser den igen
+      if (r.dom.ven) r.dom.ven.classList.add('paa-broen');
+      bro.append(ven);
+      void ven.offsetWidth;
+      ven.classList.add('gaar');
+      await ventMs(1100);
+      return sagt;
+    },
+    // Lysblomsten vokser frem (Frøposten, Rimhaven) — par: de to billeder plantes ved den (Rimhaven)
+    async lysblomst(opg) {
+      const blomst = miniTegning('rhymeLightFlower', 'slut-blomst-tegning');
+      if (!blomst) return;
+      const r = S.runde;
+      const par = rimPar(opg).map((ord) => miniBillede(D && D.BILLEDE[ord], D && D.ORD[ord] ? D.ORD[ord].e : '', 'slut-par'));
+      const lag = slutLag(h('div', { class: 'slut-blomst' }, par[0] || null, blomst, par[1] || null));
+      void lag.offsetWidth;
+      lag.classList.add('vis');
+      await ventMs(900);
+      if (r.dom && r.dom.ven) fejrEnGang(r.dom.ven);
+      await ventMs(500);
+    },
+  };
+  async function slutBillede(opg, knap, token) {
+    const r = S.runde;
+    const levende = () => token === S.token && S.runde === r;
+    await ventMs(350); // lyden først
+    if (!levende()) return;
+    const s = opg.slut || {};
+    // Efter hjælp siges «Ja!» — undtagen når slutbilledet selv har en sætning (fx «Tak for din tegning.»)
+    if (r.forsoeg > 0 && !s.tale) await Tale.sigVent('Ja!');
+    if (!levende()) return;
+    let sagt = false; // et slutbillede, der selv siger sin sætning midt i bevægelsen, svarer true
+    try { if (SLUT[s.art]) sagt = await SLUT[s.art](opg, knap, levende); } catch (e) { /* slutbilledet er pynt */ }
+    if (!levende()) return;
+    if (s.tale && !sagt) await Tale.sigVent(s.tale);
+  }
+
   // ---------- Sidste trin: svaret lyser, og barnet trykker på det ----------
   function visSvaret(opg) {
     const r = S.runde;
     if (opg.interaktiv) { visSvaretTegn(opg); return; }
+    if (r.trinvis) { r.trinvis.visSvaret(); return; } // C: kortet til den aktive plads lyser
     r.visSvar = true;
     if (opg.valgArt === 'skjult') { r.vendtOp = true; const v = r.dom.svar.querySelector('.valg'); if (v) v.classList.remove('vendt'); }
     if (opg.valg) {
@@ -3527,7 +4900,13 @@
     gemTid();
     const maerke = r.maerke;
     data.maerker[maerke.id] = (data.maerker[maerke.id] || 0) + 1;
-    if (!r.test) { S.pausetRunde = null; data.pauset = null; } // en testrunde rører ikke en rigtig afbrudt mission
+    // Kun en afbrudt mission i samme verden og i rundens eget felt er nu slut: en mission, der venter på ▶, overlever
+    // en færdig runde i det andet fag, en historie og en Bogstavjagt. En testrunde rører aldrig en afbrudt mission.
+    if (!r.test) {
+      const felt = rundeFelt(r);
+      if (S.afbrudt[felt] && S.afbrudt[felt].verden.id === r.verden.id) S.afbrudt[felt] = null;
+      if (data[felt] && data[felt].verden === r.verden.id) saetPauset(felt, null);
+    }
     gem();
     visFejring(maerke, r.niveauOp, r.verden, r.frit);
   }
@@ -3544,7 +4923,10 @@
         : h('button', { class: 'stor-knap kort-knap', type: 'button', 'aria-label': 'Til kortet', onclick: () => videre(() => visKort(false)) }, '🗺️'));
     let aabnet = false;
     let token = -1; // sættes efter skærmskiftet nedenfor
-    const dyr = h('button', { class: 'fund-dyr skygge', type: 'button', 'aria-label': maerke.navn }, maerke.e);
+    // Vennen jubler (udtrykket) — og hopper én gang (480 ms), når dyrets sætning er sagt færdig. Uden tegning: emojien danser som før
+    const venTeg = venTegning(fig.id, 'jubler');
+    const ven = h('div', { class: 'fejring-ven' + (venTeg.nodeType === 1 ? '' : ' danser'), 'aria-hidden': 'true' }, venTeg);
+    const dyr = h('button', { class: 'fund-dyr skygge', type: 'button', 'aria-label': maerke.navn }, dyrTegning(maerke));
     const navn = h('div', { class: 'fund-navn skjult' }, maerke.navn);
     // Barnet kan ikke læse «tryk på skyggen»: en ring om skyggen og en hånd, der peger på den.
     // De dukker op sammen med stemmen (CSS-forsinkelse) — ingen ekstra lyd.
@@ -3557,21 +4939,25 @@
       ring.remove();
       haand.remove();
       dyr.classList.remove('skygge');
-      hop(dyr, 'frem');
+      hop(dyr, 'frem'); // bevægelsen straks i trykket — kun lyd og tale går gennem forløbet
       navn.classList.remove('skjult');
-      Lyd.pling();
       flyvPerle();
-      setTimeout(() => {
-        if (token !== S.token) return;
-        const tekst = stort(maerke.bestemt) + ' er med! ' + stort(pronomen(maerke)) + ' er nu i din samlebog.';
-        S.gentagTale = tekst;
-        Tale.sig(tekst);
-        knapper.classList.remove('skjult');
-      }, 600);
+      const tekst = stort(maerke.bestemt) + ' er med! ' + stort(pronomen(maerke)) + ' er nu i din samlebog.';
+      S.gentagTale = tekst;
+      Forloeb.stop(); // fejringens intro afbrydes
+      // Lyd → ro → dyrets sætning → ro → vennen jubler én gang (forløbets animationstrin; ikke med reduceret bevægelse)
+      Forloeb.run({ lyd: 'niveauOp', tekst: tekst, animer: () => { fejrEnGang(ven); return pause(480); } });
+      // Knapperne først efter 900 ms (niveauOp 0,65 s + ro): et hurtigt ▶ må ikke skære dyrets sætning af
+      setTimeout(() => { if (token === S.token) knapper.classList.remove('skjult'); }, 900);
     };
     // En lysperle flyver fra dyret til tårnet, og tårnet lyser op (historiens røde tråd)
     // Lysperlen (og tårnet) kun i eventyret — i «Vælg selv» er dyret belønningen
-    const perle = frit ? null : h('div', { class: 'fejring-perle', style: '--lys:' + lysStyrke(), 'aria-hidden': 'true' }, fyrtaarn(), h('span', { class: 'perle-tal' }, '✨ ' + data.perler));
+    // Tårnet står på stadiet fra før denne perle; når perlen lander, tændes det nye lys (hvis et stadie er nået)
+    const perle = frit ? null : h('div', { class: 'fejring-perle', style: '--lysstyrke:' + lysStyrke(), 'aria-hidden': 'true' }, fyrtaarn('', taarnStadie(data.perler - 1)), h('span', { class: 'perle-tal' }, '✨ ' + data.perler));
+    const taend = () => {
+      const nu = taarnStadie(data.perler);
+      if (perle && perle.firstChild.getAttribute('data-stadie') !== String(nu)) perle.replaceChild(fyrtaarn('', nu), perle.firstChild);
+    };
     const flyvPerle = () => {
       if (!perle) return;
       try {
@@ -3580,21 +4966,23 @@
         document.body.append(p);
         const dx = b.left + b.width / 2 - (a.left + a.width / 2), dy = b.top + b.height / 3 - (a.top + a.height / 2);
         const anim = p.animate([{ transform: 'translate(-50%, -50%) scale(1.4)' }, { transform: 'translate(calc(' + dx + 'px - 50%), calc(' + dy + 'px - 50%)) scale(0.6)' }], { duration: 750, easing: 'ease-in' });
-        anim.onfinish = () => { p.remove(); if (token === S.token) hop(perle, 'gloed'); };
-      } catch (e) { hop(perle, 'gloed'); }
+        anim.onfinish = () => { p.remove(); if (token === S.token) { taend(); hop(perle, 'gloed'); } };
+      } catch (e) { taend(); hop(perle, 'gloed'); }
     };
     const intro = 'Du klarede det!' + (niveauOp ? ' Du er blevet stærkere!' : '') + ' Tryk på ' + maerke.bestemt + '.';
+    const medLyd = Palet.vilSpille('fejring'); // spiller fejringen, siges introen først efter den
     S.gentagTale = intro;
     skift(h('div', { class: 'skaerm fejring' },
       h('div', { class: 'fejring-top' },
-        h('div', { class: 'fejring-ven danser', 'aria-hidden': 'true' }, fig.e),
+        ven,
         h('div', { class: 'fejring-tekst' }, 'Du klarede det!'),
         perle,
         // Missionens fodspor (alle fyldt) — og en stjerne, der popper frem, når barnet er blevet stærkere
         h('div', { class: 'fejring-stjerner', 'aria-hidden': 'true' }, S.runde.opgaver.map(() => h('span', { class: 'fejring-spor' }, '🐾')),
           niveauOp ? h('span', { class: 'fejring-ny-stjerne' }, '⭐') : null)),
       // Klik på hele fundet (også ringen og hånden) åbner — skyggen er ikke det eneste, et barn rammer
-      h('div', { class: 'fejring-midte' }, h('div', { class: 'fund', onclick: aabn }, h('div', { class: 'fund-straaler', 'aria-hidden': 'true' }), ring, dyr, haand, navn)),
+      // Ring og hånd kommer med stemmen: efter fejringens lyd (1,7 s), eller som før (0,8 s), når der ingen lyd er (app.css)
+      h('div', { class: 'fejring-midte' }, h('div', { class: 'fund', onclick: aabn, style: medLyd ? '--ring-ind:1.7s;--ring-puls:2.1s' : null }, h('div', { class: 'fund-straaler', 'aria-hidden': 'true' }), ring, dyr, haand, navn)),
       knapper),
     (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
@@ -3604,8 +4992,8 @@
       } else if (e.key === 'Escape') { if (frit) visVaelgSelv(); else visKort(false); }
     });
     token = S.token;
-    Lyd.fejring();
-    setTimeout(() => { if (token === S.token && !aabnet) Tale.sig(intro); }, 800);
+    // Fejringen og så introen (ca. 1,7 s) — ring og hånd kommer med stemmen (app.css). Åbnes dyret før, stoppes introen.
+    Forloeb.run({ lyd: 'fejring', tekst: intro });
   }
 
   // ---------- Historien om Lystårnet (tynd ramme, læses højt — én gang, og når man trykker på tårnet) ----------
@@ -3620,7 +5008,7 @@
     }, '▶');
     skift(h('div', { class: 'skaerm historie' },
       h('div', { class: 'topbar historie-top' }, hoejttaler()), // 🔊 øverst til højre som på de andre skærme
-      h('div', { class: 'historie-himmel', style: '--lys:' + lysStyrke() }, fyrtaarn('historie-taarn'), perler),
+      h('div', { class: 'historie-himmel', style: '--lysstyrke:' + lysStyrke() }, fyrtaarn('historie-taarn'), perler),
       h('p', { class: 'historie-tekst' }, HISTORIE),
       knap),
     (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); knap.click(); } });
@@ -3669,11 +5057,10 @@
         const knap = h('button', { class: 'stor-knap spil-knap puls', type: 'button', 'aria-label': 'Videre', onclick: () => { Lyd.init(); Lyd.tryk(); slut(); } }, '▶');
         const t3 = skift(h('div', { class: 'skaerm pause' },
           h('div', { class: 'topbar' }, topbarPlads(), h('div', { class: 'topbar-titel' }, 'Godt klaret!'), hoejttaler()),
-          h('div', { class: 'pause-midte' }, h('div', { class: 'pause-ven danser', 'aria-hidden': 'true' }, fig.e), knap)),
+          h('div', { class: 'pause-midte' }, h('div', { class: 'pause-ven danser', 'aria-hidden': 'true' }, venTegning(fig.id, 'jubler')), knap)),
         (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); knap.click(); } });
-        Lyd.fejring();
         S.gentagTale = 'Godt klaret! Tag iPad\'en igen, og tryk på den store knap.';
-        setTimeout(() => { if (t3 === S.token) Tale.sig(S.gentagTale); }, 700);
+        Forloeb.run({ lyd: 'fejring', tekst: S.gentagTale }); // fejringen (1,6 s) og så sætningen — ikke oven i hinanden
       };
       // En øvelse: vennen viser bevægelsen, og vi tæller højt i et roligt tempo. ⏭ kommer først efter 15 sekunder.
       const oevelse = async (i) => {
@@ -3684,7 +5071,7 @@
         const naeste = () => { if (videreVist) return; videreVist = true; oevelse(i + 1); };
         const springKnap = h('button', { class: 'ikon-knap spring-over usynlig', type: 'button', 'aria-label': 'Spring øvelsen over', title: 'Spring øvelsen over', onclick: () => { Lyd.init(); Lyd.tryk(); naeste(); } }, '⏭');
         const stort = h('div', { class: 'pause-tal' }, '');
-        const ven = h('div', { class: 'pause-ven anim-' + ov.anim, 'aria-hidden': 'true' }, fig.e);
+        const ven = h('div', { class: 'pause-ven anim-' + ov.anim, 'aria-hidden': 'true' }, venTegning(fig.id));
         // Bevægelsen selv vises stort ved siden af vennen — barnet kan ikke læse, hvad det skal gøre
         const bev = h('div', { class: 'pause-ven pause-bevaegelse anim-' + ov.anim, 'aria-hidden': 'true' }, ov.e);
         const prikker = h('div', { class: 'pause-prikker', 'aria-hidden': 'true' }, Array.from({ length: n }, () => h('i')));
@@ -3716,7 +5103,11 @@
       const token = skift(h('div', { class: 'skaerm pause' },
         h('div', { class: 'topbar' }, topbarPlads(), h('div', { class: 'topbar-titel' }, 'Pause'), hoejttaler()),
         h('div', { class: 'pause-midte' },
-          h('div', { class: 'laeg-ned', 'aria-hidden': 'true' }, h('span', { class: 'laeg-ned-ipad' }, '📱'), h('span', { class: 'laeg-ned-pil' }, '⬇️')),
+          // Vennen er glad (der kommer tre øvelser — ikke regnvejr med paraply, ui-review 11-10) ved siden af iPad'en, der lægges ned
+          h('div', { class: 'pause-par' },
+            h('div', { class: 'pause-ven', 'aria-hidden': 'true' }, venTegning(fig.id, 'glad')),
+            // Pilen over iPad'en: når den lægges ned (drejes og glider ned), dækker den ikke pilen (ui-review 11-10)
+            h('div', { class: 'laeg-ned', 'aria-hidden': 'true' }, h('span', { class: 'laeg-ned-pil' }, '⬇️'), h('span', { class: 'laeg-ned-ipad' }, '📱'))),
           h('div', { class: 'pause-tekst' }, 'Læg iPad\'en ned'))));
       S.gentagTale = 'Læg iPad\'en ned på bordet. ' + (stil === 'sid' ? 'Bliv siddende. ' : 'Rejs dig op. ') + 'Så gør vi tre øvelser sammen.';
       Tale.sig(S.gentagTale);
@@ -3726,7 +5117,7 @@
     skift(h('div', { class: 'skaerm pause' },
       h('div', { class: 'topbar' }, topbarPlads(), h('div', { class: 'topbar-titel' }, 'Pause!'), hoejttaler()),
       h('div', { class: 'pause-midte' },
-        h('div', { class: 'pause-ven', 'aria-hidden': 'true' }, fig.e),
+        h('div', { class: 'pause-ven', 'aria-hidden': 'true' }, venTegning(fig.id)),
         h('div', { class: 'pause-valg' },
           h('button', { class: 'pause-knap', type: 'button', 'aria-label': 'Stå op', onclick: () => vaelgStil('staa') }, h('span', { 'aria-hidden': 'true' }, '🧍'), h('b', null, 'Stå')),
           h('button', { class: 'pause-knap', type: 'button', 'aria-label': 'Sid ned', onclick: () => vaelgStil('sid') }, h('span', { 'aria-hidden': 'true' }, '🪑'), h('b', null, 'Sid'))))),
@@ -3738,6 +5129,7 @@
   // ---------- 🎒 Vælg selv: alle emner frit (også dem, eventyret ikke er nået til) ----------
   // Runder her tæller på samme emne-niveau og mestring som i eventyret — øvelse hjælper eventyret videre.
   function visVaelgSelv(hilsen) {
+    stopUr();
     S.runde = null;
     const felt = (v) => {
       const antalStj = stjerner(v.emne);
@@ -3745,7 +5137,7 @@
         class: 'vaelg-emne', type: 'button', 'aria-label': v.navn, 'data-verden': v.id,
         onclick: () => { Lyd.init(); Lyd.tryk(); startRunde(v, { frit: true }); },
       },
-      v.svg ? fyrtaarn('station-ikon') : h('span', { class: 'station-ikon', 'aria-hidden': 'true' }, v.e),
+      verdenIkon(v),
       h('span', { class: 'vaelg-navn' }, v.navn),
       h('span', { class: 'station-stjerner', 'aria-label': antalStj + (antalStj === 1 ? ' stjerne' : ' stjerner') },
         [0, 1, 2].map((k) => h('i', { class: k < antalStj ? 'fuld' : '' }, '★'))));
@@ -3753,11 +5145,15 @@
       const lektion = LEKTIONER[v.id] && data.lektioner[v.id] ? ikonKnap('📖', 'Lektion: ' + v.navn, () => visLektion(v, () => startRunde(v, { frit: true, lektionSet: true }), () => visVaelgSelv()), 'vaelg-lektion') : null;
       return h('div', { class: 'vaelg-felt' }, knap, lektion);
     };
+    // Vennen udforsker (med luppen) ved den første gruppes overskrift — står oven på gitteret og ruller med
+    let venVist = false;
     const grupper = VAELG_GRUPPER.map((g) => {
       const verdener = g.verdener.map((id) => alleVerdener().find((v) => v.id === id)).filter((v) => v && (v.blandet || ((emneDef(v.emne) || v.emne === 'historie' || v.emne === 'jagt') && emneSlaaetTil(v.emne))));
       if (!verdener.length) return null;
+      const ven = venVist ? null : h('span', { class: 'vaelg-ven', 'aria-hidden': 'true' }, venTegning(minFigur().id, 'udforsker'));
+      venVist = true;
       return h('section', { class: 'vaelg-gruppe' },
-        h('h2', { class: 'vaelg-gruppe-titel' }, h('span', { 'aria-hidden': 'true' }, g.e), g.navn),
+        h('h2', { class: 'vaelg-gruppe-titel' }, h('span', { 'aria-hidden': 'true' }, g.e), g.navn, ven),
         h('div', { class: 'vaelg-gitter' }, verdener.map(felt)));
     });
     S.gentagTale = 'Vælg selv. Tryk på det, du vil lege med.';
@@ -3814,7 +5210,7 @@
     skift(h('div', { class: 'skaerm lektion' },
       h('div', { class: 'topbar' },
         ikonKnap('⬅️', 'Tilbage', () => tilbage()),
-        h('div', { class: 'topbar-titel' }, verden.svg ? '🗼' : verden.e, ' ' + verden.navn),
+        h('div', { class: 'topbar-titel' }, verdenIkonLille(verden, 'titel-ikon'), ' ' + verden.navn),
         hoejttaler()),
       h('div', { class: 'lektion-midte' },
         h('div', { class: 'lektion-tegning', 'aria-hidden': 'true' }, lektionTegning(verden.id)),
@@ -3828,7 +5224,7 @@
   function visSamlebog() {
     const pulje = O.MAERKER[T.samling] || O.MAERKER.jungle;
     const antalForskellige = pulje.filter((m) => data.maerker[m.id]).length;
-    const naeste = O.maerkeForRunde(T.samling, data.runderIalt, minFigur().e);
+    const naeste = O.maerkeForRunde(T.samling, data.runderIalt, minFigur().e, data.maerker);
     const gitter = h('div', { class: 'samlebog-gitter' }, pulje.map((m) => {
       const antal = data.maerker[m.id] || 0;
       return h('button', {
@@ -3836,11 +5232,12 @@
         'aria-label': antal ? m.navn : 'Ikke fundet endnu',
         onclick: (e) => {
           Lyd.init();
-          if (antal) { Lyd.pling(); hop(e.currentTarget, 'pop'); Tale.sig(m.navn + (antal > 1 ? '. Du har ' + antal + '.' : '.')); }
-          else if (m.id === naeste.id) { Lyd.tryk(); Tale.sig(stort(m.bestemt) + ' er den næste, du hjælper.'); }
-          else { Lyd.tryk(); Tale.sig('Den har du ikke hjulpet endnu.'); }
+          Forloeb.stop(); // et nyt dyr afløser det forrige
+          if (antal) { hop(e.currentTarget, 'pop'); Forloeb.run({ lyd: 'boblePop', tekst: m.navn + (antal > 1 ? '. Du har ' + antal + '.' : '.') }); }
+          else if (m.id === naeste.id) Forloeb.run({ lyd: 'tryk', tekst: stort(m.bestemt) + ' er den næste, du hjælper.' });
+          else Forloeb.run({ lyd: 'tryk', tekst: 'Den har du ikke hjulpet endnu.' });
         },
-      }, h('span', { class: 'samle-emoji', 'aria-hidden': 'true' }, m.e), antal > 1 ? h('span', { class: 'samle-antal' }, '×' + antal) : null);
+      }, h('span', { class: 'samle-emoji', 'aria-hidden': 'true' }, dyrTegning(m)), antal > 1 ? h('span', { class: 'samle-antal' }, '×' + antal) : null);
     }));
     S.gentagTale = 'Din samlebog. ' + (antalForskellige === 1 ? 'Du har fundet den første.' : 'Du har fundet ' + antalForskellige + ' forskellige.');
     skift(h('div', { class: 'skaerm samlebog' },
@@ -3876,8 +5273,10 @@
       if (document.hidden) {
         Tale.stop();
         if (S.runde) { registrerAktivitet(); gemTid(); }
-      } else if (S.runde) {
-        S.runde.sidstAktiv = Date.now();
+        if (S.ur) { gemUr(); S.ur.start = 0; } // Historiebogen/Bogstavjagt: gem nu, og uret står stille, mens iPad'en er skjult
+      } else {
+        if (S.runde) S.runde.sidstAktiv = Date.now();
+        if (S.ur && !S.ur.start) S.ur.start = Date.now();
       }
     });
     // En anden side (voksendelens import, en anden fane) har ændret data: læs dem igen, så vores gamle
@@ -3891,6 +5290,7 @@
         // En igangværende runde fortsætter; ellers tages en gemt mission fra den anden side med
         if (!S.runde) hentMission();
       } else if (e.key === 'mat_voksen_v1' && T.side !== 'voksen') {
+        Forloeb.stop(); // fx Lydeffekter/Oplæsning slået fra: feedbacken, der kører, stopper først
         voksenRes = G.indlaesVoksen(lager);
         Object.assign(voksen, voksenRes.data);
       } else if (e.key === 'mat_voksen_v1' && T.side === 'voksen') {
@@ -3910,7 +5310,7 @@
       hentMission();
       visStart();
     } else if (T.side === 'voksen' && window.Voksen) {
-      window.Voksen.start({ h, G, O, D, lager, voksen, Lyd, Tale, KlipLager, skift, hop, vent, FIGURER, VERDENER, DANSK_VERDENER, fyrtaarn, tegnVisning, valgIndhold, gemVoksen, lagerAdvarsel });
+      window.Voksen.start({ h, G, O, D, lager, voksen, Lyd, Tale, Forloeb, KlipLager, skift, hop, vent, FIGURER, venTegning, VERDENER, DANSK_VERDENER, fyrtaarn, tegnVisning, valgIndhold, gemVoksen, lagerAdvarsel });
     } else {
       visIndex();
     }
@@ -3948,6 +5348,8 @@
   // Vælg en historie (Vælg selv): alle 18 kan vælges
   function visHistorieValg() {
     S.runde = null;
+    startUr();
+    S.ur.historie = null; // den næste historie er en ny start (tidsgrænsen tjekkes igen)
     const knapper = D.HISTORIER.map((x) => {
       const hd = data.historier[x.nr];
       return h('button', {
@@ -3964,12 +5366,16 @@
   }
 
   function visHistorieSide(nr, frit) {
-    if (tidOpbrugt()) { visTidBrugt(); return; }
+    // Tilbage fra ✏️ Skriv eller 🤔 i samme, ufærdige historie: den er i gang og gøres færdig (som en runde).
+    // En færdig historie er ikke «i gang» — ellers kunne 🤔 gentages forbi tidsgrænsen
+    const iGang = !!S.ur && S.ur.historie === nr && !(data.historier[nr] && data.historier[nr].faerdig);
+    if (!iGang) { gemUr(); if (tidOpbrugt()) { visTidBrugt(); return; } }
     const H = D.HISTORIER.find((x) => x.nr === nr);
     const hd = historieData(nr);
     S.runde = null;
-    S.historie = { nr: nr, frit: !!frit, start: Date.now() };
-    const tilbage = () => { gemHistorieTid(); if (frit) visHistorieValg(); else visKort(false); };
+    startUr();
+    S.ur.historie = nr;
+    const tilbage = () => { if (frit) visHistorieValg(); else visKort(false); };
     // --- 📖 Læs ---
     const linjer = H.linjer.map((l, i) => h('p', { class: 'laes-linje' }, linjeOrd(l, i)));
     const bobler = h('div', { class: 'laes-bobler' },
@@ -3983,6 +5389,7 @@
       }, hd.voksen ? '🧑' : '👂'));
     const laesHele = async () => {
       Lyd.init();
+      saetUdtryk(ven, 'laeser'); // også med mellemrumstasten
       const token = S.token;
       const ord = [...document.querySelectorAll('.laes-ord')];
       for (const o of ord) {
@@ -3993,10 +5400,14 @@
       }
     };
     // --- 🖍️ Tegn ---
-    const tegn = tegnefelt('historie-' + nr, () => { if (!hd.tegnet) { hd.tegnet = true; gem(); tjekFaerdig(); } });
+    // Vennen læser (laeser), indtil barnet tegner eller vælger en farve (maler) — og læser igen ved et ord eller ▶
+    const ven = h('div', { class: 'tegne-ven', 'aria-hidden': 'true' }, venTegning(minFigur().id, 'laeser'));
+    const tegn = tegnefelt('historie-' + nr, () => { if (!hd.tegnet) { hd.tegnet = true; gem(); tjekFaerdig(); } }, ven);
+    const laeser = () => saetUdtryk(ven, 'laeser');
+    const maler = () => saetUdtryk(ven, 'maler');
     // --- ✏️ Skriv ---
     const skrivKnap = h('button', { class: 'stor-knap trin-knap skriv-knap' + (hd.skrevet ? ' ok' : ''), type: 'button', 'aria-label': 'Skriv', onclick: () => { Lyd.init(); Lyd.tryk(); visSkriv(nr, frit, 0); } }, '✏️');
-    const quizKnap = h('button', { class: 'stor-knap trin-knap quiz-knap', type: 'button', 'aria-label': 'Hvad skete der?', onclick: () => { Lyd.init(); Lyd.tryk(); gemHistorieTid(); startHistorieQuiz(nr, frit); } }, '🤔');
+    const quizKnap = h('button', { class: 'stor-knap trin-knap quiz-knap', type: 'button', 'aria-label': 'Hvad skete der?', onclick: () => { Lyd.init(); Lyd.tryk(); startHistorieQuiz(nr, frit); } }, '🤔');
     // ✏️ og 🤔 følges ad: er der ikke plads på én linje, kommer de to sammen på næste linje (🤔 står aldrig alene)
     const videreKnapper = h('div', { class: 'laes-videre' }, skrivKnap, quizKnap);
     const trinMaerker = h('div', { class: 'historie-trin', 'aria-hidden': 'true' },
@@ -4015,9 +5426,9 @@
         trinMaerker,
         hoejttaler()),
       h('div', { class: 'historie-krop' },
-        h('div', { class: 'historie-laes' }, linjer,
+        h('div', { class: 'historie-laes', onpointerdown: laeser, onclick: laeser }, linjer,
           h('div', { class: 'laes-knapper' }, h('button', { class: 'stor-knap trin-knap laes-hele', type: 'button', 'aria-label': 'Læs hele historien', onclick: laesHele }, '▶'), bobler, videreKnapper)),
-        h('div', { class: 'historie-tegn' }, tegn.node))),
+        h('div', { class: 'historie-tegn', onpointerdown: maler, onclick: maler }, tegn.node))),
     (e) => {
       if (e.key === 'Escape') tilbage();
       else if (e.key === ' ') { e.preventDefault(); laesHele(); }
@@ -4029,13 +5440,15 @@
 
   // 🤔 Hvad skete der? (D1): en lille runde med tre opgaver om små historier. Den bruger rundemotoren, men gemmer
   // intet — ingen statistik, ingen gentagelser, intet dyr og ingen lysperle — og fører tilbage til historiesiden.
+  // Tiden tæller med i Historiebogens ur (gemTid springer 🤔 over, så den ikke tælles to gange).
   // Trinnet følger antallet af færdige historier: 0–5 → 1, 6–11 → 2, 12+ → 3.
   function startHistorieQuiz(nr, frit) {
+    gemUr();
+    if (tidOpbrugt()) { visTidBrugt(); return; } // 🤔 er en ny lille runde: tidsgrænsen gælder
     const faerdige = Object.keys(data.historier || {}).filter((k) => data.historier[k] && data.historier[k].faerdig).length;
     const trin = faerdige >= 12 ? 3 : faerdige >= 6 ? 2 : 1;
     const rng = O.lavRng((Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0);
     const verden = DANSK_VERDENER.find((v) => v.id === 'historiebog');
-    S.historie = null;
     S.runde = {
       verden: verden, emne: verden.emne, opgaver: D.lavHistorieQuiz(trin, rng, 3), i: 0, forsoeg: 0, sidstAktiv: Date.now(), aktivMs: 0,
       niveauOp: false, registreret: -1, test: true, quiz: { nr: nr, frit: !!frit }, maerke: { e: '🤔', bestemt: '' },
@@ -4057,34 +5470,47 @@
     Tale.sig('Godt lyttet!', () => setTimeout(() => { if (token === S.token) tilbage(); }, 1600 * TEMPO));
   }
 
-  function gemHistorieTid() {
-    const s = S.historie;
-    if (!s) return;
-    G.dag(data).sek += Math.min(1200, Math.round((Date.now() - s.start) / 1000));
-    s.start = Date.now();
+  // Historiebogen og Bogstavjagt har ingen runde, der tæller aktiv tid, men ét fælles ur: det starter, når delen
+  // åbnes, gemmes ved hvert skærmskift (også ✏️ Skriv og 🤔) og når iPad'en skjules — mens den er skjult, står
+  // uret stille — og stopper på kortet, i 🎒 og ved belønningen. Højst 20 minutter pr. stykke, som før.
+  function startUr() {
+    if (!S.ur) S.ur = { start: document.hidden ? 0 : Date.now(), historie: null };
+  }
+  function gemUr() {
+    const u = S.ur;
+    if (!u || !u.start || !data) return;
+    const nu = Date.now();
+    G.dag(data).sek += Math.min(1200, Math.max(0, Math.round((nu - u.start) / 1000)));
+    u.start = nu;
     gem();
   }
+  function stopUr() { gemUr(); S.ur = null; }
 
-  // En færdig historie (læst, tegnet, skrevet) giver en belønning som en runde
+  // En færdig historie (læst, tegnet, skrevet) giver en belønning som en runde. Fejringen kommer 600 ms efter, og
+  // først dér står historien som færdig: går barnet fra siden inden da (🗺️, 📖, 🤔), kommer belønningen næste gang
   function historieFaerdig(nr, frit) {
-    const hd = historieData(nr);
-    hd.faerdig = true;
-    gemHistorieTid();
+    if (S.runde && S.runde.historie === nr) return; // fejringen er allerede på vej
     const verden = DANSK_VERDENER.find((v) => v.id === 'historiebog');
-    S.runde = {
+    const r = S.runde = {
       verden: verden, emne: 'historie', opgaver: [{ svar: 'læst' }, { svar: 'tegnet' }, { svar: 'skrevet' }], i: 3, forsoeg: 0, frit: !!frit,
       sidstAktiv: Date.now(), aktivMs: 0, niveauOp: false, registreret: -1, historie: nr,
-      maerke: O.maerkeForRunde(T.samling, data.runderIalt, minFigur().e),
+      maerke: O.maerkeForRunde(T.samling, data.runderIalt, minFigur().e, data.maerker),
     };
-    gem();
-    setTimeout(() => afslutRunde(), 600);
+    setTimeout(() => {
+      if (S.runde !== r) return; // barnet gik videre (fx 🤔): uret kører videre, og historien er ikke belønnet endnu
+      stopUr();
+      historieData(nr).faerdig = true; // data kan være læst igen i mellemtiden (storage-hændelse)
+      afslutRunde(); // gemmer
+    }, 600);
   }
 
   // ---------- Tegnefelt: finger og pen (Pointer Events), 6 farver, viskelæder, start forfra ----------
   // Tegningen gemmes som streger i et 500 × 500-gitter (nedskaleret) i IndexedDB — højst 30; den ældste ryger først.
   const FARVER = ['#2b2b2b', '#e5484d', '#2f7de1', '#2fae66', '#f5b82e', '#9b59d0'];
   const MAX_TEGNINGER = 30;
-  function tegnefelt(noegle, efterStreg) {
+  let tegneStop = null; // det tegnefelt, der lytter efter ny størrelse lige nu (stopper det)
+  // ven (valgfri): vennen står til venstre for farverne (Historiebogen)
+  function tegnefelt(noegle, efterStreg, ven) {
     const canvas = h('canvas', { class: 'tegne-canvas', 'aria-label': 'Tegnefelt' });
     let farve = FARVER[0], visk = false;
     let streger = []; // { f: farve, v: visk, p: [[x, y] i 0..500] }
@@ -4097,12 +5523,14 @@
     const forfraKnap = h('button', { class: 'farve-knap forfra', type: 'button', 'aria-label': 'Start forfra', onclick: () => { Lyd.init(); Lyd.tryk(); streger = []; tegnAlt(); gemTegning(); } }, '🗑️');
     const vaelgKnap = (k) => { [...knapper, viskKnap].forEach((x) => x.classList.toggle('valgt', x === k)); };
     const ramme = h('div', { class: 'tegne-ramme' }, canvas);
-    const node = h('div', { class: 'tegne-felt' }, ramme, h('div', { class: 'tegne-vaerktoej' }, knapper, viskKnap, forfraKnap));
+    const vaerktoej = h('div', { class: 'tegne-vaerktoej' }, knapper, viskKnap, forfraKnap);
+    const node = h('div', { class: 'tegne-felt' }, ramme, ven ? h('div', { class: 'tegne-bund' }, ven, vaerktoej) : vaerktoej);
     const ctx2 = () => canvas.getContext('2d');
-    // Feltet er kvadratisk og så stort, som pladsen tillader (også når iPad'en vendes midt i en tegning)
+    // Feltet er kvadratisk og så stort, som pladsen tillader (også når iPad'en vendes midt i en tegning).
+    // Layoutets mål (offsetWidth/-Height), ikke getBoundingClientRect: skærmen kommer ind med scale(0.985), og et mål
+    // midt i den animation gjorde feltet 1,5 % for lille, til iPad'en blev vendt (E)
     function maal() {
-      const r = ramme.getBoundingClientRect();
-      const side = Math.max(120, Math.floor(Math.min(r.width, r.height)));
+      const side = Math.max(120, Math.floor(Math.min(ramme.offsetWidth, ramme.offsetHeight)));
       canvas.style.width = side + 'px'; canvas.style.height = side + 'px';
       const dpr = window.devicePixelRatio || 1;
       const w = Math.round(side * dpr);
@@ -4147,11 +5575,24 @@
         while (ids.length > MAX_TEGNINGER) await KlipLager.slet('tegninger', ids.shift());
       } catch (e) { /* tegningen gemmes bare ikke */ }
     }
-    const ro = window.ResizeObserver ? new ResizeObserver(() => maal()) : null;
+    // Ny størrelse (fx når iPad'en vendes): mål i næste frame, ikke i selve ResizeObserver-kaldet — maal ændrer
+    // lærredets størrelse (samme Safari-fejl som i vedStoerrelse). Der er højst ét tegnefelt på skærmen: starter et
+    // nyt, eller er feltet væk, stopper det gamle med at lytte (uden ResizeObserver hobede resize-lyttere sig op)
+    let ventende = 0, ro = null;
+    const senere = () => {
+      if (!ramme.isConnected) { stop(); return; }
+      if (!ventende) ventende = requestAnimationFrame(() => { ventende = 0; if (ramme.isConnected) maal(); });
+    };
+    function stop() {
+      if (ro) ro.disconnect(); else window.removeEventListener('resize', senere);
+      if (tegneStop === stop) tegneStop = null;
+    }
     return {
       node,
       start() {
-        if (ro) ro.observe(ramme); else window.addEventListener('resize', maal);
+        if (tegneStop) tegneStop();
+        tegneStop = stop;
+        if (window.ResizeObserver) { ro = new ResizeObserver(senere); ro.observe(ramme); } else window.addEventListener('resize', senere);
         maal();
         KlipLager.hent('tegninger', noegle).then((t) => { if (t && Array.isArray(t.streger) && !streger.length) { streger = t.streger; tegnAlt(); } }).catch(() => {});
       },
@@ -4161,12 +5602,18 @@
 
   // ---------- ✏️ Skriv: tastatur (bogstavknapper + fysisk tastatur) eller pen/finger på et prikket forlæg ----------
   function visSkriv(nr, frit, ordNr, maade) {
+    S.runde = null; // en fejring på vej (✏️ lige efter sidste trin) venter, til barnet er tilbage i historien
     const H = D.HISTORIER.find((x) => x.nr === nr);
     const ord = H.skriv[ordNr];
     const hd = historieData(nr);
     const naeste = () => {
       if (ordNr + 1 < H.skriv.length) visSkriv(nr, frit, ordNr + 1, maade);
-      else { hd.skrevet = true; gem(); Lyd.fejring(); visHistorieSide(nr, frit); }
+      else {
+        hd.skrevet = true; gem();
+        // Er historien hermed færdig, kommer fejringen med sin egen lyd og tale (visFejring) — ingen ekstra fejring her
+        if (!(hd.bobler > 0 && hd.tegnet && !hd.faerdig)) Lyd.fejring();
+        visHistorieSide(nr, frit);
+      }
     };
     const e = D.ORD[ord] ? D.ORD[ord].e : '';
     const top = h('div', { class: 'topbar' },
@@ -4201,10 +5648,19 @@
         if (brugt.indexOf(i) >= 0 || skrevet.length >= ord.length) return;
         const b = brikker[i];
         Lyd.init();
-        if (b !== ord[skrevet.length]) { Lyd.blid(); Lyd.klip(D.lydId(ord[skrevet.length]), D.lydReserve(ord[skrevet.length])); return; }
+        if (b !== ord[skrevet.length]) {
+          Forloeb.stop();
+          Forloeb.run({ lyd: 'forkertBlid', klip: D.lydId(ord[skrevet.length]), reserve: D.lydReserve(ord[skrevet.length]) });
+          return;
+        }
+        Forloeb.stop(); // et rigtigt bogstav afløser feedbacken fra et forkert (ellers er låsen optaget, når ordet er færdigt)
         Lyd.tryk();
         brugt.push(i); skrevet += b; vis();
-        if (skrevet === ord) { Lyd.rigtig(); setTimeout(() => { Tale.sig('Ja! ' + ord + '.'); setTimeout(naeste, 1200); }, 300); }
+        if (skrevet === ord) {
+          // Svarets lyd afløser trykket; ordet siges efter lyden, og næste ord kommer tidligst efter 1,5 s som før
+          const t = S.token;
+          Promise.all([Forloeb.run({ lyd: 'rigtig', tekst: 'Ja! ' + ord + '.' }), pause(1500)]).then(() => { if (t === S.token) naeste(); });
+        }
       };
       S.gentagTale = 'Skriv ' + ord + '. Tryk på bogstaverne.';
       skift(h('div', { class: 'skaerm skriv' }, top,
@@ -4269,10 +5725,14 @@
         const r = D.vurderSpor(F.strøg, spor);
         forsoeg++;
         // Ingen straf: «prøv igen» højst én gang — så godkendes det
-        if (r.ok || forsoeg >= 2) { Lyd.rigtig(); Tale.sig(r.ok ? 'Flot skrevet!' : 'Godt øvet!'); setTimeout(naeste, 1300); return; }
-        Lyd.blid();
+        Forloeb.stop();
+        if (r.ok || forsoeg >= 2) {
+          const t = S.token;
+          Promise.all([Forloeb.run({ lyd: 'rigtig', tekst: r.ok ? 'Flot skrevet!' : 'Godt øvet!' }), pause(1300)]).then(() => { if (t === S.token) naeste(); });
+          return;
+        }
         besked.textContent = '';
-        Tale.sig('Prøv igen. Start ved den grønne prik. ' + vej + '.');
+        Forloeb.run({ lyd: 'forkertBlid', tekst: 'Prøv igen. Start ved den grønne prik. ' + vej + '.' });
         spor = []; tegn();
       },
     }, '✔');
@@ -4299,22 +5759,38 @@
     const rng = O.lavRng((Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0);
     const runde = D.lavJagtRunde(D.jagtBogstaver(data.dansk.lyde), trin, rng);
     const langsom = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-    const start = Date.now();
-    const st = { i: 0, point: 0, forsoeg: 0, bobler: [], aktiv: true, rigtige: [], laast: false };
-    st.facit = () => runde[Math.min(st.i, runde.length - 1)].bogstav;
+    startUr();
+    const st = { i: 0, point: 0, forsoeg: 0, bobler: [], aktiv: true, rigtige: [], laast: false, nr: 0 };
+    // Bogstavet, der skal rammes nu. To lyde i rækkefølge (D2): den næste, der ikke er ramt endnu (st.nr)
+    st.facit = () => { const r = runde[Math.min(st.i, runde.length - 1)]; return r.raekke ? r.raekke[Math.min(st.nr, r.raekke.length - 1)] : r.bogstav; };
+    st.boelgen = () => runde[Math.min(st.i, runde.length - 1)];
     S.jagt = st; // til test
     const felt = h('div', { class: 'jagt-felt', 'aria-label': 'Bogstavjagt' });
     const spor = svgEl('svg', { class: 'jagt-spor', 'aria-hidden': 'true' });
     felt.append(spor);
     const pointTal = h('span', { class: 'jagt-point' }, '0');
     const lyde = h('div', { class: 'jagt-lyde', 'aria-hidden': 'true' }, runde.map(() => h('i')));
-    const tilbage = () => { st.aktiv = false; gemJagtTid(); if (frit) visVaelgSelv(); else visKort(false); };
-    // En stille bølge (D1, «boblerne venter på barnet»): «Find de to bobler med» + lyden
+    const tilbage = () => { st.aktiv = false; if (frit) visVaelgSelv(); else visKort(false); };
+    // En stille bølge (D1, «boblerne venter på barnet»): «Find de to bobler med» + lyden.
+    // D2 'raekke': «Find de to lyde i rækkefølge» + lyd 1, kort pause, lyd 2 · D3 'midt': kun sætningen (ordet siges ikke)
     const sigLyd = async () => {
       const r = runde[st.i];
       // Et nyt 🔊/mellemrum afbryder sætningen — så må det ældre kald ikke spille lyden oven i den nye (review #6)
       const n = st.lydGen = (st.lydGen || 0) + 1;
-      if (r.stille === 'alle') { await Tale.sigVent('Find de to bobler med'); if (!st.aktiv || token !== S.token || runde[st.i] !== r || st.lydGen !== n) return; }
+      const stadig = () => st.aktiv && token === S.token && runde[st.i] === r && st.lydGen === n;
+      // … og et klip, der spiller endnu, stoppes, før sætningen begynder (code-review #6)
+      Lyd.stopKlip();
+      if (r.stille === 'midt') return Tale.sigVent('Find bogstavet i midten');
+      if (r.stille === 'raekke') {
+        await Tale.sigVent('Find de to lyde i rækkefølge');
+        if (!stadig()) return;
+        await Lyd.klip(D.lydId(r.raekke[0]), D.lydReserve(r.raekke[0]));
+        if (!stadig()) return;
+        await new Promise((res) => setTimeout(res, 550 * TEMPO));
+        if (!stadig()) return;
+        return Lyd.klip(D.lydId(r.raekke[1]), D.lydReserve(r.raekke[1]));
+      }
+      if (r.stille === 'alle') { await Tale.sigVent('Find de to bobler med'); if (!stadig()) return; }
       return Lyd.klip(D.lydId(r.bogstav), D.lydReserve(r.bogstav));
     };
     S.gentagFn = () => sigLyd();
@@ -4333,10 +5809,6 @@
       const k = e.key.toLowerCase();
       if (k.length === 1 && /[a-zæøå]/.test(k)) { const b = st.bobler.find((x) => !x.ramt && x.b === k); if (b) ram(b); }
     });
-    function gemJagtTid() {
-      G.dag(data).sek += Math.min(1200, Math.round((Date.now() - start) / 1000));
-      gem();
-    }
     const boblePx = () => { const b = felt.querySelector('.jagt-boble'); return b ? b.offsetWidth : 90; };
     // En ny boelge bobler til lyden nu (samme lyd igen, hvis de alle faldt ned uden et ramt)
     function boelge() {
@@ -4344,6 +5816,16 @@
       const r = runde[st.i];
       st.bobler.forEach((b) => b.el.remove());
       st.bobler = [];
+      st.nr = 0;
+      if (st.stilleVis) { st.stilleVis.remove(); st.stilleVis = null; }
+      // D2/D3: over boblerne står de to tomme pladser (rækkefølgen) eller ordet (bogstavet i midten)
+      if (r.stille === 'raekke') {
+        st.stilleVis = h('div', { class: 'jagt-stille-vis raekke', 'aria-hidden': 'true' },
+          h('span', { class: 'jagt-plads' }), h('span', { class: 'jagt-raekke-pil' }), h('span', { class: 'jagt-plads' }));
+      } else if (r.stille === 'midt') {
+        st.stilleVis = h('div', { class: 'jagt-stille-vis midt', 'aria-hidden': 'true' }, r.ord.split('').map((b) => h('span', { class: 'jagt-ord-b' }, b)));
+      }
+      if (st.stilleVis) felt.append(st.stilleVis);
       const w = felt.clientWidth, hh = felt.clientHeight;
       const nu = performance.now();
       st.forkerteStille = 0;
@@ -4352,7 +5834,7 @@
         // Hjælp: efter to boelger uden et ramt lyser det rigtige bogstav
         if (st.forsoeg >= 2 && bogstav === r.bogstav) el.classList.add('hjaelp');
         felt.append(el);
-        if (r.stille === 'alle') {
+        if (r.stille) {
           // Stille bølge: boblerne står jævnt fordelt i tre forskellige højder, så et vandret strøg kun rammer én (review #5)
           const b = { b: bogstav, el: el, stille: { fx: (k + 1) / (r.bobler.length + 1), fy: [0.22, 0.68, 0.45][k % 3] }, t0: nu, ramt: false };
           stilBoble(b, w, hh);
@@ -4361,15 +5843,30 @@
         }
         st.bobler.push({ b: bogstav, el: el, bane: D.lavBane(rng, trin, w, hh, langsom), t0: nu + k * 450 * (langsom ? 1.4 : 1), ramt: false });
       });
-      setTimeout(() => { if (st.aktiv && token === S.token) sigLyd(); }, 150);
+      // Ikke for en bølge, der allerede er klaret (et hurtigt tryk) — så kom lyden først i næste bølge (WebKit-e2e 11-10)
+      setTimeout(() => { if (st.aktiv && token === S.token && !st.laast) sigLyd(); }, 150);
     }
-    // En stille boble står på sin plads i feltet. Banen står stille (samme form som de flyvende, uden fart og tyngde)
+    // En stille boble står på sin plads i feltet. Banen står stille (samme form som de flyvende, uden fart og tyngde).
+    // En boble, der står lige under pladserne/ordet øverst, rykkes ned under dem
     function stilBoble(b, w, hh) {
       const r = boblePx() / 2;
-      const x = w * b.stille.fx, y = Math.max(r + 8, hh * b.stille.fy);
+      const x = w * b.stille.fx;
+      let yMin = r + 8;
+      if (st.stilleVis) {
+        const f = felt.getBoundingClientRect(), v = st.stilleVis.getBoundingClientRect();
+        if (x + r > v.left - f.left - 8 && x - r < v.right - f.left + 8) yMin = v.bottom - f.top + r + 8;
+      }
+      const y = Math.min(Math.max(yMin, hh * b.stille.fy), Math.max(yMin, hh - r - 8));
       b.pos = { x: x, y: y };
       b.bane = { x0: x, y0: y + r, vx: 0, vy: 0, g: 0, T: Infinity };
       b.el.style.transform = 'translate(' + (x - r) + 'px, ' + (y - r) + 'px)';
+    }
+    // Hjælp i en stille bølge (efter to forkerte): den boble, der skal rammes nu, lyser — i 'alle' begge, i 'midt'
+    // også ordets midterste bogstav
+    function stilleHjaelp(r) {
+      const maal = r.raekke ? r.raekke[st.nr] : r.bogstav;
+      st.bobler.forEach((x) => x.el.classList.toggle('hjaelp', !x.ramt && x.b === maal));
+      if (r.stille === 'midt' && st.stilleVis) st.stilleVis.children[1].classList.add('hjaelp');
     }
     // Animationen: hver boble følger sin bue (requestAnimationFrame); når alle er landet, kommer en ny boelge
     function frame(nu) {
@@ -4394,19 +5891,31 @@
     function ram(b) {
       if (st.laast || b.ramt) return;
       const r = runde[st.i];
+      // To lyde i rækkefølge (D2): den, der skal rammes nu, er den næste i rækken — omvendt rækkefølge er forkert
+      const maal = r.raekke ? r.raekke[st.nr] : r.bogstav;
       // Forkert: boblen ryster og flyver videre — ingen straf, men det tæller ikke som rigtigt i første forsøg
-      if (b.b !== r.bogstav) {
+      if (b.b !== maal) {
         st.forkertHer = true; b.el.classList.remove('forbi'); void b.el.offsetWidth; b.el.classList.add('forbi');
-        // Stille bølge: efter to forkerte lyser de rigtige
-        if (r.stille === 'alle' && ++st.forkerteStille >= 2) st.bobler.forEach((x) => { if (!x.ramt && x.b === r.bogstav) x.el.classList.add('hjaelp'); });
+        // Stille bølge: efter to forkerte lyser den, der skal rammes nu
+        if (r.stille && ++st.forkerteStille >= 2) stilleHjaelp(r);
         return;
       }
       b.ramt = true;
       b.el.classList.add('delt');
-      Lyd.pling();
+      // To lyde i rækkefølge: den første får kun et kort tik — plinget (ca. 0,9 s) dækkede lyd nr. 2 (code-review #6)
+      if (r.raekke && st.nr === 0) Lyd.tael(); else Lyd.pling();
       // Stille bølge: begge bobler med lyden skal rammes, før der er point og en ny lyd
       if (r.stille === 'alle' && st.bobler.some((x) => !x.ramt && x.b === r.bogstav)) return;
+      // Rækkefølgen: bogstavet lægges på sin plads; først når begge er ramt, er der point
+      if (r.raekke) {
+        const plads = st.stilleVis ? st.stilleVis.querySelectorAll('.jagt-plads')[st.nr] : null;
+        if (plads) { plads.textContent = b.b; plads.classList.add('fyldt'); }
+        st.nr++;
+        if (st.nr < r.raekke.length) { if (st.forkerteStille >= 2) stilleHjaelp(r); return; }
+      }
+      if (r.stille === 'midt' && st.stilleVis) { const m = st.stilleVis.children[1]; m.classList.remove('hjaelp'); m.classList.add('fundet'); }
       st.laast = true;
+      Lyd.stopKlip(); // bølgens lyd er forbi — et klip, der stadig hentes, må ikke lyde i næste bølge
       st.point++;
       pointTal.textContent = String(st.point);
       lyde.children[st.i].classList.add('fuld');
@@ -4431,11 +5940,12 @@
     function slut() {
       st.aktiv = false;
       st.bobler.forEach((b) => b.el.remove());
-      gemJagtTid();
+      if (st.stilleVis) { st.stilleVis.remove(); st.stilleVis = null; }
+      stopUr();
       S.runde = {
         verden: verden, emne: 'jagt', opgaver: runde.map((x) => ({ svar: x.bogstav })), i: runde.length, forsoeg: 0, frit: !!frit,
         sidstAktiv: Date.now(), aktivMs: 0, niveauOp: false, registreret: -1,
-        maerke: O.maerkeForRunde(T.samling, data.runderIalt, minFigur().e),
+        maerke: O.maerkeForRunde(T.samling, data.runderIalt, minFigur().e, data.maerker),
       };
       afslutRunde();
     }
@@ -4483,15 +5993,16 @@
 
   // Til test og voksendelen. _testRunde viser bestemte opgaver (bruges kun af test/test-e2e.js).
   window.Spil = {
-    FIGURER, VERDENER, S, get data() { return data; }, _lyd: Lyd,
+    FIGURER, VERDENER, S, get data() { return data; }, _lyd: Lyd, _palet: Palet, _forloeb: Forloeb,
     _pause: { BEVAEGELSER, PAUSE_INTRO, SPRING_EFTER, pauseOevelser, vis: () => visBevaegelse(() => visKort(false)) },
     DANSK_VERDENER,
     _visHistorie(nr) { visHistorieSide(nr, true); },
     _startVerden(id, frit) { startRunde(alleVerdener().find((v) => v.id === id), { frit: !!frit }); },
     _visLektion(verdenId) { const v = alleVerdener().find((x) => x.id === verdenId); visLektion(v, () => visKort(false), () => visKort(false)); },
-    _testRunde(verdenId, opgaver) {
+    // ekstra (valgfri): fx { quiz: { nr: 1, frit: true } } — runden opfører sig som Historiebogens 🤔-runde (gemmer intet)
+    _testRunde(verdenId, opgaver, ekstra) {
       const verden = alleVerdener().find((v) => v.id === verdenId) || alleVerdener().find((v) => v.emne === verdenId); // verdens-id eller emne
-      S.runde = { verden: verden, emne: verden.emne, opgaver: opgaver, i: 0, forsoeg: 0, sidstAktiv: Date.now(), aktivMs: 0, niveauOp: false, registreret: -1, test: true, maerke: O.maerkeForRunde(T.samling, data.runderIalt, minFigur().e) };
+      S.runde = Object.assign({ verden: verden, emne: verden.emne, opgaver: opgaver, i: 0, forsoeg: 0, sidstAktiv: Date.now(), aktivMs: 0, niveauOp: false, registreret: -1, test: true, maerke: O.maerkeForRunde(T.samling, data.runderIalt, minFigur().e, data.maerker) }, ekstra || {});
       visRundeSkaerm();
     },
   };

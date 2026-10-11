@@ -59,6 +59,7 @@
       sidsteVerden: null,
       dage: {},             // 'ÅÅÅÅ-MM-DD' → { sek, runder, opgaver, rigtige }
       pauset: null,         // afbrudt mission { verden, i, opgaver, niveauOp, registreret } — fortsætter næste gang
+      // pausetDansk (valgfrit, fund 5, Jimmy 11-10-2026): dansk's afbrudte mission, samme form; mangler = ingen
       lektioner: {},        // verdensId → true, når verdenens lektion er vist (B2)
       dansk: {},            // dansk-emneId → standardEmne() — samme form som emner (B4)
       fag: null,            // 'matematik' | 'dansk' — det sidste valg (null: barnet har ikke valgt endnu)
@@ -189,6 +190,11 @@
       }
     }
     ud.pauset = normaliserPauset(d.pauset);
+    // Dansk har sin egen afbrudte mission i et valgfrit felt: ødelagt → slettes (ingen migrering, pauset flyttes ikke)
+    if (Object.prototype.hasOwnProperty.call(d, 'pausetDansk')) {
+      const p = normaliserPauset(d.pausetDansk);
+      if (p) ud.pausetDansk = p; else delete ud.pausetDansk;
+    }
     return ud;
   }
 
@@ -437,7 +443,7 @@
           // Børnenes gentagelsesopgaver og en afbrudt mission er hele opgaveobjekter. Fra en fil kan de være
           // ufuldstændige (runden kan gå i stå) — de droppes. Man mister kun et par opgaver, der skulle gentages.
           // Voksnes gentagelser er kun parametre (type, niveau, frø) og bygges igen af koden — de må gerne komme med.
-          if (!voksen) { nye[k].gentag = {}; nye[k].pauset = null; }
+          if (!voksen) { nye[k].gentag = {}; nye[k].pauset = null; delete nye[k].pausetDansk; }
           if (kendte) tilKendte(nye[k], kendte, voksen);
         } catch (e) { /* springes over */ }
       }

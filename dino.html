@@ -8,19 +8,20 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Dino">
-<meta name="theme-color" content="#2f9a5c">
+<meta name="theme-color" content="#367047">
 <title>Lystårnet — Dino</title>
 <link rel="manifest" href="manifest-dino.json">
 <link rel="apple-touch-icon" href="ikoner/dino-180.png">
 <link rel="icon" type="image/png" href="ikoner/dino-192.png">
 <link rel="stylesheet" href="app.css">
 <style>
-  /* Dinoens farver: jungle */
+  /* Dinoens farver (fase A): bladgrøn til handling og fokus, varm orange til materialer og lys */
   :root {
-    --farve-1: #2f9a5c; --farve-1-lys: #8ed8a6; --farve-1-moerk: #1d6b3e;
-    --farve-2: #ff9a1f; --farve-2-lys: #ffc46b; --farve-2-moerk: #d06a00;
-    --baggrund-1: #fff6df; --baggrund-2: #d6efc4;
-    --tekst: #283a2c; --sti: #a8743a; --sti-kant: #f0d8a4;
+    --farve-1: #367047; --farve-1-lys: #c7ddb4; --farve-1-moerk: #264f35;
+    --farve-2: #edb561; --farve-2-lys: #f6d9a6; --farve-2-moerk: #814915;
+    --baggrund-1: #f3f8ec; --baggrund-2: #dfecd0;
+    --tekst: #203c32; --sti: #a8743a; --sti-kant: #ddd2b8;
+    --kontur: #33493c; --paa-farve-2: #6a3a0e;
   }
 </style>
 <script>
@@ -34,7 +35,10 @@
 <script src="opgaver.js" defer></script>
 <script src="gem.js" defer></script>
 <script src="lydklip.js" defer></script>
+<script src="lydpalet.js" defer></script>
+<script src="feedback-forloeb.js" defer></script>
 <script src="dansk-opgaver.js" defer></script>
+<script src="grafik.js" defer></script>
 <script src="app.js" defer></script>
 </head>
 <body><main id="app"></main></body>

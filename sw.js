@@ -1,8 +1,8 @@
 /* sw.js — service worker, så spillet virker uden net.
    Ved hver ny udgave: tæl VERSION op. Filerne hentes med cache: 'reload',
    så GitHub Pages' HTTP-cache ikke giver en blanding af gamle og nye filer. */
-const VERSION = 'mat-2026-10-11-v73';
-// FILER-HASH: 8525e6b21bba2571 mat-2026-10-11-v73 — opdateres med: node test/test-sw.js --opdater
+const VERSION = 'mat-2026-10-11-v112';
+// FILER-HASH: 6372ba21bd0e11e6 mat-2026-10-11-v112 — opdateres med: node test/test-sw.js --opdater
 const FILER = [
   './',
   'index.html',
@@ -19,7 +19,10 @@ const FILER = [
   'voksen.js',
   'voksen-opgaver.js',
   'lydklip.js',
+  'lydpalet.js',
+  'feedback-forloeb.js',
   'dansk-opgaver.js',
+  'grafik.js', // tegningerne (fase A): venner, verdener, tårnet, kortet og samledyrene
   'lyd/liste.json', // listen over indtalte klip i lyd/ (læg også hver .wav-fil på FILER-listen)
   // Jimmys indtalte bogstavlyde (10-10-2026), skåret til med vaerktoej/klip-lyde.js
   'lyd/lyd-a.wav', 'lyd/lyd-a-kort.wav', 'lyd/lyd-aa.wav', 'lyd/lyd-ae.wav', 'lyd/lyd-b.wav', 'lyd/lyd-c.wav',

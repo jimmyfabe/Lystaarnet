@@ -1,6 +1,6 @@
 /* app.css — al stil til Matematikspillet («Lystårnet»).
-   Temafarverne (--farve-1, --farve-2, --baggrund-1 …) sættes KUN i skallerne.
-   Her står kun faste, temauafhængige farver (guld, tællebrikker, rigtig-grøn). */
+   Temafarverne (--farve-1, --farve-2, --baggrund-1, --kontur …) sættes KUN i skallerne.
+   Her står kun faste, temauafhængige farver (guld, tællebrikker, rigtig-grøn, tegningernes lys og vand). */
 
 :root {
   --hvid: #fffdf8;
@@ -15,6 +15,13 @@
   --slukket: #cfc6bb;
   --skygge: rgba(70, 45, 20, 0.18);
   --skygge-stor: rgba(70, 45, 20, 0.28);
+  /* Tegningerne (grafik.js): lys i tårnet, vand og kinder er ens i begge temaer */
+  --lys: #f0c863;
+  --vand: #cbdde0;
+  --kinder: #d99584;
+  --kontur: #33493c;
+  /* Tegn og tekst på en flade i --farve-2 (▶): skallerne sætter en mørk farve, når --farve-2 er lys */
+  --paa-farve-2: var(--hvid);
   /* Figurernes farver i Formbyen (faste, så «den røde trekant» altid er rød) */
   --form-0: #e5484d; --form-1: #2f7de1; --form-2: #f5b82e; --form-3: #2fae66; --form-4: #9b59d0; --form-5: #f08a3c;
 
@@ -63,7 +70,8 @@ button, a.ikon-knap {
   -webkit-tap-highlight-color: transparent;
 }
 button { cursor: pointer; }
-button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-offset: 3px; }
+button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline-offset: 3px; }
+.historie button:focus-visible { outline-color: #fff7e0; } /* mørk nattehimmel */
 
 .skjult { display: none !important; } /* NB: «?»-feltet i talstreg/mønster hedder .hul — ikke .skjult */
 
@@ -97,6 +105,7 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
   text-overflow: ellipsis;
 }
 .topbar-hoejre { display: flex; gap: 12px; }
+.titel-ikon .verden-tegning { display: inline-block; width: 1.4em; height: 1.4em; vertical-align: -0.35em; }
 /* Tom plads i stedet for en knap, så titlen står i midten. Den giver sig først, hvis titlen ellers ikke kan være der. */
 .topbar-plads { flex: 0 1 var(--ikon); min-width: 0; }
 .kort .topbar-titel { flex: 1 0 auto; } /* barnets navn og perlerne skæres aldrig af — pladsen giver sig i stedet */
@@ -128,8 +137,8 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
   border: none;
   border-radius: 50%;
   font-size: clamp(48px, 8vmin, 70px);
-  color: var(--hvid);
-  background: radial-gradient(circle at 35% 30%, var(--farve-2-lys), var(--farve-2) 60%, var(--farve-2-moerk));
+  color: var(--paa-farve-2);
+  background: radial-gradient(circle at 35% 30%, var(--farve-2-lys), var(--farve-2) 65%);
   box-shadow: 0 7px 0 var(--farve-2-moerk), 0 12px 24px var(--skygge-stor);
   display: inline-flex;
   align-items: center;
@@ -192,6 +201,8 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
 .start .advarsel-knap { position: absolute; top: 14px; right: 16px; }
 .fyrtaarn { display: inline-block; width: 1em; height: 1.2em; vertical-align: -0.2em; }
 .fyrtaarn svg { width: 100%; height: 100%; display: block; }
+/* Lystårnet fra grafik.js er tegnet i et kvadrat (lysstrålerne går ud til siderne) */
+.fyrtaarn.med-tegning { width: 1.2em; }
 .index-titel .fyrtaarn { margin-right: 0.2em; }
 .start-taarn { font-size: clamp(50px, 9vmin, 90px); }
 .station-ikon.fyrtaarn { width: calc(var(--s) * 0.5); height: calc(var(--s) * 0.6); }
@@ -210,6 +221,15 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
   margin-bottom: 2vmin;
 }
 .spil-knap { width: clamp(130px, 22vmin, 190px); height: clamp(130px, 22vmin, 190px); font-size: clamp(64px, 11vmin, 96px); }
+/* Telefonen på langs (ca. 390 px høj): mindsteværdierne ovenfor (130 px figur + 130 px ▶) fylder mere end skærmen —
+   ▶ blev skåret af forneden, og tårnet ramte toppen (ui-review 11-10). Her følger alt højden, i alt ca. 82 % af den */
+@media (orientation: landscape) and (max-height: 500px) {
+  .start { gap: 1.5vh; }
+  .start-taarn { font-size: 11vh; }
+  .start-figur { font-size: 25vh; }
+  .start-navn { font-size: 9vh; margin-bottom: 0; }
+  .start .spil-knap, .historie .spil-knap { width: max(88px, 24vh); height: max(88px, 24vh); font-size: max(44px, 12vh); }
+}
 
 /* ---------- Vælg ven ---------- */
 .figur-liste {
@@ -238,13 +258,37 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
 .figur-emoji { font-size: clamp(70px, 12vmin, 120px); line-height: 1.1; }
 .figur-navn { font-size: clamp(20px, 3vmin, 28px); font-weight: 800; color: var(--farve-1-moerk); }
 .figur-knap.hop .figur-emoji { animation: hop 0.5s; }
-.ok-knap { position: absolute; right: 4vmin; bottom: 4vmin; background: radial-gradient(circle at 35% 30%, #4fbf7c, var(--rigtig) 55%, var(--rigtig-moerk)); box-shadow: 0 7px 0 var(--rigtig-moerk), 0 12px 24px var(--skygge-stor); }
+.figur-emoji .ven-tegning { width: 1.3em; height: 1.3em; margin: 0; }
+
+/* ---------- Rejsevennerne som tegning (grafik.js) ----------
+   Tegningen er lige så stor som emojien, den erstatter (1em = feltets skriftstørrelse), så pladsen er den samme.
+   Hvert udtryk er sin egen tegning (grafik.vennerUdtryk; app.js bytter tegningen). Reglerne for .udtryk-* gælder kun
+   reserven (grafik.venner: glad, taenker og jubler på samme tegning — andre udtryk vises som glad). */
+.ven-tegning { display: inline-block; width: 1.1em; height: 1.1em; margin-block: -0.05em; vertical-align: bottom; overflow: visible; } /* fylder 1em i linjen som emojien */
+.ven-tegning .udtryk-taenker, .ven-tegning .udtryk-jubler { display: none; }
+.ven-tegning[data-udtryk="taenker"] .udtryk-glad, .ven-tegning[data-udtryk="jubler"] .udtryk-glad { display: none; }
+.ven-tegning[data-udtryk="taenker"] .udtryk-taenker, .ven-tegning[data-udtryk="jubler"] .udtryk-jubler { display: inline; }
+.ven-tegning .figur { transform-box: fill-box; transform-origin: center bottom; }
+/* Én jubel på 480 ms, når lyd og tale er færdige (fejrEnGang i app.js) — aldrig i løkke */
+.ven-tegning.fejr-en-gang .figur { animation: venJubel 480ms ease-out 1; }
+@keyframes venJubel {
+  0%, 100% { transform: translateY(0); }
+  45% { transform: translateY(-16px) rotate(-4deg); }
+  70% { transform: translateY(-4px) rotate(3deg); }
+}
+@media (prefers-reduced-motion: reduce) { .ven-tegning.fejr-en-gang .figur { animation: none; } }
+.kort-ven .ven-tegning { width: 100%; height: 100%; margin: 0; }
+.ok-knap { position: absolute; right: 4vmin; bottom: 4vmin; color: var(--hvid); background: radial-gradient(circle at 35% 30%, #4fbf7c, var(--rigtig) 55%, var(--rigtig-moerk)); box-shadow: 0 7px 0 var(--rigtig-moerk), 0 12px 24px var(--skygge-stor); }
 @media (orientation: portrait) {
   .ok-knap { position: static; align-self: center; margin-bottom: 5vmin; }
 }
 
 /* ---------- Verdenskort ---------- */
 .kort-flade { position: relative; flex: 1; margin: 0 8px 8px; }
+/* Landskabet bag stien (grafik.js): beskåret til kortets form, aldrig noget, man kan trykke på */
+.kort-baggrund { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; clip-path: inset(0 round var(--radius)); opacity: 0.6; }
+/* Tegningens egen sti (de to brede streger) skjules: stien mellem stationerne er kortets rigtige sti (placer() i app.js) */
+.kort-baggrund path[stroke-width="40"], .kort-baggrund path[stroke-width="28"] { display: none; }
 .kort-sti { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 .kort-sti .sti-kant { fill: none; stroke: var(--sti-kant); stroke-width: 34; stroke-linecap: round; stroke-linejoin: round; opacity: 0.55; }
 .kort-sti .sti-midte { fill: none; stroke: var(--sti); stroke-width: 7; stroke-dasharray: 2 18; stroke-linecap: round; }
@@ -270,6 +314,10 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
 .station-ikon { font-size: calc(var(--s) * 0.5); line-height: 1; }
 .station.laast { background: var(--slukket); box-shadow: 0 5px 0 #a99d90, 0 8px 14px var(--skygge); --s: clamp(64px, 9.5vmin, 96px); }
 .station.laast .station-ikon { filter: grayscale(1); opacity: 0.55; }
+/* Verdenernes ikoner (grafik.js): en lys skive med tegningen — tegningens farver forsvinder ikke i stationens farve */
+.station-ikon.med-tegning { width: calc(var(--s) * 0.7); height: calc(var(--s) * 0.7); border-radius: 50%; background: var(--papir); }
+.verden-tegning { display: block; width: 100%; height: 100%; }
+.station.laast .station-ikon.med-tegning { opacity: 0.7; }
 .station-laas { position: absolute; right: -6px; bottom: -6px; font-size: calc(var(--s) * 0.32); }
 .station.anbefalet { border-color: var(--guld); box-shadow: 0 6px 0 var(--farve-1-moerk), 0 0 0 8px rgba(255, 200, 61, 0.45), 0 12px 22px var(--skygge-stor); }
 .station-navn {
@@ -329,6 +377,7 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
   bottom: 2vmin;
   z-index: 4;
 }
+.kort-spil-ikon .verden-tegning { width: 1.2em; height: 1.2em; }
 .kort-spil-ikon {
   position: absolute;
   top: -10px;
@@ -417,6 +466,7 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
 }
 .runde-ven.glad { animation: hop 0.6s; }
 .visning-panel.med-hjaelp .runde-ven { display: none; }
+.runde-ven.paa-broen { opacity: 0; transition: opacity 0.3s; } /* Skovbroen: vennen går over broen i stedet */
 .runde-ven.taenk { animation: vip 0.7s; }
 
 @media (orientation: portrait) {
@@ -640,23 +690,23 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
 /* ---------- Fase 2: nye visninger ---------- */
 .krokodille { font-size: clamp(110px, 22vmin, 220px); font-size: min(220px, 40cqw, 50cqh); line-height: 1; animation: svaev 2.6s ease-in-out infinite; }
 
-/* Minus: det, der forsvinder, bliver gennemsigtigt med et kryds */
+/* Minus: det, der forsvinder, bliver gennemsigtigt med et kryds. Krydset tegnes fra hjørne til hjørne i tingens boks
+   (to skrå streger) — ikke som et tegn efter skriftstørrelsen, der stak ud over smalle ting (ui-review #5) */
 .vaek { position: relative; opacity: 0.35; filter: grayscale(0.6); transition: opacity 0.4s, transform 0.4s; }
 .vaek::before {
-  content: '✕';
+  --streg: max(1.5px, 0.09em);
+  content: '';
   position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1em;
-  font-style: normal;
+  inset: 6%;
+  pointer-events: none;
   color: var(--tekst);
   opacity: 0.9;
+  background:
+    linear-gradient(to top right, transparent calc(50% - var(--streg)), currentColor calc(50% - var(--streg)), currentColor calc(50% + var(--streg)), transparent calc(50% + var(--streg))),
+    linear-gradient(to bottom right, transparent calc(50% - var(--streg)), currentColor calc(50% - var(--streg)), currentColor calc(50% + var(--streg)), transparent calc(50% + var(--streg)));
 }
 .vaek-helt { opacity: 0.3; transform: translateY(6px) scale(0.9); }
 .klods.vaek { background: transparent; border: 2px dashed var(--tekst); box-shadow: none; }
-.vaek::before { font-weight: 900; font-size: 1.2em; }
 
 /* Tierstænger og enere */
 .staenger { display: flex; align-items: flex-end; gap: clamp(6px, 1.4vmin, 14px); --k: clamp(14px, 3vmin, 30px); }
@@ -830,6 +880,13 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
 /* Mens hjælpen viser, hviler svarknapperne synligt (tryk gør ingenting) */
 .svar-panel.venter { opacity: 0.55; pointer-events: none; transition: opacity 0.3s; }
 .tl-figur { position: absolute; top: -20px; left: 0; transform: translateX(-50%); font-size: clamp(30px, 5vmin, 46px); line-height: 1; transition: left 0.35s ease-out; }
+/* Telefonen på langs: en lavere tallinje i hjælpen (buerne er 34 px), så scenen over den ikke presses ned i en lille
+   størrelse (ui-review #4: toTrin, tingene ca. 18 px) */
+@media (orientation: landscape) and (max-height: 500px) {
+  .hjaelp-felt .tallinje { padding-top: 40px; }
+  .hjaelp-felt .tl-streg { height: 8px; }
+  .hjaelp-felt > .tallinje { margin-bottom: 4px; }
+}
 
 /* Svarknapper med grupper (flest/færrest) og ord (lige/ulige) */
 /* «Hvor er der flest?»: grupperne er selve opgaven — svarkortene får det meste af pladsen */
@@ -876,7 +933,8 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
 .fund-dyr { position: relative; z-index: 1; border: none; background: transparent; padding: 0; font-size: var(--dyr); line-height: 1; transition: filter 0.4s; }
 .fund-dyr.skygge { filter: brightness(0) opacity(0.55); animation: vrik 1.6s ease-in-out infinite; }
 /* Tegnet for «tryk her»: en lys skive med ring bag skyggen (så strålerne ikke bryder omridset op)
-   og en hånd, der peger. Begge kommer frem efter 0,8 s — samtidig med stemmen, der siger det. */
+   og en hånd, der peger. Begge kommer frem samtidig med stemmen, der siger det: efter 0,8 s uden lyd, og efter 1,7 s, når
+   fejringens lyd spiller først (app.js sætter --ring-ind og --ring-puls på .fund). */
 .fund-ring {
   position: absolute;
   left: 50%;
@@ -887,9 +945,9 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
   border-radius: 50%;
   background: rgba(255, 253, 248, 0.82);
   border: 6px solid var(--farve-2);
-  animation: dukOp 0.4s ease-out 0.8s both;
+  animation: dukOp 0.4s ease-out var(--ring-ind, 0.8s) both;
 }
-.fund-ring::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 6px solid var(--farve-2); opacity: 0; animation: ringUd 1.6s ease-out 1.2s infinite; }
+.fund-ring::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 6px solid var(--farve-2); opacity: 0; animation: ringUd 1.6s ease-out var(--ring-puls, 1.2s) infinite; }
 .fund-haand {
   position: absolute;
   z-index: 2;
@@ -899,7 +957,7 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
   line-height: 1;
   transform: rotate(-30deg);
   filter: drop-shadow(0 3px 3px var(--skygge-stor));
-  animation: dukOp 0.4s ease-out 0.8s both, peg 1.1s ease-in-out 1.2s infinite;
+  animation: dukOp 0.4s ease-out var(--ring-ind, 0.8s) both, peg 1.1s ease-in-out var(--ring-puls, 1.2s) infinite;
 }
 @keyframes dukOp { from { opacity: 0; } to { opacity: 1; } }
 @keyframes ringUd { from { transform: scale(1); opacity: 0.8; } to { transform: scale(1.3); opacity: 0; } }
@@ -934,12 +992,14 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
 
 /* ---------- Lystårnet: lysperler og historien ---------- */
 .start-taarn-knap { position: relative; border: none; background: transparent; padding: 6px 10px; border-radius: 22px; }
-.start-taarn-knap .fyrtaarn, .fejring-perle .fyrtaarn { filter: drop-shadow(0 0 calc(var(--lys, 0) * 22px) rgba(255, 214, 90, calc(0.3 + var(--lys, 0) * 0.7))); }
-.perle-tal { font-size: clamp(18px, 2.8vmin, 26px); font-weight: 900; color: var(--guld-moerk); margin-left: 4px; white-space: nowrap; }
+.start-taarn-knap .fyrtaarn, .fejring-perle .fyrtaarn { filter: drop-shadow(0 0 calc(var(--lysstyrke, 0) * 22px) rgba(255, 214, 90, calc(0.3 + var(--lysstyrke, 0) * 0.7))); }
+.perle-tal { font-size: clamp(18px, 2.8vmin, 26px); font-weight: 900; color: var(--farve-2-moerk); margin-left: 4px; white-space: nowrap; }
 .perle-tal.lille { font-size: clamp(17px, 2.4vmin, 22px); }
 .start-taarn-knap .perle-tal { position: absolute; right: -36px; bottom: 4px; }
 .fejring-perle { font-size: clamp(36px, 7vmin, 64px); display: flex; align-items: center; gap: 4px; }
 .fejring-perle { margin-bottom: 1.5vmin; }
+/* Lystårnet er det store i venstre spalte (ui-review 11-10: det var kun ca. 60 px på iPad) */
+.fejring-perle .fyrtaarn { width: clamp(64px, 13vmin, 130px); height: clamp(64px, 13vmin, 130px); }
 .fejring-perle .perle-tal { font-size: max(18px, 0.45em); color: var(--farve-1-moerk); }
 .fejring-perle.gloed .fyrtaarn { animation: gloed 1.2s ease-out; }
 @keyframes gloed { 0% { transform: scale(1); } 30% { transform: scale(1.3); filter: drop-shadow(0 0 28px rgba(255, 214, 90, 1)); } 100% { transform: scale(1); } }
@@ -949,7 +1009,7 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
 .historie { align-items: center; justify-content: center; gap: 3vmin; padding: 20px; background: linear-gradient(180deg, #1f2a4d, #3b3f73 60%, #5b4f7a); }
 .historie-top { position: absolute; top: 0; left: 0; right: 0; justify-content: flex-end; } /* uden for flowet: teksten bliver midt på skærmen */
 .historie-himmel { position: relative; width: clamp(160px, 30vmin, 260px); height: clamp(170px, 32vmin, 280px); display: flex; align-items: flex-end; justify-content: center; }
-.historie-taarn { font-size: clamp(120px, 24vmin, 210px); filter: drop-shadow(0 0 calc(8px + var(--lys, 0) * 30px) rgba(255, 214, 90, 0.8)); }
+.historie-taarn { font-size: clamp(120px, 24vmin, 210px); filter: drop-shadow(0 0 calc(8px + var(--lysstyrke, 0) * 30px) rgba(255, 214, 90, 0.8)); }
 .historie-perler i { position: absolute; left: 50%; top: 22%; width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fffbe0, var(--guld)); box-shadow: 0 0 14px var(--guld); animation: perleFlyv 3.2s ease-out calc(var(--i) * 0.25s) infinite; }
 @keyframes perleFlyv {
   0% { transform: translate(-50%, 0) scale(0.6); opacity: 0; }
@@ -957,6 +1017,13 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
   100% { transform: translate(calc(-50% + (var(--i) - 3) * 42px), calc(-60px - var(--i) * 6px)) scale(1); opacity: 0; }
 }
 .historie-tekst { max-width: 680px; margin: 0; font-size: clamp(20px, 3.2vmin, 30px); line-height: 1.45; font-weight: 700; color: #fff7e0; text-align: center; }
+/* Telefonen på langs: himlen (mindst 170 px), teksten og ▶ (130 px) var højere end skærmen (ui-review 11-10) */
+@media (orientation: landscape) and (max-height: 500px) {
+  .historie { gap: 2vh; padding: 10px 20px; }
+  .historie-himmel { width: 30vh; height: 30vh; }
+  .historie-taarn { font-size: 22vh; }
+  .historie-tekst { font-size: 18px; line-height: 1.35; }
+}
 
 /* ---------- Bevægelsespause ---------- */
 .pause { background: linear-gradient(165deg, var(--baggrund-1), var(--baggrund-2)); }
@@ -1021,6 +1088,8 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
 }
 .samle-felt.mangler { background: rgba(255, 253, 248, 0.5); box-shadow: inset 0 0 0 3px rgba(0, 0, 0, 0.06); }
 .samle-emoji { font-size: clamp(52px, 8vmin, 80px); line-height: 1; }
+/* Samledyrene som tegning (grafik.js): lige så store som emojien — skyggen (brightness(0)) virker også på tegningen */
+.dyr-tegning { display: inline-block; width: 1.1em; height: 1.1em; vertical-align: bottom; }
 .samle-felt.mangler .samle-emoji { filter: brightness(0); opacity: 0.18; }
 .samle-felt.naeste { box-shadow: inset 0 0 0 4px var(--guld); animation: puls 2s ease-in-out infinite; }
 .samle-felt.naeste .samle-emoji { opacity: 0.32; }
@@ -1185,7 +1254,10 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
   .voksen-valg.antal-3 { grid-template-columns: 1fr; }
 }
 @media (max-width: 600px) {
-  .voksen-valg { grid-template-columns: 1fr; }
+  /* minmax(0, …): en bred formel (fx søjlevektorer i Lær VII.3) må ikke gøre kolonnen bredere end skærmen (E) */
+  .voksen-valg { grid-template-columns: minmax(0, 1fr); }
+  .voksen-valg-knap { padding: 12px 10px; }
+  .voksen-valg-knap math { font-size: 1.1em; }
 }
 
 /* Børnedelen: dagens tid er brugt */
@@ -1246,12 +1318,13 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
 .stil-ur { position: relative; flex: 0 0 auto; width: min(540px, 88vw, 62vh); aspect-ratio: 1; container-type: inline-size; }
 @supports (width: 1cqw) { .stil-ur { width: min(540px, 100cqw, 100cqh); } }
 .stil-ur .ur-svg { width: 100%; height: 100%; }
-/* Målene ligger oven på tallene 12, 3, 6 og 9 og viser selv tallet (mindst 64 px) */
+/* Målene ligger oven på tallene (12, 3, 6 og 9 — Urværkstedet trin 1: timetallene) og viser selv tallet. 17 % (mindst
+   56 px): to nabotal står kun 18 % fra hinanden, så en større ring dækkede tallene ved siden af (ui-review 11-10) */
 .stil-ur .valg-knap.stil-maal {
   position: absolute;
-  left: calc(var(--x) * 1% - max(32px, 10%));
-  top: calc(var(--y) * 1% - max(32px, 10%));
-  width: max(64px, 20%);
+  left: calc(var(--x) * 1% - max(28px, 8.5%));
+  top: calc(var(--y) * 1% - max(28px, 8.5%));
+  width: max(56px, 17%);
   height: auto;
   aspect-ratio: 1;
   min-height: 0;
@@ -1263,7 +1336,7 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
   border: 5px solid var(--farve-1);
   border-radius: 50%;
   font-size: clamp(26px, 6vmin, 56px);
-  font-size: max(26px, 11cqw);
+  font-size: max(24px, 9.5cqw);
   line-height: 1;
   box-shadow: 0 4px 0 var(--farve-1-moerk);
 }
@@ -1347,6 +1420,8 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
   gap: 8px;
 }
 .vaelg-gruppe-titel span { font-size: 1.3em; }
+/* Vennen udforsker ved den første overskrift (til højre, står på gitteret) */
+.vaelg-gruppe-titel .vaelg-ven { margin-left: auto; font-size: clamp(50px, 8vmin, 76px); line-height: 1; margin-bottom: -4px; }
 .vaelg-gitter {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(clamp(146px, 19vmin, 190px), 1fr));
@@ -1371,6 +1446,7 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
 .vaelg-emne:active { transform: translateY(4px) scale(0.97); }
 .vaelg-emne .station-ikon { font-size: clamp(44px, 7.5vmin, 76px); }
 .vaelg-emne .station-ikon.fyrtaarn { width: clamp(40px, 6vmin, 64px); height: clamp(48px, 7.5vmin, 76px); }
+.vaelg-emne .station-ikon.med-tegning { width: clamp(48px, 8vmin, 82px); height: clamp(48px, 8vmin, 82px); }
 .vaelg-navn {
   font-size: clamp(17px, 2.3vmin, 21px);
   font-weight: 800;
@@ -1475,12 +1551,14 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
   aspect-ratio: 1;
   border: 6px solid var(--hvid);
   border-radius: 40px;
-  background: radial-gradient(circle at 35% 30%, var(--farve-1-lys), var(--farve-1) 75%);
+  /* Det lyse skær holdes øverst: navnet nederst står på --farve-1 (hvid tekst ≥ 4,5:1) */
+  background: radial-gradient(circle at 35% 22%, var(--farve-1-lys), var(--farve-1) 42%);
   box-shadow: 0 9px 0 var(--farve-1-moerk), 0 16px 30px var(--skygge);
   color: var(--hvid);
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2vmin;
 }
-.fag-kort.dansk { background: radial-gradient(circle at 35% 30%, var(--farve-2-lys), var(--farve-2) 75%); box-shadow: 0 9px 0 var(--farve-2-moerk), 0 16px 30px var(--skygge); }
+.fag-kort.dansk { color: var(--paa-farve-2); background: radial-gradient(circle at 35% 22%, var(--farve-2-lys), var(--farve-2) 42%); box-shadow: 0 9px 0 var(--farve-2-moerk), 0 16px 30px var(--skygge); }
+.fag-kort.dansk .fag-navn { text-shadow: none; }
 .fag-kort.sidst { outline: 6px solid var(--guld); outline-offset: 4px; }
 .fag-kort:active { transform: translateY(6px) scale(0.98); }
 .fag-ikon { font-size: clamp(80px, 16vmin, 150px); line-height: 1; }
@@ -1603,6 +1681,10 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
 .tegne-ramme { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
 .tegne-canvas { display: block; background: #fff; border-radius: 18px; box-shadow: 0 4px 14px var(--skygge); touch-action: none; }
 .tegne-vaerktoej { flex: 0 0 auto; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+/* Historiebogen: vennen (læser/maler) står til venstre for farverne — farverne brydes om ved siden af den */
+.tegne-bund { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; }
+.tegne-bund .tegne-vaerktoej { flex: 1 1 0; min-width: 0; }
+.tegne-ven { flex: 0 0 auto; font-size: clamp(54px, 8vmin, 76px); line-height: 1; }
 .farve-knap {
   width: var(--tryk); height: var(--tryk); border-radius: 50%; border: 4px solid var(--hvid);
   box-shadow: 0 2px 6px var(--skygge); font-size: 26px; padding: 0; background: var(--hvid);
@@ -1831,7 +1913,8 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
 /* Stak vendt til søjler (to lange rækker på en smal skærm): tingene står parvis ud for hinanden, fra toppen */
 .scene.lodret .scene-rad { align-items: flex-start; }
 .scene.lodret .ting-gruppe.linje .ting-raekke { flex-direction: column; }
-.scene .brik-celle { width: calc(var(--u) * 6); height: calc(var(--u) * 6); border-width: calc(var(--u) * 0.3); border-radius: calc(var(--u) * 1.4); font-size: calc(var(--u) * 3.8); transition: transform 0.2s, background 0.2s, border-color 0.2s; }
+/* Tal og brikker i en række: mindst 17 px — også ved den mindste målestok (review #8: talrækker i skiftendeHop) */
+.scene .brik-celle { width: max(28px, calc(var(--u) * 6)); height: max(28px, calc(var(--u) * 6)); border-width: calc(var(--u) * 0.3); border-radius: calc(var(--u) * 1.4); font-size: max(17px, calc(var(--u) * 3.8)); transition: transform 0.2s, background 0.2s, border-color 0.2s; }
 .sd-pakke { display: contents; }
 .sd-pil { display: block; width: calc(var(--u) * 4); height: calc(var(--u) * 4); margin-right: calc(var(--u) * 0.2); }
 .sd-pil svg { display: block; width: 100%; height: 100%; }
@@ -1856,6 +1939,10 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
 
 /* Hjælpen «lys»: det, der tales om, lyser guld — i opgavefeltet og på svarkortene */
 .sd-gruppe.lyser, .sd-hus.lyser, .sd-ti.lyser, .scene .enere.lyser, .scene .stang.lyser, .sd-digital-ur.lyser, .sd-tal.lyser, .scene .koeb-vare.lyser { box-shadow: 0 0 0 calc(var(--u) * 0.5) var(--guld), 0 0 calc(var(--u) * 1.4) var(--guld); }
+/* En hel ting-del (fx «de nye», skålene, et billede i rim): en lys flade og en guld ring et stykke uden om tingene,
+   så layoutet ikke flytter sig (review: der var ingen regel — hjælpen tændte intet) */
+.sd-ting { border-radius: calc(var(--u) * 1.4); transition: box-shadow 0.2s, background 0.2s; }
+.sd-ting.lyser { background: var(--papir); box-shadow: 0 0 0 calc(var(--u) * 0.6) var(--papir), 0 0 0 calc(var(--u) * 1.1) var(--guld), 0 0 calc(var(--u) * 2) var(--guld); }
 .sd-ti.lyser { background: var(--papir); }
 .scene .ting.lyser, .plads.lyser { background: var(--guld); box-shadow: 0 0 0 calc(var(--u) * 0.3) var(--guld-moerk); }
 .sd-pakke.lyser > .brik-celle { border-color: var(--guld-moerk); background: var(--guld); transform: translateY(calc(var(--u) * -0.5)); }
@@ -1885,13 +1972,22 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
 .runde .valg-scene .valg-knap.svar-ramme { position: relative; padding: 12px; }
 .runde .valg-scene .valg-knap.svar-ramme::before { content: ''; position: absolute; inset: 12px; border-radius: calc(var(--radius) - 10px); background: var(--hvid); }
 .runde .valg-scene .valg-knap.svar-ramme > .scene { position: relative; }
-.runde .valg-scene .valg-knap.vis-svar { animation-name: pulsRing; }
+/* En smallere ring end på knapperne (scenekortet har allerede guldrammen): ringen på 14 px nåede skærmkanten under det
+   nederste kort — på telefonen på langs og på højkant (ui-review #10; rundens margen er 16 px) */
+.runde .valg-scene .valg-knap.vis-svar { animation-name: pulsRingLille; }
+@keyframes pulsRingLille { 0%, 100% { box-shadow: 0 7px 0 var(--guld-moerk), 0 0 0 4px rgba(255, 200, 61, 0.4); } 50% { box-shadow: 0 7px 0 var(--guld-moerk), 0 0 0 8px rgba(255, 200, 61, 0.6); } }
 /* «Store» kort til høje scener (tierstænger) — app.js vælger det, når det giver størst indhold:
    iPad på langs: kortene side om side i en bredere kolonne · højkant: højere kort */
 @media (orientation: landscape) and (min-height: 501px) {
   .runde-krop.scene-opgave.kort-store { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); }
   .runde-krop.kort-store .valg.valg-scene { flex-direction: row; align-items: center; }
   .runde-krop.kort-store .valg-scene .valg-knap { height: 100%; max-height: 480px; }
+  /* «store-stak»: den brede kolonne, men kortene under hinanden (brede, lave kort som en kø eller en ordstrimmel) */
+  .runde-krop.kort-store .valg.valg-scene.kort-stak { flex-direction: column; align-items: stretch; }
+  .runde-krop.kort-store .valg-scene.kort-stak .valg-knap { height: auto; max-height: 300px; padding: 0 18px; }
+  .runde-krop.kort-store .valg-scene.kort-stak .valg-knap.svar-ramme { padding: 12px 18px; }
+  /* «halv-stak»: opgaven og kortene deler bredden lige (køen i opgaven i samme målestok som på kortene) */
+  .runde-krop.scene-opgave.kort-store.kort-halv { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 }
 @media (orientation: portrait) {
   .runde-krop.kort-store .valg-scene .valg-knap { height: clamp(150px, 40vh, 480px); }
@@ -1900,6 +1996,8 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
 .runde .valg.valg-scene.kort-stak { flex-direction: column; }
 @media (orientation: portrait) {
   .runde .valg-scene.kort-stak .valg-knap { flex: 0 0 auto; width: 100%; height: clamp(84px, 12vh, 150px); }
+  /* «store-stak» på højkant: kortene under hinanden, men højere (små tegninger som placeringen i laesPlacering) */
+  .runde-krop.kort-store .valg-scene.kort-stak .valg-knap { height: clamp(110px, 20vh, 240px); }
 }
 @media (orientation: landscape) and (max-height: 500px) {
   .runde .valg-scene.kort-stak .valg-knap { align-self: auto; width: 100%; }
@@ -1967,3 +2065,345 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
 .quiz-slut-tekst { font-size: clamp(30px, 6vmin, 56px); font-weight: 900; color: var(--farve-1-moerk); }
 .quiz-slut .stor-knap { position: static; margin: 0; }
 .rute-braet .soem-prik.vis-hjoerne:not(.valgt) i { background: var(--guld); } /* «vis svaret»: den næste prik er guld, også når den kan trykkes */
+
+/* ---------- D2/D3 Regning: nye scene-dele (docs/SCENE.md). Alle mål er gange --u ---------- */
+/* Ting: ring om dem, der flytter · væk = stiplet + kryds (som i minus) · en pil ind mod en gruppe, der kommer til */
+.scene .ting.maerk { box-shadow: 0 0 0 calc(var(--u) * 0.45) var(--farve-2-moerk); }
+/* Lyser en mærket ting (flytVen «flyt»), beholder den sin ring — guld udenom (som den mærkede vogn, review #4) */
+.scene .ting.maerk.lyser { box-shadow: 0 0 0 calc(var(--u) * 0.45) var(--farve-2-moerk), 0 0 0 calc(var(--u) * 0.85) var(--guld); }
+.scene .ting.vaek { outline: calc(var(--u) * 0.3) dashed var(--tekst); outline-offset: calc(var(--u) * -0.2); }
+.sd-kommer { align-self: center; display: block; width: calc(var(--u) * 4); height: calc(var(--u) * 4); }
+.sd-kommer svg { display: block; width: 100%; height: 100%; }
+.scene .staenger.lyser { border-radius: calc(var(--u) * 0.8); box-shadow: 0 0 0 calc(var(--u) * 0.5) var(--guld), 0 0 calc(var(--u) * 1.4) var(--guld); }
+
+/* Spejl og motiv */
+.sd-spejl { display: flex; align-items: center; gap: calc(var(--u) * 1.6); padding: calc(var(--u) * 0.8); border-radius: calc(var(--u) * 1.4); transition: box-shadow 0.2s; }
+.sd-motiv-e { display: inline-block; font-size: calc(var(--u) * 9); line-height: 1; }
+.spejl-linje { align-self: stretch; width: 0; min-height: calc(var(--u) * 12); border-left: calc(var(--u) * 0.6) dashed var(--farve-1-moerk); }
+.spejl-felt { display: flex; align-items: center; justify-content: center; width: calc(var(--u) * 11); height: calc(var(--u) * 11); border: calc(var(--u) * 0.45) dashed var(--farve-2-moerk); border-radius: calc(var(--u) * 1.4); background: var(--papir); color: var(--farve-2-moerk); font-size: max(17px, calc(var(--u) * 5)); font-weight: 900; }
+.sd-spejl.lyser { box-shadow: 0 0 0 calc(var(--u) * 0.5) var(--guld), 0 0 calc(var(--u) * 1.4) var(--guld); }
+.sd-motiv { display: block; padding: calc(var(--u) * 0.5); }
+.sd-motiv.vend-spejl .sd-motiv-e { transform: scaleX(-1); }
+.sd-motiv.vend-drej .sd-motiv-e { transform: rotate(180deg); }
+
+/* Streg og lineal: 1 cm = 5 --u. Stregen begynder 1,5 cm inde */
+.sd-streg, .sd-linealplac { --cm: calc(var(--u) * 5); position: relative; display: block; width: calc(var(--cm) * (var(--cmn) + 3)); }
+.sd-streg { height: calc(var(--u) * 4); }
+.sd-linealplac { height: calc(var(--u) * var(--hoejde)); }
+.streg-linje { position: absolute; left: calc(var(--cm) * 1.5); top: calc(var(--u) * 1.6); width: calc(var(--cm) * var(--cmn)); height: calc(var(--u) * 0.8); border-radius: calc(var(--u) * 0.4); background: var(--tekst); transition: box-shadow 0.2s; }
+.sd-streg.lyser .streg-linje { box-shadow: 0 0 0 calc(var(--u) * 0.5) var(--guld); }
+.sd-lineal { position: absolute; top: calc(var(--u) * 3.4); left: calc(var(--cm) * (var(--x0) - 0.4)); width: calc(var(--cm) * (var(--L) + 0.8)); height: calc(var(--u) * 6.4); border: calc(var(--u) * 0.25) solid var(--sti); border-radius: calc(var(--u) * 0.6); background: var(--sti-kant); transform-origin: calc(var(--cm) * 0.4) 0; }
+.sd-lineal.skraa { transform: rotate(12deg); }
+.lineal-cm-s, .lineal-halv-s { position: absolute; top: 0; width: calc(var(--u) * 0.3); margin-left: calc(var(--u) * -0.15); background: var(--tekst); }
+.lineal-cm-s { height: calc(var(--u) * 2.2); }
+.lineal-halv-s { height: calc(var(--u) * 1.2); }
+.lineal-tal-s { position: absolute; top: calc(var(--u) * 2.4); transform: translateX(-50%); font-size: max(17px, calc(var(--u) * 2.8)); font-weight: 900; line-height: 1; color: var(--tekst); }
+.lineal-nul.lyser .lineal-tal-s { padding: 0 0.15em; border-radius: 0.3em; background: var(--guld); box-shadow: 0 0 0 calc(var(--u) * 0.3) var(--guld-moerk); }
+.lineal-nul.lyser .lineal-cm-s { background: var(--guld-moerk); width: calc(var(--u) * 0.6); }
+
+/* Klodser og tårne i scenens mål */
+.scene .klodser { --kl: calc(var(--u) * 4); gap: calc(var(--u) * 1.2); }
+.scene .klodser .klods, .sd-taarn .klods { border-width: calc(var(--u) * 0.2); border-radius: calc(var(--u) * 0.6); }
+.sd-taarne { display: flex; flex-direction: column; align-items: center; transition: filter 0.2s; }
+.taarne-par { display: flex; align-items: flex-end; gap: calc(var(--u) * 3); padding: 0 calc(var(--u) * 2); }
+.sd-taarn { --kl: calc(var(--u) * 4.4); display: flex; flex-direction: column-reverse; gap: calc(var(--u) * 0.2); }
+.sd-taarn .klods { height: calc(var(--kl) * 0.8); }
+.taarne-bund { display: block; align-self: stretch; height: calc(var(--u) * 0.8); border-radius: calc(var(--u) * 0.4); background: var(--sti); }
+.sd-taarn .klods.lyser { box-shadow: 0 0 0 calc(var(--u) * 0.4) var(--guld); opacity: 0.7; }
+/* De fjernede klodser: tomme, stiplede pladser med et tydeligt kryds (en bleg klods med et lille kryds kunne ikke ses) */
+.sd-taarn .klods.vaek { opacity: 0.8; filter: none; background: transparent; border: calc(var(--u) * 0.3) dashed var(--tekst); box-shadow: none; }
+.sd-taarn .klods.vaek::before { --streg: max(2px, calc(var(--kl) * 0.07)); }
+/* … og de lyser stadig, når hjælpen peger på dem (sammeForskel «vaek») */
+.sd-taarn .klods.vaek.lyser { opacity: 1; background: var(--papir); box-shadow: 0 0 0 calc(var(--u) * 0.4) var(--guld); }
+
+/* Køen: vogne på en skinne, flaget i den ene ende. Den markerede vogn (svarkort) har en tyk ring */
+/* Plads i hver ende til guldet, når flaget eller den yderste vogn lyser (ui-review #9: kun 6 px til kortets kant) */
+.sd-koe { display: flex; align-items: flex-end; gap: calc(var(--u) * 0.4); padding: 0 calc(var(--u) * 1.2) calc(var(--u) * 0.6); border-bottom: calc(var(--u) * 0.6) solid var(--sti); }
+.koe-vogn, .koe-flag { position: relative; display: block; padding: calc(var(--u) * 0.3); border-radius: calc(var(--u) * 1); font-size: calc(var(--u) * 4.6); line-height: 1; transition: background 0.2s, box-shadow 0.2s; }
+.koe-flag { font-size: calc(var(--u) * 5.4); }
+.koe-vogn.maerk { background: var(--papir); box-shadow: 0 0 0 calc(var(--u) * 0.6) var(--farve-2-moerk); }
+.koe-vogn.lyser, .koe-flag.lyser { background: var(--guld); box-shadow: 0 0 0 calc(var(--u) * 0.3) var(--guld-moerk); }
+/* Den markerede vogn beholder sin ring, når hjælpen tænder den (review #4) — guld udenom */
+.koe-vogn.maerk.lyser { box-shadow: 0 0 0 calc(var(--u) * 0.6) var(--farve-2-moerk), 0 0 0 calc(var(--u) * 1.1) var(--guld); }
+
+/* Mønster i figurer og på skiltet: tegnet i mørk tekstfarve oven på figurens farve */
+.moenster-tegn { fill: var(--tekst); opacity: 0.55; }
+.form-moenster { stroke: none; pointer-events: none; }
+.sd-skilt { display: block; width: calc(var(--u) * 22); height: calc(var(--u) * 11); transition: filter 0.2s; }
+.sd-skilt svg { display: block; width: 100%; height: 100%; }
+.skilt-plade { fill: var(--hvid); stroke: var(--farve-1-moerk); stroke-width: 4; }
+.skilt-skille { stroke: var(--farve-1-lys); stroke-width: 3; stroke-dasharray: 6 5; }
+.skilt-vinkel { fill: none; stroke: var(--farve-1-moerk); stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
+.skilt-hjoerne { fill: var(--farve-2-moerk); }
+.skilt-proeve { fill: var(--form-3); stroke: rgba(0, 0, 0, 0.35); stroke-width: 3; }
+.sd-skilt.lyser { filter: drop-shadow(0 0 calc(var(--u) * 0.6) var(--guld)) drop-shadow(0 0 2px var(--guld-moerk)); }
+
+/* Prikgitter med en vej (stykkerne er taelbar) — afstanden mellem to prikker er 6 --u */
+.sd-gitter { --g: calc(var(--u) * 6); position: relative; display: block; width: calc(var(--g) * var(--kol) + var(--u) * 2); height: calc(var(--g) * var(--raek) + var(--u) * 2); }
+.gitter-prik { position: absolute; left: calc(var(--g) * var(--x)); top: calc(var(--g) * var(--y)); width: calc(var(--u) * 2); height: calc(var(--u) * 2); border-radius: 50%; background: var(--farve-1-lys); }
+.gitter-start { position: absolute; left: calc(var(--g) * var(--x) - var(--u) * 0.4); top: calc(var(--g) * var(--y) - var(--u) * 0.4); width: calc(var(--u) * 2.8); height: calc(var(--u) * 2.8); border-radius: 50%; background: var(--rigtig); }
+.vej-stykke { position: absolute; display: block; border-radius: calc(var(--u) * 0.6); background: var(--farve-2-moerk); transition: background 0.2s; }
+.vej-stykke.vandret { left: calc(var(--g) * var(--x) + var(--u) * 1.6); top: calc(var(--g) * var(--y) + var(--u) * 0.5); width: calc(var(--g) - var(--u) * 1.2); height: var(--u); }
+.vej-stykke.lodret { left: calc(var(--g) * var(--x) + var(--u) * 0.5); top: calc(var(--g) * var(--y) + var(--u) * 1.6); width: var(--u); height: calc(var(--g) - var(--u) * 1.2); }
+.vej-stykke.talt { background: var(--guld-moerk); transform: none; }
+
+/* Det analoge ur i scenen: tallene er mindst 17 px (12/100 af bredden) */
+.sd-ur .ur-svg { width: max(142px, calc(var(--u) * 24)); }
+
+/* ---------- D2/D3 Dansk: lydprikker, alfabetet, ordstrimlen, skiltet «ikke» (docs/SCENE.md) ---------- */
+/* Lydprikker: én stor prik pr. lyd (svarkort). Samme --u på alle kort, så antallet kan sammenlignes */
+.lyd-prikker { display: flex; align-items: center; justify-content: center; gap: calc(var(--u) * 1.6); padding: calc(var(--u) * 0.6); }
+.lyd-prik { display: block; width: calc(var(--u) * 5); height: calc(var(--u) * 5); border-radius: 50%; background: var(--farve-1-moerk); box-shadow: inset 0 calc(var(--u) * -0.5) 0 rgba(0, 0, 0, 0.18); }
+.valg-knap.rigtig .lyd-prik { background: var(--hvid); }
+
+/* Byg i alfabetets rækkefølge: en pil under pladserne viser, at man begynder fra venstre */
+.byg-retning { display: flex; flex-direction: column; align-items: stretch; gap: clamp(10px, 2vmin, 18px); }
+.byg-retning .byg-felt { --f: clamp(60px, 11vmin, 110px); min-width: var(--f); height: var(--f); font-size: calc(var(--f) * 0.62); }
+@supports (width: 1cqw) { .byg-retning .byg-felt { --f: max(52px, min(120px, 18cqw, 30cqh)); } }
+.byg-retning-pil { position: relative; display: block; height: 8px; margin: 0 30px 0 10px; border-radius: 4px; background: var(--farve-1); }
+.byg-retning-pil::after { content: ''; position: absolute; right: -24px; top: 50%; transform: translateY(-50%); border-left: 26px solid var(--farve-1); border-top: 15px solid transparent; border-bottom: 15px solid transparent; }
+
+/* Hjælpen «alfabetVis»: hele alfabetet i rækker (15 pr. række — 10 i et smalt felt, fx telefonen på højkant). Ikke knapper */
+.alfabet-vis { display: grid; grid-template-columns: repeat(15, minmax(0, 1fr)); gap: 4px; width: min(100%, 900px); }
+.alfabet-vis-b { display: flex; align-items: center; justify-content: center; height: 1.6em; border-radius: 10px; background: var(--hvid); box-shadow: 0 2px 0 var(--skygge); font-family: var(--skrift); font-size: clamp(17px, 2.6vmin, 32px); font-weight: 800; line-height: 1; color: var(--tekst); }
+.alfabet-vis-b.naevnt { background: var(--guld); box-shadow: 0 0 0 3px var(--guld-moerk); }
+@supports (width: 1cqw) { .alfabet-vis-b { font-size: clamp(17px, 3.4cqw, 34px); } }
+@container (max-width: 440px) { .alfabet-vis { grid-template-columns: repeat(10, minmax(0, 1fr)); } }
+
+/* Ordstrimlen: brikkerne rører hinanden (ingen mellemrum). Skillestregen stikker op over og ned under strimlen */
+/* Skillestregen stikker 1,8 u op og ned over strimlen (negativ margen) — strimlen har samme margen, så stregen er med,
+   når scenen måles, og ikke stikker ud af kortet (ui-review #6). Også uden streg, så opgave og kort har samme målestok */
+.strimmel { margin: calc(var(--u) * 1.8) 0; display: flex; align-items: stretch; border: calc(var(--u) * 0.45) solid var(--farve-1-moerk); border-radius: calc(var(--u) * 1.2); background: var(--hvid); transition: box-shadow 0.2s; }
+.strimmel-b { display: flex; align-items: center; justify-content: center; min-width: 0.95em; padding: 0.1em 0.12em; font-family: var(--skrift); font-size: max(17px, calc(var(--u) * 5.4)); font-weight: 800; line-height: 1; color: var(--tekst); transition: background 0.2s; }
+.strimmel-b + .strimmel-b { border-left: calc(var(--u) * 0.25) solid var(--farve-1-lys); }
+.strimmel-b:first-child { border-radius: calc(var(--u) * 0.8) 0 0 calc(var(--u) * 0.8); }
+.strimmel-b:last-child { border-radius: 0 calc(var(--u) * 0.8) calc(var(--u) * 0.8) 0; }
+.strimmel-b.lyser { background: var(--guld); }
+.strimmel-skille { flex: 0 0 auto; width: calc(var(--u) * 1); margin: calc(var(--u) * -1.8) calc(var(--u) * 0.35); border-radius: calc(var(--u) * 0.5); background: var(--farve-2-moerk); }
+.strimmel.lyser { box-shadow: 0 0 0 calc(var(--u) * 0.5) var(--guld), 0 0 calc(var(--u) * 1.4) var(--guld); }
+.valg-knap.rigtig .strimmel-b { color: var(--tekst); text-shadow: none; }
+
+/* Skiltet «Her er ikke en 🐈»: et træskilt på en pæl — ordet, der skal læses, lyser gult */
+.ikke-skilt { display: flex; flex-direction: column; align-items: center; max-width: 100%; }
+.ikke-skilt-plade {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.16em 0.3em; max-width: 100%;
+  padding: 0.3em 0.55em; border: 6px solid var(--sti); border-radius: 22px; background: var(--hvid); box-shadow: 0 6px 0 var(--skygge);
+  font-family: var(--skrift); font-size: clamp(30px, 6vmin, 58px); font-weight: 800; line-height: 1.15; color: var(--tekst);
+}
+@supports (width: 1cqw) { .ikke-skilt-plade { font-size: max(24px, min(58px, 8cqw, 15cqh)); } }
+.skilt-ord.fremhaev { padding: 0 0.2em; border-radius: 0.25em; background: var(--guld); box-shadow: 0 0 0 3px var(--guld-moerk); }
+.skilt-e { font-size: 1.45em; line-height: 1; }
+.ikke-skilt-pael { display: block; width: 18px; height: clamp(24px, 5vmin, 56px); border-radius: 0 0 6px 6px; background: var(--sti); }
+
+/* ---------- D2/D3 Bogstavjagt: to lyde i rækkefølge · bogstavet i midten ---------- */
+/* Øverst i feltet: de to tomme pladser (rækkefølgen) eller ordet. Ikke til at trykke på — strøgene går igennem */
+.jagt-stille-vis { position: absolute; top: 10px; left: 50%; z-index: 1; transform: translateX(-50%); display: flex; align-items: center; gap: clamp(8px, 1.6vmin, 14px); padding: clamp(6px, 1.2vmin, 10px) clamp(12px, 2.4vmin, 20px); border-radius: 999px; background: rgba(255, 255, 255, 0.85); box-shadow: 0 4px 12px var(--skygge); pointer-events: none; }
+.jagt-plads { --p: clamp(52px, 9vmin, 84px); display: flex; align-items: center; justify-content: center; width: var(--p); height: var(--p); border: 4px dashed #3c7fc4; border-radius: 50%; background: rgba(255, 255, 255, 0.7); font-family: var(--skrift); font-size: calc(var(--p) * 0.56); font-weight: 900; line-height: 1; color: #1d3557; }
+.jagt-plads.fyldt { border-style: solid; background: radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.95), rgba(160, 215, 255, 0.85) 55%, rgba(90, 160, 230, 0.9)); animation: pop 0.45s; }
+.jagt-raekke-pil { display: block; width: 0; height: 0; border-left: 22px solid #3c7fc4; border-top: 14px solid transparent; border-bottom: 14px solid transparent; }
+.jagt-ord-b { display: flex; align-items: center; justify-content: center; min-width: clamp(52px, 9vmin, 84px); height: clamp(52px, 9vmin, 84px); padding: 0 6px; border-radius: 16px; background: var(--hvid); box-shadow: 0 4px 0 var(--skygge); font-family: var(--skrift); font-size: clamp(36px, 6.4vmin, 60px); font-weight: 800; line-height: 1; color: #1d3557; transition: background 0.2s; }
+.jagt-ord-b.hjaelp { background: var(--guld); box-shadow: 0 0 0 4px var(--guld-moerk); }
+.jagt-ord-b.fundet { background: var(--rigtig); color: var(--hvid); animation: pop 0.45s; }
+/* Trin 2 og 3 har 9–10 lyde: prikkerne i toppen skal kunne være der på en telefon på højkant (ellers klippes den sidste) */
+@media (max-width: 600px) { .jagt-lyde { gap: 3px; } .jagt-lyde i { width: clamp(9px, 2.6vw, 16px); height: clamp(9px, 2.6vw, 16px); border-width: 2px; } }
+
+/* Mange mønter på et lille svarkort (bytMoent på en telefon): en bunke, hvor hver mønt dækker 45 % af den næste.
+   Mønterne bliver i fuld størrelse (mindst 80 px, så tallet er 17 px), og den første ligger øverst (app.js) */
+.scene .moenter.taet { gap: 0; }
+.scene .moenter.taet .moent-plads { position: relative; }
+.scene .moenter.taet .moent-plads + .moent-plads { margin-left: calc(max(80px, var(--u) * 8) * -0.45); }
+.scene .moenter.taet .moent { filter: drop-shadow(2px 0 1.5px rgba(0, 0, 0, 0.35)); }
+/* Smalle, høje kort (telefon på langs, eller 360 px på højkant): bunken står lodret. Hver mønt dækker 40 % af den
+   ovenover, og den nederste ligger øverst (app.js) — så tallet øverst på mønten ses (guld: til 60 % af højden) */
+.scene .moenter.taet.lodret { flex-direction: column; }
+.scene .moenter.taet.lodret .moent-plads + .moent-plads { margin-left: 0; margin-top: calc(max(80px, var(--u) * 8) * -0.4); }
+.scene .moenter.taet.lodret .moent { filter: drop-shadow(0 -2px 1.5px rgba(0, 0, 0, 0.35)); }
+
+/* =====================================================================
+   C · minispil (docs/MINISPIL.md) — tegningerne fra grafik.js (Grafik.minispil) arver farvevariablerne
+   ===================================================================== */
+.mini-tegning { display: block; width: 100%; height: 100%; overflow: visible; }
+.mini-billede { display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
+
+/* Frøposten: bestillingen (dyret, tallet og lige så mange prikker) ved siden af kurven — over den i et smalt felt */
+.froe-post { display: flex; align-items: center; justify-content: center; gap: clamp(12px, 3vmin, 40px); max-width: 100%; }
+.froe-bestilling { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: clamp(6px, 1.2vmin, 12px); }
+.froe-dyr { width: clamp(72px, 13vmin, 130px); height: clamp(72px, 13vmin, 130px); font-size: clamp(60px, 11vmin, 110px); }
+.bestil-boble { display: flex; align-items: center; gap: clamp(8px, 1.4vmin, 14px); padding: 6px 16px; border-radius: 22px; background: var(--hvid); box-shadow: 0 4px 0 var(--skygge); }
+.bestil-tal { font-size: clamp(40px, 8vmin, 72px); font-weight: 900; line-height: 1; color: var(--farve-1-moerk); }
+.bestil-prikker { display: grid; grid-template-columns: repeat(5, auto); gap: 5px; }
+.bestil-prikker i { display: block; width: clamp(11px, 1.8vmin, 16px); height: clamp(11px, 1.8vmin, 16px); border-radius: 50%; background: var(--farve-2-moerk); }
+/* Kurven (160 × 112 som tegningen). Frøene ligger nede i kurven i rækker à fem (trin 1: seks) */
+.froe-kurv { position: relative; flex: 0 0 auto; width: clamp(220px, 52vmin, 540px); aspect-ratio: 160 / 112; container-type: inline-size; }
+@supports (width: 1cqw) { .froe-kurv { width: min(560px, calc(100cqw - 180px), calc(92cqh * 1.43)); } }
+@container (max-aspect-ratio: 1/1) {
+  .froe-post { flex-direction: column; }
+  .froe-bestilling { flex-direction: row; }
+  .froe-kurv { width: min(560px, 96cqw, calc((100cqh - 130px) * 1.43)); }
+}
+.kurv-tegning { position: absolute; inset: 0; width: 100%; height: 100%; }
+.kurv-reserve { position: absolute; inset: 30% 8% 4%; border-radius: 0 0 40% 40% / 0 0 30% 30%; background: var(--farve-2); border: 3px solid var(--kontur); }
+/* Den lyse flade i kurven (frøene er i samme farve som kurven): fem på række, cellen er en brøkdel af kurvens bredde.
+   Fladen må aldrig nå op over kurvens forkant (y 49 af 112 — ca. 34 cqw over fladens bund; 31 cqw giver luft): ved tre og fire rækker
+   (trin 3, 11–20 frø) bliver cellerne mindre, så højden 2·padding + rk·c + (rk−1)·gap holder sig under 31 cqw (ui-review 11-10) */
+.kurv-indhold { --c: min(calc(56cqw / var(--kol, 5)), calc((31cqw - 4.8cqw - (var(--rk, 2) - 1) * 1.4cqw) / var(--rk, 2))); position: absolute; left: 50%; bottom: 8%; transform: translateX(-50%); display: grid; padding: 2.4cqw; border-radius: 3cqw; background: rgba(255, 253, 248, 0.82); box-shadow: 0 0.5cqw 0 rgba(70, 45, 20, 0.18); }
+.kurv-indhold.mange { --c: min(calc(56cqw / var(--kol, 5)), calc((31cqw - 6.4cqw - (var(--rk, 2) - 1) * 1.4cqw) / var(--rk, 2))); padding-bottom: 4cqw; }
+.froe-lag { grid-area: 1 / 1; display: grid; grid-template-columns: repeat(var(--kol, 5), var(--c)); grid-template-rows: repeat(var(--rk, 2), var(--c)); gap: 1.4cqw; align-content: start; border-radius: 2cqw; transition: box-shadow 0.2s, background 0.2s; }
+.kurv-indhold.mange .froe-lag > :nth-child(n+11) { top: 1.6cqw; } /* luft efter hver ti */
+.froe, .froe-plads { position: relative; display: flex; align-items: center; justify-content: center; aspect-ratio: 1; line-height: 1; transition: transform 0.2s, filter 0.2s; }
+.froe svg, .froe-plads svg { width: 100%; height: 100%; }
+.froe.land { animation: land 0.25s ease-out; }
+@keyframes land { from { transform: translateY(-45%) scale(0.85); opacity: 0.2; } to { transform: none; opacity: 1; } }
+.froe-lag.lyser { background: rgba(255, 200, 61, 0.28); box-shadow: 0 0 0 4px var(--guld), 0 0 14px var(--guld); }
+.froe-kurvlag.lyser .froe { filter: drop-shadow(0 0 3px var(--guld-moerk)); }
+.froe-pladser.lyser .froe-plads circle { fill: var(--guld); stroke: var(--guld-moerk); }
+.froe.talt { filter: drop-shadow(0 0 6px var(--guld)); }
+/* ➕ ➖ og ✔ Færdig (store, runde) — under hinanden ved siden af kurven, på række på højkant */
+.kurv-knap { width: clamp(76px, 13vmin, 112px); height: clamp(76px, 13vmin, 112px); flex: 0 0 auto; border: none; border-radius: 50%; background: var(--hvid); box-shadow: 0 6px 0 var(--farve-1-lys), 0 10px 18px var(--skygge); font-size: clamp(34px, 6vmin, 54px); line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
+.kurv-knap:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--farve-1-lys); }
+.kurv-knap:disabled { opacity: 0.35; box-shadow: none; }
+.kurv-panel .kurv-ok { width: clamp(88px, 15vmin, 130px); height: clamp(88px, 15vmin, 130px); }
+@media (orientation: landscape) and (max-height: 500px) { .kurv-panel { gap: 10px; } .kurv-knap { width: 72px; height: 72px; } .kurv-panel .kurv-ok { width: 80px; height: 80px; } }
+/* Telefonen på højkant: op til fire knapper på én række (Spor i sandet trin 3) */
+@media (orientation: portrait) and (max-width: 600px) { .kurv-panel { gap: 10px; } .kurv-knap { width: 68px; height: 68px; } .kurv-panel .kurv-ok { width: 80px; height: 80px; } }
+
+/* Slutbilledet (bedømmes ikke): et lag over opgavefeltet, der ikke tager tryk */
+.slut-lag { position: absolute; inset: 0; z-index: 3; display: flex; align-items: flex-end; justify-content: flex-end; padding: 10px 14px; pointer-events: none; }
+.slut-blomst { display: flex; align-items: flex-end; gap: 4px; opacity: 0; transform: translateY(20%) scale(0.3); transform-origin: bottom center; transition: transform 0.7s ease-out, opacity 0.4s; }
+.slut-lag.vis .slut-blomst { opacity: 1; transform: none; }
+.slut-blomst-tegning { display: block; width: clamp(96px, 18vmin, 170px); height: clamp(96px, 18vmin, 170px); }
+.slut-par { width: clamp(52px, 9vmin, 90px); height: clamp(52px, 9vmin, 90px); font-size: clamp(44px, 8vmin, 80px); }
+
+/* Løft og læg (Skovbroen, Skyggeatelieret): det løftede kort har en tyk ramme og står højere; stedet viser, at det
+   venter (stiplet ramme). Stedet er en gennemsigtig knap på mindst 64 px oven på tegningen */
+.valg.placer .valg-knap { touch-action: none; }
+.valg-knap.loeftet { transform: translateY(-6px); box-shadow: 0 0 0 6px var(--farve-2-moerk), 0 14px 24px var(--skygge-stor); }
+.placer-sted { position: relative; }
+.placer-felt { position: absolute; left: 50%; top: 50%; z-index: 2; width: max(100%, 64px); height: max(100%, 64px); transform: translate(-50%, -50%); padding: 0; border: none; border-radius: 14px; background: transparent; }
+.placer-sted.klar .placer-felt { outline: 5px dashed var(--farve-2-moerk); outline-offset: 4px; }
+.placer-felt:focus-visible { outline: 5px solid var(--tekst); outline-offset: 4px; }
+.flyv-kopi { position: fixed; z-index: 50; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+.flyv-kopi.traekkes { opacity: 0.92; filter: drop-shadow(0 10px 10px var(--skygge-stor)); }
+
+/* Skovbroen: 1 enhed i GRAFIK-C = 0,2 --u (et felt er 4,8 --u). Felterne ligger som HTML oven på broens dæk */
+.sd-bro { position: relative; display: block; width: calc(var(--u) * 0.2 * (24 * var(--bn) + 8)); height: calc(var(--u) * 16.8); }
+.bro-tegning { position: absolute; inset: 0; width: 100%; height: 100%; }
+.bro-felter { position: absolute; left: calc(100% * 4 / (24 * var(--bn) + 8)); width: calc(100% * 24 * var(--bn) / (24 * var(--bn) + 8)); top: calc(100% * 30 / 84); height: calc(100% * 24 / 84); display: flex; }
+.bro-gruppe { flex: var(--n) 0 0; display: flex; border-radius: calc(var(--u) * 0.5); transition: box-shadow 0.2s; }
+.bro-felt { position: relative; flex: 1 0 0; transition: background 0.2s, box-shadow 0.2s; }
+.bro-gruppe.lyser { box-shadow: 0 0 0 calc(var(--u) * 0.5) var(--guld); }
+.bro-gruppe.lyser .bro-felt { background: rgba(255, 200, 61, 0.5); }
+.bro-felt.talt { background: var(--guld); }
+.bro-brik { position: relative; flex: var(--n) 0 0; }
+.bro-brik .brik-tegning { position: absolute; top: -33.333%; height: 166.667%; left: calc(-400% / (24 * var(--n))); width: calc(100% * (24 * var(--n) + 8) / (24 * var(--n))); transition: filter 0.2s; }
+.bro-brik.fast.lyser .brik-tegning { filter: drop-shadow(0 0 calc(var(--u) * 0.6) var(--guld)) drop-shadow(0 0 2px var(--guld-moerk)); }
+.bro-brik.lagt { position: absolute; top: 0; bottom: 0; left: calc(100% * var(--fra) / var(--bn)); width: calc(100% * var(--n) / var(--bn)); opacity: 0; transform: translateY(-70%); transition: transform 0.4s ease-out, opacity 0.25s; }
+.bro-brik.lagt.vis { opacity: 1; transform: none; }
+/* Vennen er mindst 48 px (trin 3 på telefonen: broen er 11–14 felter, så en brøkdel af den var kun ca. 22 px, ui-review 11-10) */
+.bro-ven { --bv: max(48px, calc(100% * 34 / (24 * var(--bn) + 8))); position: absolute; left: 0; bottom: calc(100% * 54 / 84); width: var(--bv); aspect-ratio: 1; font-size: calc(var(--u) * 5); line-height: 1; transition: left 1s ease-in-out; }
+.bro-ven .ven-tegning { display: block; width: 100%; height: 100%; }
+.bro-ven.gaar { left: calc(100% - var(--bv)); }
+.sd-brobrik { display: block; width: calc(var(--u) * 0.2 * (24 * var(--n) + 8)); height: calc(var(--u) * 8); }
+.sd-brobrik .brik-tegning { display: block; width: 100%; height: 100%; }
+
+/* Skyggeatelieret: GRAFIK-C's figurer — kortet i sin egen farve, skyggen mørk og drejet om midten */
+.sd-figur.mini { width: calc(var(--u) * 11); height: calc(var(--u) * 11); }
+.sd-figur .mini-form { display: block; width: 100%; height: 100%; }
+.mini-form .mini-tegning { display: block; width: 100%; height: 100%; }
+.sd-figur.skygge > .skygge-form, .sd-figur.skygge-reserve > svg { transform: rotate(var(--drej, 0deg)); }
+/* Den drejede skygge rager op til 20,5 % ud til hver side (40°: cos + sin = 1,41) — scenen måler kassen uden drejning,
+   så margenen holder plads til hjørnerne (iPhone på højkant: 4 px skåret af, WebKit-e2e 11-10) */
+.sd-figur.mini.skygge { margin: calc(var(--u) * 11 * 0.21); }
+.skygge-form .mini-tegning * { fill: var(--kontur); stroke: var(--kontur); }
+.skygge-reserve .form-figur { fill: var(--kontur); stroke: var(--kontur); }
+.mini-form.form-farve-0 .mini-tegning * { fill: var(--form-0); }
+.mini-form.form-farve-1 .mini-tegning * { fill: var(--form-1); }
+.mini-form.form-farve-2 .mini-tegning * { fill: var(--form-2); }
+.mini-form.form-farve-3 .mini-tegning * { fill: var(--form-3); }
+.mini-form.form-farve-4 .mini-tegning * { fill: var(--form-4); }
+.mini-form.form-farve-5 .mini-tegning * { fill: var(--form-5); }
+.drej-ind { position: absolute; inset: 0; opacity: 0; transform: translate(-30%, -30%) rotate(0deg); transition: transform 0.9s ease-in-out, opacity 0.3s; }
+.drej-ind.vis { opacity: 1; transform: rotate(var(--drej, 0deg)); }
+.pusle-hul.skygge { fill: var(--kontur); stroke: var(--kontur); stroke-dasharray: none; }
+.pusle-hul.skygge.lyser { fill: var(--guld); stroke: var(--guld-moerk); }
+/* Det reparerede vindue lægges over puslespillet: tegningens indre kvadrat (56 af 96) dækker puslespillets (100 af 128) */
+.vindue-lag { position: absolute; left: -16.96%; top: -16.96%; width: 133.9%; height: 133.9%; opacity: 0; transform: scale(0.92); transition: opacity 0.5s, transform 0.5s; }
+.vindue-lag.vis { opacity: 1; transform: none; }
+.vindue-lag .vindue-tegning { display: block; width: 100%; height: 100%; }
+
+/* Lydtoget: billedet over toget — lokomotivet og én vogn pr. bogstav (vognens vindue: x 20–76, y 29–61 af 96) */
+.lydtog { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(10px, 2.4vmin, 24px); max-width: 100%; }
+.lydtog-billede { width: clamp(84px, 16vmin, 150px); height: clamp(84px, 16vmin, 150px); font-size: clamp(54px, 10vmin, 100px); }
+.lydtog-billede .lydtog-tegning.med-tegning { width: 74%; height: 74%; }
+.lydtog-tog { --v: clamp(60px, 12.5vmin, 130px); display: flex; align-items: flex-end; max-width: 100%; transition: transform 1.2s ease-in; }
+@supports (width: 1cqw) {
+  .lydtog-billede { width: min(150px, 30cqh, 30cqw); height: min(150px, 30cqh, 30cqw); font-size: min(100px, 20cqh, 20cqw); }
+  .lydtog-tog { --v: max(52px, min(170px, calc(94cqw / (var(--vogne) + 1)), 44cqh)); }
+}
+.lydtog-tog.koerer { transform: translateX(110vw); }
+.lydtog-lok, .lydtog-vogn { position: relative; flex: 0 0 auto; width: var(--v); height: var(--v); transition: transform 0.25s; }
+.vogn-tegning { position: absolute; inset: 0; width: 100%; height: 100%; }
+.vogn-reserve { position: absolute; inset: 22% 13% 28%; display: flex; align-items: center; justify-content: center; border: 3px solid var(--kontur); border-radius: 10%; background: var(--farve-2); }
+.vogn-reserve.lok { border: none; background: none; font-size: calc(var(--v) * 0.6); }
+.vogn-bogstav { position: absolute; left: 20.8%; width: 58.3%; top: 30.2%; height: 33.3%; display: flex; align-items: center; justify-content: center; font-family: var(--skrift); font-size: max(17px, calc(var(--v) * 0.34)); font-weight: 900; line-height: 1; color: var(--tekst); }
+.vogn-bogstav.gammel { opacity: 0.55; }
+/* Den aktive vogn: stiplet ramme og løftet (ikke kun farve) */
+.lydtog-vogn.aktiv { transform: translateY(calc(var(--v) * -0.1)); }
+.lydtog-vogn.aktiv::after { content: ''; position: absolute; inset: 15% 3% 13%; border: 4px dashed var(--farve-2-moerk); border-radius: 14px; }
+.lydtog-vogn.fyldt .vogn-bogstav { color: var(--farve-1-moerk); }
+/* Kortene til den aktive vogn/plads — store (mindst 64 px) */
+.byg-panel.trinvis.tog .trinvis-kort { min-width: clamp(72px, 13vmin, 120px); height: clamp(72px, 13vmin, 120px); font-size: clamp(44px, 8vmin, 72px); }
+.trinvis-kort.vis-svar { background: var(--guld); box-shadow: 0 6px 0 var(--guld-moerk), 0 0 0 8px rgba(255, 200, 61, 0.4); animation: puls 1.2s ease-in-out infinite; }
+.trinvis-kort.vis-svar:disabled { opacity: 1; }
+
+/* Rimhaven: kortene vises ét ad gangen (et kort, der ikke er sagt endnu, er en rolig, tom flade) — og en streg fra
+   billedordet til et kort, mens fingeren trækker. GRAFIK-C's billedord i samme størrelse som emojierne */
+.valg-knap.skjult-kort { background: var(--papir); box-shadow: inset 0 0 0 4px var(--farve-1-lys); }
+.valg-knap.skjult-kort > * { visibility: hidden; }
+.valg-tegning, .ord-tegning { display: inline-flex; width: 1.15em; height: 1.15em; }
+.ord-emoji .ord-tegning { width: 72%; height: 72%; }
+.streg-lag { position: fixed; inset: 0; z-index: 40; width: 100vw; height: 100vh; pointer-events: none; }
+.streg-lag line { stroke: var(--farve-2-moerk); stroke-width: 8; stroke-linecap: round; stroke-dasharray: 1 16; }
+
+/* Spor i sandet: ét stort sandfelt (tegningen) med tegnelaget ovenpå i skrivekassen (100 × 100) — forbilledet ved
+   siden af på trin 2. Banen er bred og lys, forbilledet en blød, fuld streg; barnets streg er mørk */
+.sand-post { display: flex; align-items: center; justify-content: center; gap: clamp(10px, 2.4vmin, 24px); max-width: 100%; }
+.sand-felt { position: relative; flex: 0 0 auto; width: clamp(220px, 56vmin, 560px); aspect-ratio: 1; }
+@supports (width: 1cqw) {
+  .sand-felt { width: min(560px, 96cqw, 96cqh); }
+  .sand-post.med-ved .sand-felt { width: min(560px, 66cqw, 96cqh); }
+}
+@container (max-aspect-ratio: 1/1) {
+  .sand-post.med-ved { flex-direction: column; }
+  .sand-post.med-ved .sand-felt { width: min(560px, 96cqw, 70cqh); }
+}
+.sand-tegning { position: absolute; inset: 0; width: 100%; height: 100%; }
+.sand-reserve { position: absolute; inset: 9%; border: 3px solid var(--kontur); border-radius: 12%; background: var(--farve-2); }
+.sand-svg { position: absolute; inset: 9%; width: 82%; height: 82%; overflow: visible; touch-action: none; cursor: crosshair; }
+.sand-bane polyline { fill: none; stroke: var(--papir); stroke-width: 15; stroke-linecap: round; stroke-linejoin: round; opacity: 0.9; }
+.sand-model polyline, .sand-vis polyline { fill: none; stroke: var(--farve-1-moerk); stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; opacity: 0.5; }
+.sand-vis polyline { opacity: 0.85; stroke: var(--farve-2-moerk); }
+.skjult-model { display: none; }
+.sand-streg { fill: none; stroke: var(--tekst); stroke-width: 5.5; stroke-linecap: round; stroke-linejoin: round; }
+.sand-start-reserve { fill: var(--kontur); stroke: var(--papir); stroke-width: 2; }
+.sand-ved { flex: 0 0 auto; width: clamp(96px, 20vmin, 200px); aspect-ratio: 1; border-radius: 22px; background: var(--hvid); box-shadow: 0 4px 0 var(--skygge); opacity: 0; transition: opacity 0.4s; }
+.sand-ved.vis { opacity: 1; } /* først efter talen, sammen med forbilledet (pladsen er der hele tiden — intet hopper) */
+.sand-ved-svg { display: block; width: 100%; height: 100%; }
+.sand-ved .sand-model polyline { opacity: 0.85; stroke-width: 6; }
+.sand-oeje[aria-pressed="false"] { opacity: 0.6; }
+/* Telefonen på langs: fire knapper kan ikke stå under hinanden — to og to */
+@media (orientation: landscape) and (max-height: 500px) {
+  .sand-panel { display: grid; grid-template-columns: repeat(2, auto); align-content: center; justify-items: center; gap: 10px; }
+}
+
+/* Fortællebroen: billederne fra grafik.js i felterne og på kortene (samme størrelse som emojierne); trin 3's frie
+   fortsættelse er et sandfelt med ✔ ved siden af (under på højkant) */
+.byg-felt.aktiv { border-color: var(--farve-2-moerk); border-style: dashed; box-shadow: 0 0 0 4px var(--farve-2-lys); }
+.felt-billede, .trinvis-billede { display: inline-flex; width: 1.15em; height: 1.15em; }
+.scene .ting.med-tegning { display: inline-flex; width: 1.5em; height: 1.5em; }
+.ting-tegning { display: block; width: 100%; height: 100%; }
+.tegn-selv { display: flex; align-items: center; justify-content: center; gap: clamp(12px, 3vmin, 32px); max-width: 100%; }
+.tegn-selv .sand-felt { width: clamp(200px, 48vmin, 460px); }
+.tegn-selv .tegn-selv-ok { position: static; margin: 0; }
+@supports (width: 1cqw) { .tegn-selv .sand-felt { width: min(460px, 76cqw, 92cqh); } }
+@container (max-aspect-ratio: 1/1) { .tegn-selv { flex-direction: column; } .tegn-selv .sand-felt { width: min(460px, 92cqw, calc(100cqh - 150px)); } }

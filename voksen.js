@@ -14,7 +14,7 @@
   const MAX_KOPI_BYTES = 2 * 1024 * 1024; // en kopi fra spillet fylder langt mindre
 
   function start(ctx) {
-    const { h, G, O, lager, voksen, Lyd, Tale, skift, hop, FIGURER, VERDENER, tegnVisning, valgIndhold } = ctx;
+    const { h, G, O, lager, voksen, Lyd, Tale, Forloeb, skift, hop, FIGURER, venTegning, VERDENER, tegnVisning, valgIndhold } = ctx;
     const D = ctx.D;
     const DANSK_VERDENER = (ctx.DANSK_VERDENER || []).filter((v) => v.emne && D && D.EMNER[v.emne]); // dansk med opgaver
     const VO = window.VoksenOpgaver;
@@ -814,7 +814,8 @@
 
     function startDuel(b) {
       const barnData = G.indlaesBarn(lager, b.noegle, b.navn).data;
-      const fig = FIGURER[barnData.figur] || FIGURER[b.figur];
+      const figId = FIGURER[barnData.figur] ? barnData.figur : b.figur; // barnets rejseven (tegningen fra grafik.js)
+      const fig = FIGURER[figId];
       // Barnets emne: den verden, barnet sidst spillede (ikke Lystårnet), ellers plus til 10
       const sidste = VERDENER.find((v) => v.id === barnData.sidsteVerden); // verdens-id → emne (Klokketorvet: «maaling»)
       const emne = sidste && O.EMNER[sidste.emne] ? sidste.emne : 'plus10';
@@ -873,7 +874,7 @@
           return k;
         });
         barnFelt.append(
-          h('div', { class: 'duel-hoved' }, h('span', { class: 'duel-figur', 'aria-hidden': 'true' }, fig.e),
+          h('div', { class: 'duel-hoved' }, h('span', { class: 'duel-figur', 'aria-hidden': 'true' }, venTegning(figId)),
             h('span', { class: 'duel-opgave' }, h('span', { class: 'opgave-ikon', 'aria-hidden': 'true' }, o.ikon || ''), ' ' + (o.tekst || '')),
             h('button', { class: 'ikon-knap', type: 'button', 'aria-label': 'Læs op', onclick: () => Tale.sig(o.tale) }, '🔊')),
           vis,
@@ -930,13 +931,13 @@
         skift(h('div', { class: 'skaerm voksen' },
           topbar('Familieduel', visMenu),
           h('div', { class: 'voksen-midte' },
-            h('div', { class: 'duel-klaekket', 'aria-hidden': 'true' }, h('span', { class: 'duel-skal' }, b.gave ? '🎉' : '🐣'), h('span', { class: 'fejring-ven danser' }, fig.e)),
+            h('div', { class: 'duel-klaekket', 'aria-hidden': 'true' }, h('span', { class: 'duel-skal' }, b.gave ? '🎉' : '🐣'), h('span', { class: 'fejring-ven danser' }, venTegning(figId, 'jubler'))),
             h('div', { class: 'fejring-tekst' }, 'I klarede det sammen!'),
             h('div', { class: 'voksen-knaprad' },
               h('button', { class: 'voksen-valg-knap', type: 'button', onclick: () => startDuel(b) }, 'Spil igen'),
               h('button', { class: 'voksen-valg-knap', type: 'button', onclick: visMenu }, 'Til menuen')))));
-        Lyd.fejring();
-        setTimeout(() => Tale.sig('I klarede det sammen! ' + (b.gave ? 'Gaven er åbnet' : 'Ægget er klækket') + ', og ' + fig.navn + ' kom ud.'), 800);
+        // Fejringen (1,6 s) og så sætningen — ikke oven i hinanden (feedback-forloeb.js)
+        Forloeb.run({ lyd: 'fejring', tekst: 'I klarede det sammen! ' + (b.gave ? 'Gaven er åbnet' : 'Ægget er klækket') + ', og ' + fig.navn + ' kom ud.' });
       }
 
       nyBarneopgave();

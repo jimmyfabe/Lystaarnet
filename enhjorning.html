@@ -8,19 +8,20 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Enhjørning">
-<meta name="theme-color" content="#9a5bd8">
+<meta name="theme-color" content="#765399">
 <title>Lystårnet — Enhjørning</title>
 <link rel="manifest" href="manifest-enhjorning.json">
 <link rel="apple-touch-icon" href="ikoner/enhjorning-180.png">
 <link rel="icon" type="image/png" href="ikoner/enhjorning-192.png">
 <link rel="stylesheet" href="app.css">
 <style>
-  /* Enhjørningens farver: eventyr */
+  /* Enhjørningens farver (fase A): lilla til handling og fokus, dæmpet gylden til materialer og lys */
   :root {
-    --farve-1: #9a5bd8; --farve-1-lys: #d2b0f5; --farve-1-moerk: #6a35a3;
-    --farve-2: #ff6fa5; --farve-2-lys: #ffb3cf; --farve-2-moerk: #cf3d76;
-    --baggrund-1: #fff3f8; --baggrund-2: #e8dcff;
-    --tekst: #3a2950; --sti: #b285d6; --sti-kant: #fde0ef;
+    --farve-1: #765399; --farve-1-lys: #decaed; --farve-1-moerk: #503565;
+    --farve-2: #d6ab77; --farve-2-lys: #ebd3b0; --farve-2-moerk: #715127;
+    --baggrund-1: #faf5fd; --baggrund-2: #ede3f5;
+    --tekst: #3e304a; --sti: #b285d6; --sti-kant: #ddd2b8;
+    --kontur: #4c3c5e; --paa-farve-2: #4f3818;
   }
 </style>
 <script>
@@ -34,7 +35,10 @@
 <script src="opgaver.js" defer></script>
 <script src="gem.js" defer></script>
 <script src="lydklip.js" defer></script>
+<script src="lydpalet.js" defer></script>
+<script src="feedback-forloeb.js" defer></script>
 <script src="dansk-opgaver.js" defer></script>
+<script src="grafik.js" defer></script>
 <script src="app.js" defer></script>
 </head>
 <body><main id="app"></main></body>
