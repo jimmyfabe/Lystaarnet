@@ -110,12 +110,21 @@
     moenster: 'Lad os sige mønstret højt.',
     urVisere: 'Lad os kigge på viserne.',
     visUr: 'Se her.',
+    stilHel: 'Lad os stille uret sammen.',
+    stilFlyt: 'Lad os flytte den store viser.',
     moenter: 'Lad os tælle kronerne. Vi starter med den største mønt.',
     hoerIgen: 'Lyt godt efter.',
     visBogstav: 'Se her.',
     visOrd: 'Se her.',
     rimLyt: 'Lyt efter slutningen af ordene.',
     alfabetSang: 'Lad os sige alfabetet.',
+    lys: 'Se her.',
+    urFem: 'Lad os tælle fem ad gangen.',
+    rute: 'Lad os gå vejen sammen.',
+    vendOp: 'Se kortene igen.',
+    laesKort: 'Lyt til svarene.',
+    foersteBrik: 'Se her. Den her kommer først.',
+    skrivBogstav: 'Se, hvordan vi skriver det i hånden.',
   };
 
   // Figurer i Formbyen som SVG (egen grafik). Hjørnerne får små prikker, som hjælpen kan tælle.
@@ -1061,8 +1070,8 @@
 
   // En gemt opgave (afbrudt mission, «kommer igen») kan stamme fra en anden udgave af spillet: brug den kun,
   // hvis emnet, visningen og tingene stadig findes — ellers kan runden gå i stå
-  const KENDTE_VISNINGER = ['ting', 'terning', 'terninger', 'klodser', 'streger', 'fingre', 'haand', 'kugleramme', 'par', 'flest', 'forskel', 'lyt', 'talstreg', 'plus', 'regnestykke', 'mangler', 'stoerst', 'minus', 'raekke', 'staenger', 'form', 'formScene', 'ur', 'moenter', 'koeb', 'moenster', 'soembraet', 'lineal', 'linealTegn', 'maalKlodser'];
-  const KENDTE_DANSK = ['ordBillede', 'lyt', 'lytLyd', 'bogstav', 'stortBogstav', 'alfabet', 'lydering', 'skrevetOrd', 'bygOrd', 'saetning', 'bygSaetning'];
+  const KENDTE_VISNINGER = ['ting', 'terning', 'terninger', 'klodser', 'streger', 'fingre', 'haand', 'kugleramme', 'par', 'flest', 'forskel', 'lyt', 'talstreg', 'plus', 'regnestykke', 'mangler', 'stoerst', 'minus', 'raekke', 'staenger', 'form', 'formScene', 'ur', 'moenter', 'koeb', 'moenster', 'soembraet', 'lineal', 'linealTegn', 'maalKlodser', 'scene', 'rute'];
+  const KENDTE_DANSK = ['ordBillede', 'lyt', 'lytLyd', 'bogstav', 'stortBogstav', 'alfabet', 'lydering', 'skrevetOrd', 'bygOrd', 'saetning', 'bygSaetning', 'scene', 'tryktBogstav', 'retOrd'];
   function opgaveKendt(o) {
     if (o && o.fag === 'dansk') return !!(D && D.EMNER[o.emne] && D.GEN[o.type] && o.vis && KENDTE_DANSK.indexOf(o.vis.art) >= 0);
     return !!(o && O.EMNER[o.emne] && o.vis && KENDTE_VISNINGER.indexOf(o.vis.art) >= 0 && (!o.vis.ting || O.TING[o.vis.ting]) &&
@@ -1096,6 +1105,7 @@
   // Tilbage fra en runde: til kortet (eventyret) eller til 🎒 (Vælg selv). Missionen huskes (▶ fortsætter den).
   function forladRunde() {
     const r = S.runde;
+    if (r && r.quiz) { S.runde = null; visHistorieSide(r.quiz.nr, r.quiz.frit); return; } // 🤔: tilbage til historien
     registrerAktivitet(); gemTid(); S.pausetRunde = r;
     if (r && r.frit) visVaelgSelv(); else visKort(false);
   }
@@ -1120,7 +1130,7 @@
       r.dom.svar);
     skift(h('div', { class: 'skaerm runde' },
       h('div', { class: 'topbar' },
-        r.frit ? ikonKnap('🎒', 'Tilbage til Vælg selv', forladRunde) : ikonKnap('🗺️', 'Tilbage til kortet', forladRunde),
+        r.quiz ? ikonKnap('📖', 'Tilbage til historien', forladRunde) : r.frit ? ikonKnap('🎒', 'Tilbage til Vælg selv', forladRunde) : ikonKnap('🗺️', 'Tilbage til kortet', forladRunde),
         prikker,
         // 📖 læser verdenens lektion op igen (uden at forlade opgaven)
         LEKTIONER[r.verden.id] && !r.test
@@ -1131,12 +1141,12 @@
     // Fodspor, der allerede er fyldt (når en afbrudt mission fortsætter)
     [...prikker.querySelectorAll('.prik')].slice(0, r.i).forEach((pk) => pk.classList.add('fuld'));
     // Kort missionsbesked før første spørgsmål — lange sætninger mister man undervejs
-    visOpgave(genoptag ? 'Vi fortsætter.' : (forTale ? forTale + ' ' : '') + 'Hjælp ' + r.maerke.bestemt + '!');
+    visOpgave(r.quiz ? 'Hvad skete der? Lyt godt efter.' : genoptag ? 'Vi fortsætter.' : (forTale ? forTale + ' ' : '') + 'Hjælp ' + r.maerke.bestemt + '!');
   }
 
   function gemTid() {
     const r = S.runde;
-    if (!r || !r.aktivMs) return;
+    if (!r || !r.aktivMs || r.quiz) return;
     G.dag(data).sek += Math.round(r.aktivMs / 1000);
     r.aktivMs = 0;
     gem();
@@ -1149,7 +1159,7 @@
     r.laast = false;
     r.visSvar = false;
     r.buffer = '';
-    r.opdaterDisplay = null; r.bygNulstil = null; r.byg = null; r.figur = null; r.lineal = null;
+    r.opdaterDisplay = null; r.bygNulstil = null; r.byg = null; r.figur = null; r.lineal = null; r.vendtOp = false;
     S.spaertTil = performance.now() + 300; // et dobbelttryk på sidste svar må ikke besvare den nye opgave
     [...r.dom.prikker.querySelectorAll('.prik')].forEach((p, i) => p.classList.toggle('nu', i === r.i));
     r.dom.tekst.textContent = '';
@@ -1165,12 +1175,21 @@
     r.dom.svar.classList.toggle('byg', !!opg.byg);
     // «Hvor er der flest?»: grupperne i svarkortene ER opgaven — de får pladsen, vægten i midten bliver lille
     r.dom.krop.classList.toggle('gruppe-opgave', opg.valgArt === 'gruppe');
+    r.dom.krop.classList.toggle('stil-opgave', opg.valgArt === 'stil'); // uret med målene ER svaret — det får pladsen
+    r.dom.krop.classList.toggle('scene-opgave', opg.valgArt === 'scene'); // svarkort med små scener
+    r.dom.krop.classList.remove('kort-store'); // tilpasScener vælger kortenes opstilling igen
+    // Uret er opgaven: på en telefon på langs står hjælpen ved siden af uret, så uret ikke skrumper
+    r.dom.krop.classList.toggle('ur-opgave', !!opg.vis && opg.vis.art === 'ur');
     r.dom.krop.classList.toggle('dansk-opgave', opg.fag === 'dansk');
     r.dom.svar.append(opg.valg ? valgKnapper(opg) : opg.byg ? bygPanel(opg) : opg.interaktiv ? interaktivPanel(opg) : taltastatur(opg));
     S.gentagTale = opg.tale;
     // Dansk: teksten, så de indtalte lyde (eller reserverne) — 🔊 gentager det hele
     S.gentagFn = opg.lyd ? () => sigOpgave(opg) : null;
-    sigOpgave(opg, forTale);
+    if (opg.valgArt === 'skjult') {
+      // Huskekort: 🔊 vender kortene op, læser igen og vender dem igen (til hjælpen har vendt dem op for godt)
+      S.gentagFn = () => { if (r.vendtOp) Tale.sig(opg.tale); else visSkjulteKort(opg); };
+      visSkjulteKort(opg, forTale);
+    } else sigOpgave(opg, forTale);
     huskMission();
     gem();
   }
@@ -1240,6 +1259,8 @@
       case 'formScene': return h('div', { class: 'form-scene' }, v.former.map((f) =>
         h('span', { class: 'scene-form' + (f.form === v.spoerg ? ' taelbar' : '') }, formSvg(f.form, f.farve, f.drej, false))));
       case 'ur': return h('div', { class: 'ur-ramme' }, urSvg(v.klokke));
+      case 'scene': return tegnScene(v.dele, { lag: v.lag });
+      case 'rute': return rutebraet(opg);
       case 'moenter': return moentRaekke(v.moenter);
       case 'koeb': return h('div', { class: 'koeb' },
         h('div', { class: 'koeb-vare' }, h('span', { class: 'moent-plads' }, moentSvg(v.har)), h('span', { class: 'koeb-pris' }, v.har + ' kr')),
@@ -1286,6 +1307,77 @@
     el('line', { x1: 50, y1: 50, x2: 50, y2: lille ? 29 : 25, class: 'ur-minut', transform: 'rotate(' + (m * 6) + ' 50 50)' });
     el('circle', { cx: 50, cy: 50, r: 3.5, class: 'ur-midte' });
     return svg;
+  }
+
+  // Stil viserne: et stort ur, hvor målene for den store viser (12, 3, 6, 9) er rigtige knapper oven på tallene.
+  // Valgene er tider ('7:45'); minuttallet bestemmer målet. Urets stilling gemmes som minutter siden 12
+  // (data-min), så den lille viser følger mekanisk med: 7:00 → 7:45 er tre fjerdedele af vejen fra 7 mod 8.
+  const MAAL_TAL = { 0: 12, 15: 3, 30: 6, 45: 9 };
+  function stilMin(klokke, start) {
+    const [t, m] = String(klokke).split(':').map(Number);
+    const fra = (Number(String(start).split(':')[0]) % 12) * 60;
+    let x = (t % 12) * 60 + m;
+    while (x < fra) x += 720; // «kvart i et»: 12:45 → 1:00 fortsætter fremad
+    return x;
+  }
+  function stilUr(opg) {
+    const ur = urSvg(opg.vis.start);
+    return h('div', { class: 'stil-ur', 'data-start': opg.vis.start, 'data-min': stilMin(opg.vis.start, opg.vis.start) },
+      ur,
+      opg.valg.map((x) => {
+        const tal = MAAL_TAL[Number(x.split(':')[1])];
+        const under = ur.querySelector('.ur-tal[data-tal="' + tal + '"]');
+        if (under) under.remove(); // knappen viser selv tallet — ellers skinner det igennem, når målet er dæmpet
+        const v = (tal / 12) * 2 * Math.PI;
+        return h('button', {
+          class: 'valg-knap stil-maal', type: 'button', 'data-v': x, 'aria-label': 'Den store viser på ' + tal,
+          style: '--x:' + (50 + 35 * Math.sin(v)).toFixed(1) + ';--y:' + (50 - 35 * Math.cos(v)).toFixed(1),
+          onclick: (e) => { Lyd.init(); stilViser(opg, x, e.currentTarget); },
+        }, String(tal));
+      }));
+  }
+  // Drej viserne til en tid. Uden bevægelse (prefers-reduced-motion): straks den nye stilling.
+  function drejUr(felt, klokke) {
+    const ur = felt.querySelector('.ur-svg');
+    const fra = Number(felt.getAttribute('data-min'));
+    const til = stilMin(klokke, felt.getAttribute('data-start'));
+    felt.setAttribute('data-min', til);
+    const saet = (x) => {
+      ur.querySelector('.ur-time').setAttribute('transform', 'rotate(' + (x / 2) + ' 50 50)');
+      ur.querySelector('.ur-minut').setAttribute('transform', 'rotate(' + (x * 6) + ' 50 50)');
+    };
+    const rolig = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    const varighed = rolig ? 0 : (500 + Math.abs(til - fra) * 18) * TEMPO; // et kvarter ≈ 0,8 s, en hel omgang ≈ 1,6 s
+    if (!varighed || fra === til) { saet(til); return Promise.resolve(); }
+    return new Promise((ok) => {
+      const t0 = performance.now();
+      let faerdig = false;
+      const slut = () => { if (!faerdig) { faerdig = true; saet(til); ok(); } };
+      const trin = (nu) => {
+        if (faerdig) return;
+        const p = Math.min(1, (nu - t0) / varighed);
+        saet(fra + (til - fra) * (p < 0.5 ? 2 * p * p : 1 - Math.pow(2 - 2 * p, 2) / 2));
+        if (p < 1) requestAnimationFrame(trin); else slut();
+      };
+      requestAnimationFrame(trin);
+      setTimeout(slut, varighed + 400); // en skjult fane tegner ingen billeder — svaret må ikke hænge
+    });
+  }
+  // Et tryk på et mål: den store viser drejer derhen (den lille følger med), så vurderes svaret som altid
+  async function stilViser(opg, x, knap) {
+    const r = S.runde;
+    if (!r || r.laast) return;
+    const felt = r.dom.svar.querySelector('.stil-ur');
+    if (!felt) { svar(x, knap); return; }
+    const token = S.token, i = r.i;
+    r.laast = true;
+    clearTimeout(r.mindTimer);
+    Tale.stop();
+    felt.querySelectorAll('.lyser').forEach((el) => el.classList.remove('lyser'));
+    await drejUr(felt, x);
+    if (token !== S.token || S.runde !== r || r.i !== i) return;
+    r.laast = false;
+    svar(x, knap);
   }
 
   // Mønter: 1, 2 og 5 kr er sølv med hul, 10 og 20 kr er guld (forenklet, egen tegning)
@@ -1495,6 +1587,411 @@
     return linje;
   }
 
+  // =====================================================================
+  //  D (forslaget 09-10): SCENER. De nye opgavetyper beskriver små dele (docs/SCENE.md), som tegnes ens overalt:
+  //  i opgavefeltet og på svarkortene. Alle mål er gange --u (px); tilpasScener() sætter --u, så scenen fylder
+  //  sin plads uden at stikke ud. data-del="id" er det, hjælpen «lys» peger på.
+  // =====================================================================
+  const RAMMER = ['boks', 'kurv', 'kasse', 'maatte', 'ingen'];
+
+  // Ting: rækker af 5 (tingGruppe) — eller én række (linje), så to rækker kan sammenlignes ting for ting.
+  // «under» giver nogle af tingene et data-del (og evt. et andet taelbar) uden synlig forskel.
+  function sceneTing(d) {
+    let el, ting;
+    if (d.linje) {
+      ting = Array.from({ length: d.n }, () => h('span', { class: 'ting taelbar' }, d.e));
+      el = h('div', { class: 'ting-gruppe i-scene linje' }, h('div', { class: 'ting-blok' }, h('div', { class: 'ting-raekke' }, ting)));
+    } else {
+      el = tingGruppe(d.n, d.e, null, 'i-scene');
+      ting = [...el.querySelectorAll('.ting')];
+    }
+    if (d.spredt) el.classList.add('spredt');
+    if (d.taelbar === false) ting.forEach((t) => t.classList.remove('taelbar'));
+    (d.under || []).forEach((u) => ting.slice(u.fra, u.til).forEach((t) => {
+      t.setAttribute('data-del', u.id);
+      if (u.taelbar === true) t.classList.add('taelbar');
+      else if (u.taelbar === false) t.classList.remove('taelbar');
+    }));
+    return el;
+  }
+
+  // Et hus med n værelser i én række. De fyldte værelser har en emoji og et data-del; fra taelbarFra tælles de
+  function scenePladser(d) {
+    const celler = [];
+    for (let i = 0; i < d.n; i++) {
+      const f = (d.fyldt || []).find((x) => i >= x.fra && i < x.til);
+      const taelbar = typeof d.taelbarFra === 'number' && i >= d.taelbarFra;
+      celler.push(h('span', { class: 'plads' + (f ? ' fyldt' : '') + (taelbar ? ' taelbar' : ''), 'data-del': f ? f.id : null }, f ? f.e : null));
+    }
+    return h('div', { class: 'sd-hus' }, h('span', { class: 'hus-tag', 'aria-hidden': 'true' }), h('div', { class: 'hus-rum' }, celler));
+  }
+
+  // Tierstænger og enere. Enerne står i søjler af højst 10 (over 9: to søjler). rammeOmTi: de første 10 enere
+  // står i en stiplet ramme (data-del 'ti') — lige så høj som en tierstang
+  function sceneStaenger(d) {
+    const ud = staenger(d.tiere, 0);
+    const soejle = (n) => { const en = h('span', { class: 'enere' }); for (let k = 0; k < n; k++) en.append(h('i', { class: 'klods ener taelbar' })); return en; };
+    let rest = d.enere || 0;
+    if (d.rammeOmTi) {
+      ud.querySelectorAll('.stang').forEach((s) => s.setAttribute('data-del', 'tiere'));
+      if (rest >= 10) { ud.append(h('span', { class: 'sd-ti', 'data-del': 'ti' }, soejle(10))); rest -= 10; }
+      if (rest) { const s = soejle(rest); s.setAttribute('data-del', 'rest'); ud.append(s); }
+    } else {
+      while (rest > 0) { const n = Math.min(10, rest); ud.append(soejle(n)); rest -= n; }
+    }
+    return ud;
+  }
+
+  // Mønsterbrikker i en række. pil: her begynder mønstret. pakke k: brikkerne grupperes k ad gangen (data-del g0,
+  // g1 …) uden synligt mellemrum — så gentagelsen ikke afsløres
+  function sceneRaekke(d) {
+    const celler = d.celler.map((c) => h('span', { class: 'brik-celle taelbar', 'data-brik': c }, c));
+    let indhold = celler;
+    if (d.pakke) {
+      indhold = [];
+      for (let i = 0; i < celler.length; i += d.pakke) indhold.push(h('span', { class: 'sd-pakke', 'data-del': 'g' + (i / d.pakke) }, celler.slice(i, i + d.pakke)));
+    }
+    let pil = null;
+    if (d.pil) {
+      const svg = svgEl('svg', { viewBox: '0 0 40 40', 'aria-hidden': 'true' });
+      svgEl('path', { d: 'M3 14 H21 V5 L38 20 L21 35 V26 H3 Z', class: 'sd-pil-form' }, svg);
+      pil = h('span', { class: 'sd-pil' }, svg);
+    }
+    // Brikker pr. række, når frisen står i to rækker: med pakker brydes der kun mellem hele pakker (9 i pakker af 3
+    // → 6 + 3), så den anden række ikke begynder midt i en pakke
+    const halv = d.pakke ? Math.ceil(Math.ceil(d.celler.length / d.pakke) / 2) * d.pakke : Math.ceil(d.celler.length / 2);
+    return h('div', { class: 'sd-raekke' + (d.pil ? ' frise' : ''), style: '--halv:' + halv }, pil, indhold);
+  }
+
+  // Formbyen (D): brikker i et koordinatsystem, hvor kvadratet er 100 × 100 (som PUSLESPIL i opgaver.js).
+  // Trekanten er retvinklet med den rette vinkel i hjørnet nv/no/sv/so; halvcirklen har den flade side op/ned/venstre/hoejre.
+  function brikSti(b, x, y) {
+    x = x || 0; y = y || 0;
+    const B = b.b, H = b.h;
+    const p = (q) => q[0] + ',' + q[1];
+    if (b.form === 'trekant') {
+      const hj = { nv: [[x, y], [x + B, y], [x, y + H]], no: [[x + B, y], [x, y], [x + B, y + H]], sv: [[x, y + H], [x, y], [x + B, y + H]], so: [[x + B, y + H], [x + B, y], [x, y + H]] }[b.hjoerne] || [[x, y + H], [x, y], [x + B, y + H]];
+      return 'M' + hj.map(p).join(' L') + ' Z';
+    }
+    if (b.form === 'halvcirkel') {
+      const bue = (fra, til, rx, ry) => 'M' + p(fra) + ' A' + rx + ',' + ry + ' 0 0 1 ' + p(til) + ' Z';
+      if (b.flad === 'op') return bue([x + B, y], [x, y], B / 2, H);
+      if (b.flad === 'venstre') return bue([x, y], [x, y + H], B, H / 2);
+      if (b.flad === 'hoejre') return bue([x + B, y + H], [x + B, y], B, H / 2);
+      return bue([x, y + H], [x + B, y + H], B / 2, H); // flad side nedad
+    }
+    if (b.form === 'cirkel') return 'M' + x + ',' + (y + H / 2) + ' A' + B / 2 + ',' + H / 2 + ' 0 1 1 ' + (x + B) + ',' + (y + H / 2) + ' A' + B / 2 + ',' + H / 2 + ' 0 1 1 ' + x + ',' + (y + H / 2) + ' Z';
+    return 'M' + x + ',' + y + ' H' + (x + B) + ' V' + (y + H) + ' H' + x + ' Z'; // kvadrat og rektangel
+  }
+  // Puslespillet: en bakke med figuren skåret i to — den faste brik er farvet, hullet er en stiplet kontur
+  function scenePuslespil(d) {
+    const m = 14;
+    const svg = svgEl('svg', { viewBox: (-m) + ' ' + (-m) + ' ' + (d.b + 2 * m) + ' ' + (d.h + 2 * m), 'aria-hidden': 'true' });
+    svgEl('rect', { x: 2 - m, y: 2 - m, width: d.b + 2 * m - 4, height: d.h + 2 * m - 4, rx: 10, class: 'pusle-bakke' }, svg);
+    svgEl('path', { d: brikSti(d.fast, d.fast.x, d.fast.y), class: 'brik-fyld' }, svg);
+    svgEl('path', { d: brikSti(d.hul, d.hul.x, d.hul.y), class: 'pusle-hul', 'data-del': 'hul' }, svg);
+    return h('span', { class: 'sd-pusle', style: '--vb-b:' + (d.b + 2 * m) + ';--vb-h:' + (d.h + 2 * m) }, svg);
+  }
+  // Én brik (svarkort) i samme målestok som puslespillet
+  function sceneBrik(d) {
+    const m = 6;
+    const svg = svgEl('svg', { viewBox: (-m) + ' ' + (-m) + ' ' + (d.b + 2 * m) + ' ' + (d.h + 2 * m), 'aria-hidden': 'true' });
+    svgEl('path', { d: brikSti(d), class: 'brik-fyld' }, svg);
+    return h('span', { class: 'sd-brik', style: '--vb-b:' + (d.b + 2 * m) + ';--vb-h:' + (d.h + 2 * m) }, svg);
+  }
+
+  // Små ord (D1): tingen er tydeligt INDE I beholderen (delvist skjult bag forkanten), OVEN PÅ den eller BAG den.
+  // «På» tegnes med beholderen stående og lukket med et låg (kasse, kurv og skål), og tingen står på låget —
+  // «i» med beholderen åben, så man ser ned i den. Så ligner de to aldrig hinanden (en kurv på hovedet lignede en skammel).
+  // «Bag» (bagved): beholderen står lukket som i «på», og tingen står bag den, forskudt til højre, så den kigger frem
+  // bag kanten fra siden og over låget — resten skjules af beholderens forside. (Midt bag beholderen lignede den «i».)
+  // Tegningen er 128 bred (x −14 … 114, beholderen står midt i, x 50), så «bag»-tingen ikke klippes; alle tre ens.
+  // Lagene: beholderens bagside → tingen → forsiden. Begge lag har data-del="beholder" (hjælpen lyser dem).
+  // Scenen har data-rel (i/på/bag), så testene kan se, hvilken placering der er tegnet.
+  function scenePlacering(d) {
+    const rel = d.rel === 'i' || d.rel === 'bag' ? d.rel : 'på';
+    const paa = rel !== 'i'; // lukket beholder med låg (både «på» og «bag»)
+    const lag = (klasse) => svgEl('svg', { viewBox: '-14 0 128 110', class: klasse, 'data-del': 'beholder', 'aria-hidden': 'true' });
+    const bag = lag('plac-bag'), foran = lag('plac-for');
+    const laag = (x, b, rx) => svgEl('rect', { x: x, y: 53, width: b, height: 11, rx: rx, class: 'plac-laag' }, foran);
+    // Kurvens fletning: vandrette streger, der stopper ved de skrå sider (kanten går fra x 10–90 ved y0 til 22–78 ved 104)
+    const flet = (y0, ys) => ys.forEach((y) => {
+      const ind = 12 * (y - y0) / (104 - y0) + 2.5;
+      svgEl('line', { x1: 10 + ind, y1: y, x2: 90 - ind, y2: y, class: 'plac-flet' }, foran);
+    });
+    let top; // hvor tingen står (y i tegningen): bunden af tingen
+    if (d.beholder === 'kurv') {
+      if (paa) {
+        svgEl('path', { d: 'M10 62 H90 L78 104 H22 Z', class: 'plac-krop' }, foran);
+        flet(62, [76, 90]);
+        laag(6, 88, 4);
+        top = 54;
+      } else {
+        svgEl('path', { d: 'M18 58 C18 6 82 6 82 58', class: 'plac-hank' }, bag);
+        svgEl('ellipse', { cx: 50, cy: 58, rx: 40, ry: 9, class: 'plac-inde' }, bag);
+        svgEl('path', { d: 'M10 58 H90 L78 104 H22 Z', class: 'plac-krop' }, foran);
+        flet(58, [72, 88]);
+        top = 78;
+      }
+    } else if (d.beholder === 'skaal') {
+      if (paa) {
+        svgEl('path', { d: 'M6 62 A44 42 0 0 0 94 62 Z', class: 'plac-krop' }, foran);
+        laag(3, 94, 5);
+        top = 54;
+      } else {
+        svgEl('ellipse', { cx: 50, cy: 62, rx: 44, ry: 10, class: 'plac-inde' }, bag);
+        svgEl('path', { d: 'M6 62 A44 42 0 0 0 94 62 Z', class: 'plac-krop' }, foran);
+        top = 82;
+      }
+    } else {
+      // Kassen: åben (tingen er inde i den) eller lukket med låg (tingen står ovenpå)
+      if (paa) {
+        svgEl('rect', { x: 10, y: 62, width: 80, height: 42, rx: 4, class: 'plac-krop' }, foran);
+        laag(6, 88, 3);
+        top = 54;
+      } else {
+        svgEl('path', { d: 'M10 62 L20 46 H80 L90 62 Z', class: 'plac-inde' }, bag);
+        svgEl('rect', { x: 10, y: 62, width: 80, height: 42, rx: 4, class: 'plac-krop' }, foran);
+        top = 80;
+      }
+    }
+    // Bag: tingens midte står ved beholderens højre kant (x 84) og dens bund skjult bag forsiden (y 80), så toppen
+    // og den højre halvdel ses — venstre halvdel er bag beholderen
+    let midt = 50;
+    if (rel === 'bag') { top = 80; midt = 84; }
+    const ting = h('span', { class: 'plac-ting', 'aria-hidden': 'true', style: 'bottom:' + ((110 - top) / 110 * 100).toFixed(1) + '%;left:' + ((midt + 14) / 128 * 100).toFixed(1) + '%' }, d.ting);
+    return h('span', { class: 'sd-placering beholder-' + (d.beholder || 'kasse') + ({ i: ' i', 'på': ' paa', bag: ' bag' })[rel], 'data-rel': rel }, bag, ting, foran);
+  }
+
+  const SCENE_DEL = {
+    gruppe: (d) => h('div', { class: 'sd-gruppe ramme-' + (RAMMER.indexOf(d.ramme) >= 0 ? d.ramme : 'boks') }, (d.dele || []).map(sceneDel)),
+    ting: sceneTing,
+    tegn: (d) => h('span', { class: 'sd-tegn', 'aria-hidden': 'true' }, d.s),
+    tal: (d) => h('span', { class: 'sd-tal' + (d.s === '?' ? ' hul' : '') + (d.ret ? ' ret' : '') }, String(d.s),
+      d.laast ? h('i', { class: 'sd-laas', 'aria-hidden': 'true' }, '🔒') : null),
+    pladser: scenePladser,
+    staenger: sceneStaenger,
+    raekke: sceneRaekke,
+    moenter: (d) => moentRaekke(d.liste || []),
+    moent: (d) => h('span', { class: 'moent-plads' }, moentSvg(d.kr)),
+    vare: (d) => h('div', { class: 'koeb-vare' }, h('span', { class: 'koeb-emoji', 'aria-hidden': 'true' }, d.e), h('span', { class: 'koeb-pris' }, d.pris + ' kr')),
+    digital: (d) => h('div', { class: 'sd-digital-ur' }, h('span', { class: 'sd-digital-tal' }, d.klokke)),
+    form: (d) => h('span', { class: 'sd-figur' }, formSvg(d.form, d.farve, d.drej, false)),
+    puslespil: scenePuslespil,
+    brik: sceneBrik,
+    placering: scenePlacering,
+  };
+
+  // Én del: elementet får klassen sd-<t> og data-del; et navn står som en lille etiket under delen
+  function sceneDel(d) {
+    const lav = SCENE_DEL[d.t];
+    let el = lav ? lav(d) : h('span');
+    el.classList.add('sd', 'sd-' + d.t);
+    if (d.id) el.setAttribute('data-del', d.id);
+    if (d.navn) el = h('div', { class: 'sd-navngivet' }, el, h('span', { class: 'sd-navn' }, d.navn));
+    return el;
+  }
+
+  // Hele scenen: delene i rækker (lag 'raekke': én række, evt. to; 'stak': én del pr. række)
+  function tegnScene(dele, opts) {
+    opts = opts || {};
+    const scene = h('div', { class: 'scene lag-' + (opts.lag === 'stak' ? 'stak' : 'raekke') + (opts.kort ? ' kort-scene' : '') });
+    scene._dele = (dele || []).map(sceneDel);
+    scene._lag = opts.lag === 'stak' ? 'stak' : 'raekke';
+    arrangerScene(scene, 0);
+    setTimeout(() => foelgScene(scene), 0);
+    return scene;
+  }
+
+  // En frise (mønsterrække med pil) læses bedst i én linje: den brydes kun, når brikkerne ellers bliver små.
+  // En lille pakke på et svarkort brydes aldrig (A B / C ligner et andet mønster)
+  const harFrise = (scene) => !!scene.querySelector('.sd-raekke.frise');
+  // To rækker, der sammenlignes ting for ting (stak af lange rækker), kan vendes til to søjler side om side
+  const kanVendes = (scene) => scene._lag === 'stak' && scene._dele.length > 1 && scene._dele.every((d) => d.classList.contains('linje'));
+  // Hvor en række af dele må brydes. Er der tegn, brydes der lige EFTER et tegn (en ny linje begynder aldrig med
+  // «+»), og en pil (→) står for sig selv og peger nedad. Uden tegn må der brydes mellem alle dele.
+  function brudSteder(dele) {
+    const erTegn = dele.map((d) => d.classList.contains('sd-tegn'));
+    const ud = [];
+    if (erTegn.some(Boolean)) {
+      dele.forEach((d, t) => {
+        if (!erTegn[t] || t === 0 || t === dele.length - 1) return;
+        ud.push(d.textContent === '→' ? { t: t, pil: true } : { t: t + 1, pil: false });
+      });
+    } else for (let t = 1; t < dele.length; t++) ud.push({ t: t, pil: false });
+    return ud;
+  }
+  function delIRader(dele, brud) {
+    const rader = [];
+    let fra = 0;
+    brud.forEach((b) => {
+      rader.push(dele.slice(fra, b.t));
+      if (b.pil) { rader.push([dele[b.t]]); fra = b.t + 1; } else fra = b.t;
+    });
+    rader.push(dele.slice(fra));
+    return rader.every((r) => r.length) ? rader : null;
+  }
+  const kombinationer = (liste, k) => (k === 0 ? [[]] : [].concat.apply([], liste.map((x, i) => kombinationer(liste.slice(i + 1), k - 1).map((r) => [x].concat(r)))));
+  // Hvor mange gange kan scenen brydes (0 = kun én opstilling)? Rækker af dele: op til to brud (tre rækker)
+  function maksBrud(scene) {
+    if (harFrise(scene)) return 1;
+    if (scene._lag === 'stak') return kanVendes(scene) ? 1 : 0;
+    return scene._dele.length > 1 ? Math.min(2, brudSteder(scene._dele).length) : 0;
+  }
+
+  // Stil delene op. to = antal brud: 0 = én række (stak: én del pr. række). Ellers deles rækken, så den bredeste
+  // række bliver så smal som muligt; en frise brydes i to, og en stak af lange rækker vendes til søjler.
+  // (Bredderne måles, så scenen skal være på skærmen.)
+  function arrangerScene(scene, to) {
+    to = Number(to) || 0;
+    const dele = scene._dele;
+    dele.forEach((d) => [d].concat([...d.querySelectorAll('.sd-raekke')]).forEach((x) => {
+      if (x.classList.contains('sd-raekke')) x.classList.toggle('to-rader', to > 0 && x.classList.contains('frise') && x.querySelectorAll('.brik-celle').length > 2);
+    }));
+    const vend = to > 0 && kanVendes(scene);
+    scene.classList.toggle('lodret', vend);
+    let rader = [dele];
+    if (scene._lag === 'stak') rader = vend ? [dele] : dele.map((d) => [d]);
+    else if (to && dele.length > 1) {
+      scene.textContent = '';
+      const proeve = h('div', { class: 'scene-rad' }, dele);
+      scene.append(proeve);
+      const b = dele.map((d) => d.offsetWidth);
+      const gab = parseFloat(getComputedStyle(proeve).columnGap) || 0;
+      const bredde = (rad) => rad.reduce((s, d) => s + b[dele.indexOf(d)], 0) + gab * (rad.length - 1);
+      const steder = brudSteder(dele);
+      let bedst = null, bedstB = Infinity;
+      for (let k = Math.min(to, steder.length); k >= 1 && !bedst; k--) {
+        kombinationer(steder, k).forEach((brud) => {
+          const r = delIRader(dele, brud);
+          if (!r) return;
+          const w = Math.max.apply(null, r.map(bredde));
+          if (w < bedstB) { bedstB = w; bedst = r; }
+        });
+      }
+      if (bedst) rader = bedst;
+    }
+    // En pil, der står alene i sin række, peger nedad
+    dele.forEach((d) => { if (d.classList.contains('sd-tegn')) d.classList.toggle('ned', rader.length > 1 && rader.some((rad) => rad.length === 1 && rad[0] === d)); });
+    scene.textContent = '';
+    rader.forEach((rad) => scene.append(h('div', { class: 'scene-rad' }, rad)));
+    scene._to = to;
+  }
+
+  // Det største --u, hvor scenen kan stå i B × H. Nogle mål har et minimum (tekst ≥ 17 px), så der måles igen.
+  const U_MIN = 3;
+  function saetU(scene, u) { scene.style.setProperty('--u', (Math.floor(u * 100) / 100) + 'px'); }
+  function stoersteU(scene, B, H, uMax) {
+    let u = Math.min(10, uMax), passer = 0;
+    for (let k = 0; k < 7; k++) {
+      saetU(scene, u);
+      const w = scene.offsetWidth, hh = scene.offsetHeight;
+      if (!w || !hh) return u;
+      const f = Math.min(B / w, H / hh);
+      if (f >= 1) passer = Math.max(passer, u);
+      if (f >= 1 && (f < 1.02 || u >= uMax)) break;
+      const ny = Math.max(U_MIN, Math.min(uMax, u * f * (f < 1 ? 0.99 : 1)));
+      if (Math.abs(ny - u) < 0.02) break;
+      u = ny;
+    }
+    return Math.min(uMax, passer || U_MIN);
+  }
+  // Pladsen til en scene: forælderens indholdsboks (minus søskende i samme felt og en lille margen til lyset)
+  function sceneBoks(scene) {
+    const p = scene.parentElement;
+    const cs = getComputedStyle(p);
+    let B = p.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    let H = p.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    const gab = parseFloat(cs.rowGap) || 0;
+    [...p.children].forEach((c) => { if (c !== scene && c.getClientRects().length) H -= c.offsetHeight + gab; });
+    return [B - 10, H - 10];
+  }
+  function tilpasEn(scene, uMax) {
+    const [B, H] = sceneBoks(scene);
+    if (B <= 0 || H <= 0) return 0;
+    // Hvert brud mere skal give tydeligt større dele (15 %); en frise brydes kun, når brikkerne ellers bliver små
+    arrangerScene(scene, 0);
+    let u = stoersteU(scene, B, H, uMax), to = 0;
+    const frise = harFrise(scene);
+    for (let k = 1; k <= maksBrud(scene); k++) {
+      arrangerScene(scene, k);
+      const uk = stoersteU(scene, B, H, uMax);
+      if (frise ? to === 0 && u < 7 && uk > u * 1.4 : uk > u * 1.15) { u = uk; to = k; }
+    }
+    if (scene._to !== to) arrangerScene(scene, to);
+    saetU(scene, u);
+    return u;
+  }
+  // Svarkortene får samme opstilling og samme --u, så de kan sammenlignes
+  function tilpasKort(scener, uMax) {
+    const proev = (to) => Math.min.apply(null, scener.map((s) => {
+      arrangerScene(s, to);
+      const [B, H] = sceneBoks(s);
+      return B > 0 && H > 0 ? stoersteU(s, B, H, uMax) : U_MIN;
+    }));
+    let to = 0, u = proev(0);
+    const maks = Math.max.apply(null, scener.map(maksBrud));
+    for (let k = 1; k <= maks; k++) {
+      const uk = proev(k);
+      if (uk > u * 1.15) { to = k; u = uk; }
+    }
+    scener.forEach((s) => { if (s._to !== to) arrangerScene(s, to); saetU(s, u); });
+    return u;
+  }
+  // Alle scener i runden tilpasses samlet: når de tegnes, og når deres felt skifter størrelse (fx når hjælpen
+  // tager plads, eller iPad'en vendes). Ved puslespillet får hullet og brikkerne samme størrelse på skærmen.
+  let tilpasVenter = 0;
+  const sceneFelter = new Set();
+  const sceneRO = window.ResizeObserver ? new ResizeObserver(() => planlaegTilpas()) : null;
+  function planlaegTilpas() {
+    if (!tilpasVenter) tilpasVenter = requestAnimationFrame(() => { tilpasVenter = 0; tilpasScener(); });
+  }
+  function foelgScene(scene) {
+    const p = scene.parentElement;
+    if (!scene.isConnected || !p) return;
+    if (sceneRO && !sceneFelter.has(p)) { sceneFelter.add(p); sceneRO.observe(p); }
+    planlaegTilpas();
+  }
+  if (!window.ResizeObserver) window.addEventListener('resize', () => planlaegTilpas());
+  function tilpasScener() {
+    sceneFelter.forEach((p) => { if (!p.isConnected) { sceneFelter.delete(p); if (sceneRO) sceneRO.unobserve(p); } });
+    const alle = [...document.querySelectorAll('#app .runde .scene')];
+    const kort = alle.filter((s) => s.closest('.valg-knap'));
+    const opgave = alle.filter((s) => !s.closest('.valg-knap'));
+    // Puslespil og mønter: opgaven og svarkortene tegnes i samme størrelse (hullet = brikken, 1 kr = 1 kr)
+    const samme = opgave.find((s) => s.querySelector('.sd-pusle, .sd-moenter'));
+    const sammeKort = !!samme && kort.some((s) => s.querySelector('.sd-brik, .sd-moent'));
+    // Mønsterfrisen: brikkerne på svarkortene er aldrig større end frisens (opgaven er det, der skal ses)
+    const friseKort = opgave.some(harFrise) && kort.some((s) => s.querySelector('.sd-raekke'));
+    // Tilpas det hele; giver den mindste --u (opgave eller kort) — den, der bestemmer, hvor godt det kan ses
+    const tilpasAlt = () => {
+      let uq = 22;
+      opgave.forEach((s) => { const u = tilpasEn(s, 22); if (u) uq = Math.min(uq, u); });
+      if (!kort.length) return uq;
+      const uk = tilpasKort(kort, sammeKort || friseKort ? uq : 22);
+      if (sammeKort && uk < uq) { saetU(samme, uk); uq = uk; }
+      return Math.min(uq, uk);
+    };
+    const valg = kort.length ? kort[0].closest('.valg') : null;
+    if (!valg) { tilpasAlt(); return; }
+    // Svarkortene side om side — eller stablet under hinanden (brede kort som mønsterrækker og figur med bær)?
+    // Høje kort (fx tierstænger) får desuden prøvet «store» kort: på en iPad på langs side om side i en bredere
+    // kolonne (normalt står de under hinanden i en smal), på højkant højere kort. Den opstilling, hvor det mindste
+    // står størst, vælges (den første, hvis de er lige gode). Telefonen på langs har sin egen opstilling.
+    // Valget ligger fast for skærmens størrelse — kortene må ikke springe, når hjælpen tager plads i opgavefeltet.
+    const skaerm = window.innerWidth + 'x' + window.innerHeight;
+    if (valg._stakFor === skaerm) { tilpasAlt(); return; }
+    valg._stakFor = skaerm;
+    const krop = valg.closest('.runde-krop');
+    const saet = (o) => { valg.classList.toggle('kort-stak', o === 'stak'); if (krop) krop.classList.toggle('kort-store', o === 'store'); };
+    const muligheder = ['side', 'stak'];
+    if (krop && (window.innerHeight > window.innerWidth || window.innerHeight > 500)) muligheder.push('store');
+    let valgt = null, bedst = 0;
+    muligheder.forEach((o) => { saet(o); const u = tilpasAlt(); if (!valgt || u > bedst * 1.1) { valgt = o; bedst = u; } });
+    saet(valgt);
+    tilpasAlt();
+  }
+
   // ---------- Dansk (B4): visninger, svarknapper, byg-ord og hjælp ----------
   // Bogstav-kort: stort og lille bogstav (M m) — læses og skrives med små, så det lille er størst
   function bogstavKort(b, kunLille) {
@@ -1521,9 +2018,11 @@
     }, b)));
   }
   // Tomme felter, der fyldes, mens barnet bygger ordet/sætningen
-  function bygFelter(opg) {
+  function bygFelter(opg, nummereret) {
     const dele = opg.byg.dele;
-    return h('div', { class: 'byg-felter' + (opg.byg.adskil ? ' ord' : '') }, Array.from({ length: dele }, () => h('span', { class: 'byg-felt' }, '')));
+    // «Hvad skete der?»: pladserne er nummererede (1 2 3), og brikkerne er billeder
+    return h('div', { class: 'byg-felter' + (opg.byg.adskil ? ' ord' : '') + (nummereret ? ' nummereret' : '') },
+      Array.from({ length: dele }, (_, k) => h('span', { class: 'byg-felt', 'data-nr': nummereret ? k + 1 : null })));
   }
 
   function tegnDanskVisning(opg) {
@@ -1550,12 +2049,36 @@
       case 'bygOrd': return h('div', { class: 'dansk-billede byg' }, ordEmoji(v.ord, v.e, 'mellem'), bygFelter(opg));
       case 'saetning': return lytKnap(opg);
       case 'bygSaetning': return h('div', { class: 'dansk-billede byg' }, lytKnap(opg), bygFelter(opg));
+      case 'bygHistorie': return h('div', { class: 'dansk-billede byg' }, lytKnap(opg), bygFelter(opg, true));
+      // D1: scener (fx «i» og «på»), det trykte bogstav og ordet med ét forkert bogstav
+      case 'scene': return tegnScene(v.dele, { lag: v.lag });
+      case 'tryktBogstav': return h('div', { class: 'dansk-billede trykt' }, h('span', { class: 'trykt-bogstav' }, v.bogstav));
+      case 'retOrd': {
+        const ord = skrevetOrd(v.vist);
+        const ret = ord.children[v.plads];
+        if (ret) ret.classList.add('ret'); // brikken, der skal rettes (stiplet ring)
+        return h('div', { class: 'dansk-billede' }, ordEmoji(v.ord, v.e, 'mellem'), ord);
+      }
       default: return h('div');
     }
   }
 
+  // Et bogstav skrevet i hånden: strøgene fra Dansk.SKRIFT som fulde streger (samme forlæg som ✏️ Skriv)
+  function haandskriftSvg(b) {
+    const svg = svgEl('svg', { viewBox: '18 8 64 94', class: 'haandskrift-svg', 'aria-hidden': 'true' });
+    ((D && D.SKRIFT && D.SKRIFT[b]) || []).forEach((st) => svgEl('polyline', { points: st.map((q) => q.join(',')).join(' '), class: 'haandskrift-streg' }, svg));
+    return svg;
+  }
+
   function danskValgIndhold(opg, x) {
     if (opg.valgArt === 'emoji') { const o = D.ORD[x]; return h('span', { class: 'valg-emoji', 'aria-hidden': 'true' }, o ? o.e : x); }
+    // Huskekort: forsiden (billedet) og bagsiden — kortet vendes af visSkjulteKort
+    if (opg.valgArt === 'skjult') {
+      const o = D.ORD[x];
+      return h('span', { class: 'vende-kort', 'aria-hidden': 'true' }, h('span', { class: 'vende-for valg-emoji' }, o ? o.e : x), h('span', { class: 'vende-bag' }, '?'));
+    }
+    if (opg.valgArt === 'haandskrift') return haandskriftSvg(x);
+    if (opg.valgArt === 'scene') return tegnScene(opg.kort[x].dele, { kort: true });
     if (opg.valgArt === 'bogstav') return bogstavKort(x, opg.kunLille || opg.emne !== 'alfabet');
     if (opg.valgArt === 'skrevet') return h('span', { class: 'valg-skrevet' }, x);
     return String(x);
@@ -1566,8 +2089,9 @@
     const r = S.runde;
     r.byg = [];
     const B = opg.byg;
+    // byg.tale: brikken siger sin sætning (fx hændelsen på billedet) i stedet for selve teksten
     const brikker = B.brikker.map((t, i) => h('button', {
-      class: 'byg-brik' + (B.adskil ? ' ord' : ''), type: 'button', 'data-i': i, 'data-t': t, 'aria-label': t,
+      class: 'byg-brik' + (B.adskil ? ' ord' : '') + (B.tale ? ' billede' : ''), type: 'button', 'data-i': i, 'data-t': t, 'aria-label': B.tale ? B.tale[i] : t,
       onclick: () => vaelg(i),
     }, t));
     const slet = h('button', { class: 'byg-brik slet', type: 'button', 'aria-label': 'Slet', onclick: () => fjern() }, '⌫');
@@ -1582,7 +2106,7 @@
       Lyd.init(); Lyd.tryk();
       r.byg.push(i);
       // Hver brik siger sin lyd (bogstav) eller sit ord
-      if (B.adskil) Tale.sig(B.brikker[i]); else Lyd.klip(D.lydId(B.brikker[i]), '');
+      if (B.tale) Tale.sig(B.tale[i]); else if (B.adskil) Tale.sig(B.brikker[i]); else Lyd.klip(D.lydId(B.brikker[i]), '');
       tegn();
       if (r.byg.length === B.dele) {
         const svarTekst = r.byg.map((k) => B.brikker[k]).join(B.adskil);
@@ -1594,7 +2118,7 @@
     r.bygFjern = fjern;
     r.bygNulstil = () => { r.byg = []; tegn(); };
     setTimeout(tegn, 0);
-    return h('div', { class: 'byg-panel' + (B.adskil ? ' ord' : '') }, brikker, slet);
+    return h('div', { class: 'byg-panel' + (B.adskil ? ' ord' : '') + (B.tale ? ' billeder' : '') }, brikker, slet);
   }
 
   // Spørgsmålet læses op: tekst → (indtalte lyde eller reserver) → evt. de mulige svar
@@ -1612,6 +2136,29 @@
     if (opg.efterTale) await Tale.sigVent(opg.efterTale);
   }
 
+  // Huskekort (D1): kortene ligger med forsiden op, mens oplæsningen nævner dem. Når den er færdig (senest efter
+  // 8 s), vendes de. Kortene flytter sig ikke. Med prefers-reduced-motion vendes de uden animation (CSS).
+  function visSkjulteKort(opg, forTale) {
+    const r = S.runde, i = r.i;
+    const valg = r.dom.svar.querySelector('.valg');
+    if (!valg) return;
+    valg.classList.remove('vendt');
+    // Hvert kald har sit eget nummer: når 🔊 afbryder oplæsningen, må det ældre kald ikke vende kortene (review #1)
+    const gen = r.skjultGen = (r.skjultGen || 0) + 1;
+    const start = performance.now();
+    let vendt = false;
+    const vend = () => {
+      if (vendt || S.runde !== r || r.i !== i || r.vendtOp || r.skjultGen !== gen) return;
+      // Forsiden ses mindst 3 s — også uden oplæsning, hvor talen «slutter» med det samme (review #2)
+      const rest = 3000 * TEMPO - (performance.now() - start);
+      if (rest > 0) { setTimeout(vend, rest); return; }
+      vendt = true;
+      valg.classList.add('vendt');
+    };
+    Tale.sig((forTale ? forTale + ' ' : '') + opg.tale, vend);
+    setTimeout(vend, 8000 * TEMPO);
+  }
+
   // ---------- Svar: knapper ----------
   // Indholdet af en svarknap: tal, figur, gruppe af ting, ord eller mønsterbrik
   function valgIndhold(opg, x) {
@@ -1621,6 +2168,7 @@
     if (opg.valgArt === 'gruppe') return tingGruppe(x === 'a' ? v.a : v.b, O.TING[v.ting].e, x, 'knap');
     if (opg.valgArt === 'ur') return urSvg(x, true);
     if (opg.valgArt === 'tid') return h('span', { class: 'tid-tekst' }, x);
+    if (opg.valgArt === 'scene') return tegnScene(opg.kort[x].dele, { kort: true });
     if (opg.valgArt === 'ord') {
       // lige: alle har en makker · ulige: én står alene
       const ikon = h('span', { class: 'ord-ikon', 'aria-hidden': 'true' }, x === 'lige' ? '●● ●●' : '●● ●');
@@ -1630,10 +2178,11 @@
   }
 
   function valgKnapper(opg) {
+    if (opg.valgArt === 'stil') return stilUr(opg);
     const indhold = (x) => valgIndhold(opg, x);
     return h('div', { class: 'valg' + (opg.valgArt ? ' valg-' + opg.valgArt : '') + ' antal-' + opg.valg.length }, opg.valg.map((x) => h('button', {
       class: 'valg-knap', type: 'button', 'data-v': x,
-      'aria-label': opg.valgArt === 'gruppe' ? (x === 'a' ? 'Venstre gruppe' : 'Højre gruppe') : String(x),
+      'aria-label': opg.valgArt === 'gruppe' ? (x === 'a' ? 'Venstre gruppe' : 'Højre gruppe') : opg.valgArt === 'scene' ? opg.kort[x].navn : String(x),
       onclick: (e) => { Lyd.init(); svar(x, e.currentTarget); },
     }, indhold(x))));
   }
@@ -1714,6 +2263,13 @@
       else if (e.key === 'Enter') r.tast('✔');
       return;
     }
+    // Stil viserne: tasterne følger tallene på målene — 3, 6, 9, og 1 eller 0 for 12. Andre taster gør intet
+    if (opg.valgArt === 'stil') {
+      const tal = e.key === '1' || e.key === '0' ? '12' : e.key;
+      const k = [...r.dom.svar.querySelectorAll('.stil-maal')].find((b) => b.textContent === tal);
+      if (k && !k.disabled) k.click();
+      return;
+    }
     // Figurer, grupper, ord og mønsterbrikker: 1, 2, 3 vælger knappen efter plads
     if (opg.valgArt) {
       const n = Number(e.key);
@@ -1770,6 +2326,11 @@
       knap.classList.add('rigtig');
     }
     Lyd.rigtig();
+    // Ret bogstavet (D1): det rigtige bogstav kommer på plads i ordet
+    if (opg.vis && opg.vis.art === 'retOrd') {
+      const b = r.dom.visning.querySelectorAll('.ord-bogstav')[opg.vis.plads];
+      if (b) { b.textContent = opg.svar; b.classList.remove('ret'); b.classList.add('rettet'); }
+    }
     const prik = r.dom.prikker.querySelectorAll('.prik')[r.i];
     prik.classList.add('fuld');
     hop(prik, 'pop');
@@ -1811,6 +2372,7 @@
   // Første forsøg tæller i statistikken og i den tilpassede sværhedsgrad
   function registrer(opg, rigtig) {
     const r = S.runde;
+    if (r.quiz) return; // 🤔 gemmer intet
     // En opgave tæller kun én gang — også når en afbrudt mission fortsætter ved samme opgave
     if (r.registreret === r.i) return;
     r.registreret = r.i;
@@ -1902,10 +2464,73 @@
     return node;
   }
 
+  // Sluk alt, hjælpen «lys» har tændt (i opgavefeltet og på svarkortene)
+  function slukLys(r) {
+    [r.dom.visning, r.dom.svar].forEach((felt) => felt.querySelectorAll('.lyser, .har-lys').forEach((el) => el.classList.remove('lyser', 'har-lys')));
+  }
+
   async function hjaelpAnimation(opg, trin, levende) {
     const r = S.runde;
     const vis = r.dom.visning;
     const art = trin.art;
+    // Scener: det, en tidligere hjælp lyste op, slukkes, før næste hjælp viser noget nyt
+    if (opg.vis.art === 'scene' && (art === 'tael' || art === 'lys')) slukLys(r);
+
+    // D: trin for trin lyser delene (i opgavefeltet og på svarkortene), sætningen siges, og evt. tælles der
+    if (art === 'lys') {
+      vis.querySelectorAll('.talt').forEach((el) => { el.classList.remove('talt'); el.removeAttribute('data-n'); });
+      for (const t of trin.trin || []) {
+        if (!levende()) return;
+        if (t.lys) {
+          slukLys(r);
+          t.lys.forEach((id) => [vis, r.dom.svar].forEach((felt) => felt.querySelectorAll('[data-del="' + id + '"]').forEach((el) => {
+            el.classList.add('lyser');
+            const kort = el.closest('.valg-knap');
+            if (kort) kort.classList.add('har-lys'); // kortet hviler ikke, mens det lyser
+          })));
+        }
+        if (t.tale) await Tale.sigVent(t.tale);
+        if (!levende()) return;
+        if (t.tael) {
+          const omr = vis.querySelector('[data-del="' + t.tael + '"]');
+          if (omr) await taelOp([...omr.querySelectorAll('.taelbar')], 1, levende);
+        }
+        await vent(300);
+      }
+      return;
+    }
+
+    // Klokken i 5-minutter: tæl 5, 10, 15 … ved tallene 1, 2, 3 … frem til den store viser — så timen
+    if (art === 'urFem') {
+      const [t, m] = String(trin.klokke).split(':').map(Number);
+      const ur = vis.querySelector('.ur-svg');
+      if (!ur) return;
+      const minut = ur.querySelector('.ur-minut'), time = ur.querySelector('.ur-time');
+      ur.querySelectorAll('.lyser').forEach((el) => el.classList.remove('lyser'));
+      minut.classList.add('lyser');
+      await vent(300);
+      for (let k = 1; k <= Math.round(m / 5); k++) {
+        if (!levende()) return;
+        const tx = ur.querySelector('.ur-tal[data-tal="' + k + '"]');
+        if (tx) tx.classList.add('lyser');
+        Lyd.tael();
+        Tale.sig(String(k * 5));
+        await vent(800);
+      }
+      if (!levende()) return;
+      await Tale.sigVent('Den store viser peger på ' + Math.round(m / 5) + '. Det er ' + m + ' minutter.');
+      if (!levende()) return;
+      minut.classList.remove('lyser');
+      time.classList.add('lyser');
+      const naeste = (t % 12) + 1;
+      // Efter halv er den lille viser tæt på næste time — men timen er stadig den, den er gået forbi
+      await Tale.sigVent(m > 30 ? 'Den lille viser er ikke nået til ' + naeste + ' endnu. Timen er stadig ' + t + '.' : 'Den lille viser er lige gået forbi ' + t + '.');
+      if (!levende()) return;
+      await Tale.sigVent(m > 20 ? m + ' minutter over ' + t + '. Det hedder ' + O.klokkeNavn(trin.klokke) + '.' : 'Så er klokken ' + O.klokkeNavn(trin.klokke) + '.');
+      return;
+    }
+
+    if (art === 'rute') { await ruteHjaelp(opg, trin, levende); return; }
 
     if (art === 'tael') {
       const alle = [...vis.querySelectorAll('.taelbar')];
@@ -2212,6 +2837,36 @@
       const ur = vis.querySelector('.ur-svg');
       const minut = ur && ur.querySelector('.ur-minut'), time = ur && ur.querySelector('.ur-time');
       if (minut) minut.classList.add('lyser');
+      if (m === 15 || m === 45) {
+        // Kvart: markér en kvart omgang (12 → 3 eller 9 → 12), og tæl 5, 10, 15 på de tre tal
+        const over = m === 15;
+        if (ur && !ur.querySelector('.ur-kvart')) {
+          const kile = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          kile.setAttribute('d', over ? 'M50 50 L50 6 A44 44 0 0 1 94 50 Z' : 'M50 50 L6 50 A44 44 0 0 1 50 6 Z');
+          kile.setAttribute('class', 'ur-kvart');
+          ur.insertBefore(kile, ur.querySelector('.ur-skive').nextSibling); // under tallene, så de står skarpt
+        }
+        await Tale.sigVent(over
+          ? 'Den store viser peger på 3. Den er gået en kvart omgang fra 12.'
+          : 'Den store viser peger på 9. Der mangler en kvart omgang, før den er ved 12.');
+        for (const [k, tal] of (over ? [[1, 5], [2, 10], [3, 15]] : [[10, 5], [11, 10], [12, 15]])) {
+          if (!levende()) return;
+          const tx = ur && ur.querySelector('.ur-tal[data-tal="' + k + '"]');
+          if (tx) tx.classList.add('lyser');
+          Lyd.tael();
+          Tale.sig(String(tal));
+          await vent(850);
+        }
+        if (!levende()) return;
+        await Tale.sigVent(over ? '15 minutter. Det er et kvarter. Så er klokken kvart over.' : 'Der mangler 15 minutter. Det er et kvarter. Så er klokken kvart i.');
+        if (!levende()) return;
+        if (minut) minut.classList.remove('lyser');
+        if (time) time.classList.add('lyser');
+        await Tale.sigVent(over
+          ? 'Den lille viser er lige gået forbi ' + t + '. Så er klokken ' + O.klokkeNavn(opg.svar) + '.'
+          : 'Den lille viser er næsten ved ' + ((t % 12) + 1) + '. Så er klokken ' + O.klokkeNavn(opg.svar) + '.');
+        return;
+      }
       await Tale.sigVent(m === 30 ? 'Den store viser peger på 6. Så er klokken halv.' : 'Den store viser peger på 12. Så er klokken hel.');
       if (!levende()) return;
       if (minut) minut.classList.remove('lyser');
@@ -2219,6 +2874,42 @@
       await Tale.sigVent(m === 30
         ? 'Den lille viser er gået forbi ' + t + '. Den er på vej mod ' + ((t % 12) + 1) + '. Så er klokken halv ' + O.klokkeNavn(((t % 12) + 1) + ':00') + '.'
         : 'Den lille viser peger på ' + t + '. Så er klokken ' + O.klokkeNavn(opg.svar) + '.');
+      return;
+    }
+    // Stil viserne: trin 1 stiller uret på den hele time, der nævnes; trin 2 flytter derfra til facit
+    if (art === 'stilHel' || art === 'stilFlyt') {
+      const felt = r.dom.svar.querySelector('.stil-ur');
+      if (!felt) return;
+      const ur = felt.querySelector('.ur-svg');
+      const lys = (sel) => { const el = ur.querySelector(sel); if (el) el.classList.add('lyser'); };
+      felt.querySelectorAll('.lyser').forEach((el) => el.classList.remove('lyser'));
+      const hel = opg.hjaelp[0].klokke;
+      const naevnt = Number(hel.split(':')[0]);
+      const navn = O.klokkeNavn(hel);
+      const m = Number(String(opg.svar).split(':')[1]);
+      await vent(150); // indledningen først — så bevæger uret sig
+      if (!levende()) return;
+      await drejUr(felt, hel);
+      if (!levende()) return;
+      if (art === 'stilHel') {
+        lys('.ur-time');
+        // Ligger timetallet under et mål, er det fjernet fra uret (stilUr) — så lyser målknappen med tallet
+        const maal = [...felt.querySelectorAll('.stil-maal')].find((k) => k.textContent === String(naevnt));
+        if (maal) maal.classList.add('lyser'); else lys('.ur-tal[data-tal="' + naevnt + '"]');
+        await Tale.sigVent('Sådan ser klokken ' + navn + ' ud. Den lille viser peger på ' + naevnt + '.');
+        return;
+      }
+      await Tale.sigVent(m === 15 ? 'Kvart over ' + navn + ' er et kvarter efter ' + navn + '.'
+        : m === 45 ? 'Kvart i ' + navn + ' er et kvarter før ' + navn + '.'
+          : 'Halv ' + navn + ' er en halv time før ' + navn + '.');
+      if (!levende()) return;
+      lys('.ur-minut');
+      await drejUr(felt, trin.klokke);
+      if (!levende()) return;
+      ur.querySelector('.ur-minut').classList.remove('lyser');
+      lys('.ur-time');
+      await Tale.sigVent(m === 15 ? 'Den lille viser er lige gået forbi ' + naevnt + '.'
+        : 'Den lille viser er ikke nået til ' + naevnt + ' endnu.' + (m === 30 ? ' Den er halvvejs.' : ''));
       return;
     }
     if (art === 'visUr') {
@@ -2264,7 +2955,65 @@
       if (!levende()) return;
       if (opg.emne === 'alfabet') { await Tale.sigVent('Sådan ser det ud.'); return; }
       await Lyd.klip(D.lydId(trin.bogstav), D.lydReserve(trin.bogstav));
-      if (levende() && trin.ord) await Tale.sigVent(stort(trin.ord) + (opg.type === 'udlyd' ? ' slutter med den lyd.' : ' starter med den lyd.'));
+      if (levende() && trin.ord) await Tale.sigVent(stort(trin.ord) + (trin.midt ? ' har den lyd i midten.' : opg.type === 'udlyd' ? ' slutter med den lyd.' : ' starter med den lyd.'));
+      return;
+    }
+    // Svarkort med scener (Historiebogen): hvert kort læses op, mens det lyser
+    if (art === 'laesKort') {
+      for (const k of [...r.dom.svar.querySelectorAll('.valg-knap:not(.forkert)')]) {
+        if (!levende()) return;
+        const kort = opg.kort && opg.kort[k.getAttribute('data-v')];
+        k.classList.add('lytter');
+        await Tale.sigVent(kort ? kort.navn : k.getAttribute('aria-label'));
+        k.classList.remove('lytter');
+        await vent(250);
+      }
+      return;
+    }
+    // Byg (D1): den brik, der skal først, lyser, og dens sætning siges. Den bliver ved med at lyse
+    if (art === 'foersteBrik') {
+      const brik = [...r.dom.svar.querySelectorAll('.byg-brik')].find((b) => b.getAttribute('data-t') === trin.brik);
+      if (brik) brik.classList.add('lyser');
+      await vent(200);
+      if (levende() && trin.tale) await Tale.sigVent(trin.tale);
+      return;
+    }
+    // Huskekort (D1): kortene vendes op og bliver liggende sådan; hvert kort siges, mens det lyser
+    if (art === 'vendOp') {
+      r.vendtOp = true;
+      const valg = r.dom.svar.querySelector('.valg');
+      if (valg) valg.classList.remove('vendt');
+      await vent(450);
+      for (const k of [...r.dom.svar.querySelectorAll('.valg-knap:not(.forkert)')]) {
+        if (!levende()) return;
+        k.classList.add('lytter');
+        await Tale.sigVent(k.getAttribute('data-v') + '.');
+        k.classList.remove('lytter');
+      }
+      return;
+    }
+    // Håndskrift (D1): ved siden af det trykte bogstav skrives det håndskrevne langsomt, strøg for strøg
+    if (art === 'skrivBogstav') {
+      const billede = vis.querySelector('.dansk-billede');
+      if (!billede) return;
+      const gammel = billede.querySelector('.skrevet-felt');
+      if (gammel) gammel.remove();
+      const svg = haandskriftSvg(trin.bogstav);
+      billede.append(h('span', { class: 'skrevet-felt' }, svg));
+      const streger = [...svg.querySelectorAll('.haandskrift-streg')];
+      const laengde = streger.map((st) => (st.getTotalLength ? st.getTotalLength() : 100) || 1);
+      streger.forEach((st, k) => { st.style.strokeDasharray = laengde[k] + ' ' + laengde[k]; st.style.strokeDashoffset = String(laengde[k]); });
+      await vent(300);
+      for (let k = 0; k < streger.length; k++) {
+        if (!levende()) return;
+        const ms = Math.max(450, laengde[k] * 14);
+        streger[k].style.transition = 'stroke-dashoffset ' + Math.round(ms * TEMPO) + 'ms linear';
+        void streger[k].getBoundingClientRect();
+        streger[k].style.strokeDashoffset = '0';
+        await vent(ms + 250);
+      }
+      if (!levende()) return;
+      await Tale.sigVent('Sådan skriver vi ' + (D.NAVNE[trin.bogstav] || trin.bogstav) + ' i hånden. Find det samme.');
       return;
     }
     if (art === 'visOrd') {
@@ -2410,6 +3159,97 @@
     return h('div', { class: 'soem-felt' }, h('div', { class: 'soem-maal', 'aria-hidden': 'true' }, formSvg(v.form, 2, 0, false)), tavle);
   }
 
+  // Tegnebyen (D): gå efter opskriften. Prikgitteret er sømbrættets; vejen tegnes fra den grønne prik, og kun
+  // nabo-prikkerne ved vejens ende kan trykkes (højre, venstre, op, ned — ikke tilbage og ikke over vejen).
+  // Når vejen er lige så lang som opskriften, vurderes den med Opgaver.rutePasser.
+  const RUTE_ORD = { hoejre: 'til højre', venstre: 'til venstre', op: 'op', ned: 'ned' };
+  const RUTE_TAL = ['nul', 'ét', 'to', 'tre', 'fire', 'fem', 'seks'];
+  const ruteBenTekst = (ret, n) => (RUTE_TAL[n] || String(n)) + ' ' + (n === 1 ? 'felt' : 'felter') + ' ' + RUTE_ORD[ret];
+  function rutebraet(opg) {
+    const v = opg.vis;
+    const r = S.runde;
+    const tavle = h('div', { class: 'soembraet rute-braet', style: '--kol:' + v.kol + ';--raek:' + v.raek });
+    const svg = svgEl('svg', { class: 'soem-streger', 'aria-hidden': 'true' });
+    tavle.append(svg);
+    const prikker = {};
+    for (let y = 0; y < v.raek; y++) for (let x = 0; x < v.kol; x++) {
+      prikker[x + ',' + y] = h('button', { class: 'soem-prik', type: 'button', 'data-x': x, 'data-y': y, 'aria-label': 'Prik ' + (x + 1) + ', ' + (y + 1), onclick: (e) => trykPrik(x, y, e) }, h('i', { 'aria-hidden': 'true' }));
+      tavle.append(prikker[x + ',' + y]);
+    }
+    // Opskriften: ét ben pr. linje, en pil pr. skridt (➡️➡️ / ⬆️). Hjælpen lyser det ben, den viser
+    const ben = (v.pile || []).map((p) => h('span', { class: 'rute-ben' }, Array.from({ length: p.antal }, () => h('span', { class: 'rute-pil' }, p.pil))));
+    const opskrift = h('div', { class: 'rute-opskrift', role: 'img', 'aria-label': stort(v.opskrift.map(([ret, n], i) => (i ? 'så ' : '') + ruteBenTekst(ret, n)).join(', ')) + '.' }, ben);
+    const maal = O.ruteFraOpskrift(v.start, v.opskrift);
+    const st = { punkter: [v.start.slice()], guide: null, vis: null, tast: false, ben: -1 };
+    r.figur = st;
+    const paaVejen = (x, y) => st.punkter.some(([px, py]) => px === x && py === y);
+    const naboer = () => {
+      if (st.punkter.length >= maal.length) return [];
+      const [x, y] = st.punkter[st.punkter.length - 1];
+      return [[1, 0], [-1, 0], [0, -1], [0, 1]].map(([dx, dy]) => [x + dx, y + dy])
+        .filter(([nx, ny]) => nx >= 0 && ny >= 0 && nx < v.kol && ny < v.raek && !paaVejen(nx, ny));
+    };
+    const center = ([x, y]) => {
+      const t = tavle.getBoundingClientRect(), q = prikker[x + ',' + y].getBoundingClientRect();
+      return [Math.round(q.left + q.width / 2 - t.left), Math.round(q.top + q.height / 2 - t.top)];
+    };
+    function tegn() {
+      const t = tavle.getBoundingClientRect();
+      svg.setAttribute('viewBox', '0 0 ' + Math.max(1, Math.round(t.width)) + ' ' + Math.max(1, Math.round(t.height)));
+      svg.textContent = '';
+      // Hjælpens stiplede vej ligger under barnets egen streg
+      if (st.guide && st.guide.length > 1) svgEl('polyline', { points: st.guide.map((p) => center(p).join(',')).join(' '), class: 'rute-guide' }, svg);
+      if (st.punkter.length > 1) svgEl('polyline', { points: st.punkter.map((p) => center(p).join(',')).join(' '), class: 'soem-linje' }, svg);
+      const aktive = naboer().map((p) => p.join(','));
+      for (const k in prikker) {
+        const b = prikker[k];
+        b.classList.remove('valgt', 'foerste', 'markoer', 'vis-hjoerne');
+        b.removeAttribute('data-n');
+        b.classList.toggle('aktiv', aktive.indexOf(k) >= 0);
+        b.disabled = aktive.indexOf(k) < 0;
+      }
+      st.punkter.forEach(([x, y], i) => prikker[x + ',' + y].classList.add(i === 0 ? 'foerste' : 'valgt'));
+      // «Vis svaret»: vejen med numre fra den grønne prik
+      if (st.vis) st.vis.forEach(([x, y], i) => { if (i) { const b = prikker[x + ',' + y]; b.classList.add('vis-hjoerne'); b.setAttribute('data-n', i); } });
+      if (st.tast) prikker[st.punkter[st.punkter.length - 1].join(',')].classList.add('markoer');
+      ben.forEach((b, i) => b.classList.toggle('nu', i === st.ben));
+    }
+    function trykPrik(x, y, e) {
+      if (r.laast || S.runde !== r || st.punkter.length >= maal.length) return;
+      Lyd.init();
+      if (!naboer().some(([nx, ny]) => nx === x && ny === y)) { Lyd.blid(); return; }
+      Lyd.tryk();
+      st.punkter.push([x, y]);
+      tegn();
+      // Med tastaturet (Tab + Enter): fokus videre til en ny nabo-prik — den trykkede er nu slukket
+      if (e && e.detail === 0) { const n = tavle.querySelector('.soem-prik.aktiv'); if (n) n.focus(); }
+      if (st.punkter.length === maal.length) {
+        // Vejen er færdig: den vises et øjeblik (runden er låst), så vurderes den
+        r.laast = true;
+        const i = r.i;
+        setTimeout(() => { if (S.runde === r && r.i === i) { r.laast = false; svar(O.rutePasser(v.start, v.opskrift, st.punkter) ? 'ok' : 'nej', null); } }, 450);
+      }
+    }
+    st.fortryd = () => { if (r.laast || st.punkter.length < 2) return; Lyd.init(); Lyd.tryk(); st.punkter.pop(); tegn(); };
+    st.nulstil = () => { st.punkter = [st.punkter[0]]; tegn(); };
+    st.visBen = (i) => { st.ben = i; tegn(); };
+    st.tegn = tegn;
+    r.bygNulstil = st.nulstil; // et forkert svar: tegn forfra fra den grønne prik
+    // Fysisk tastatur: piletasterne går et skridt ad gangen, Backspace fortryder (Tab + Enter virker også)
+    st.taster = (e) => {
+      const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+      if (d) {
+        e.preventDefault();
+        st.tast = true;
+        const [x, y] = st.punkter[st.punkter.length - 1];
+        trykPrik(x + d[0], y + d[1]);
+        tegn();
+      } else if (e.key === 'Backspace') { e.preventDefault(); st.fortryd(); }
+    };
+    vedStoerrelse(tavle, tegn);
+    return h('div', { class: 'rute-felt' }, opskrift, tavle);
+  }
+
   // Lineal: 1 cm = 52 px på iPad. Er der ikke plads, skaleres hele linealen — det er stadig «cm på linealen».
   function linealVisning(opg) {
     const v = opg.vis;
@@ -2507,7 +3347,7 @@
   // Svarpanelet til tegneopgaverne: ↩️ og 🗑️ (sømbræt) eller ✔ (linealen)
   function interaktivPanel(opg) {
     const r = S.runde;
-    if (opg.interaktiv === 'soembraet') {
+    if (opg.interaktiv === 'soembraet' || opg.interaktiv === 'rute') {
       return h('div', { class: 'interaktiv-panel' },
         ikonKnap('↩️', 'Fortryd', () => { if (r.figur) r.figur.fortryd(); }, 'soem-fortryd'),
         ikonKnap('🗑️', 'Start forfra', () => { if (!r.laast && r.figur) { Lyd.init(); Lyd.tryk(); r.figur.nulstil(); } }, 'soem-forfra'));
@@ -2526,6 +3366,12 @@
       r.figur.vis = O.eksempelFigur(opg.vis.form, opg.vis.start, opg.vis.kol, opg.vis.raek);
       r.figur.tegn();
       tekst = 'Tryk på prikkerne, der lyser: en, to, tre … og slut ved den grønne prik.';
+    } else if (opg.interaktiv === 'rute' && r.figur) {
+      // Hele vejen med nummererede prikker fra den grønne prik — barnet følger dem
+      r.figur.nulstil();
+      r.figur.vis = O.ruteFraOpskrift(opg.vis.start, opg.vis.opskrift);
+      r.figur.tegn();
+      tekst = 'Start ved den grønne prik. Tryk på prikkerne, der lyser: en, to, tre …';
     } else if (r.lineal) {
       r.lineal.nulstil();
       r.lineal.visMaal();
@@ -2577,6 +3423,38 @@
     st.tegn();
   }
 
+  // Hjælp: de første k ben af vejen tegnes stiplet, skridt for skridt fra den grønne prik. Den stiplede vej
+  // bliver liggende, mens barnet selv tegner ovenpå.
+  async function ruteHjaelp(opg, trin, levende) {
+    const st = S.runde.figur;
+    if (!st) return;
+    const v = opg.vis;
+    st.nulstil();
+    st.vis = null;
+    const vej = [v.start.slice()];
+    st.guide = vej;
+    let [x, y] = v.start;
+    const antal = Math.min(trin.ben || 1, v.opskrift.length);
+    await vent(150);
+    for (let b = 0; b < antal; b++) {
+      const [ret, n] = v.opskrift[b];
+      if (!levende()) return;
+      st.visBen(b);
+      for (let k = 1; k <= n; k++) {
+        if (!levende()) return;
+        x += O.RETNING[ret][0]; y += O.RETNING[ret][1];
+        vej.push([x, y]);
+        st.tegn();
+        Lyd.tael();
+        Tale.sig(String(k));
+        await vent(700);
+      }
+      if (!levende()) return;
+      await Tale.sigVent(stort(ruteBenTekst(ret, n)) + '.');
+    }
+    if (levende()) st.visBen(-1);
+  }
+
   // Hjælp: cm-hop tælles højt på linealen
   async function cmHjaelp(opg, levende) {
     const st = S.runde.lineal;
@@ -2598,9 +3476,14 @@
     const r = S.runde;
     if (opg.interaktiv) { visSvaretTegn(opg); return; }
     r.visSvar = true;
+    if (opg.valgArt === 'skjult') { r.vendtOp = true; const v = r.dom.svar.querySelector('.valg'); if (v) v.classList.remove('vendt'); }
     if (opg.valg) {
       r.dom.svar.querySelectorAll('.valg-knap').forEach((k) => {
-        if (k.getAttribute('data-v') === String(opg.svar)) { k.classList.add('vis-svar'); k.disabled = false; }
+        if (k.getAttribute('data-v') === String(opg.svar)) {
+          k.classList.add('vis-svar');
+          if (opg.valgArt === 'scene') k.classList.add('svar-ramme'); // scenen på en lys flade i en guldramme (bliver)
+          k.disabled = false;
+        }
         else { k.classList.add('forkert'); k.disabled = true; }
       });
     } else {
@@ -2614,10 +3497,14 @@
     if (opg.valgArt === 'form') navn = O.FORMER[opg.svar].bestemt;
     else if (opg.valgArt === 'brik') navn = O.MOENSTER_BRIKKER[opg.svar] ? O.MOENSTER_BRIKKER[opg.svar].bestemt : '';
     else if (opg.valgArt === 'gruppe') navn = 'den her';
-    else if (opg.valgArt === 'ur' || opg.valgArt === 'tid') navn = 'klokken ' + O.klokkeNavn(opg.svar);
+    else if (opg.valgArt === 'scene') navn = opg.kort[opg.svar].navn;
+    else if (opg.valgArt === 'ur' || opg.valgArt === 'tid' || opg.valgArt === 'stil') navn = 'klokken ' + O.klokkeNavn(opg.svar);
+    // Stil viserne: uret viser facit, mens det siges (sidste trin på hjælpetrappen)
+    const stilFelt = opg.valgArt === 'stil' && r.dom.svar.querySelector('.stil-ur');
+    if (stilFelt) drejUr(stilFelt, opg.svar);
     let tekst = opg.valgArt ? 'Det er ' + navn + '. Tryk på den, der lyser.' : 'Det er ' + opg.svar + '. Tryk på ' + opg.svar + '.';
     // Et bogstav-svar siges ikke som bogstavets navn (det er lyden, der menes)
-    if (opg.fag === 'dansk') tekst = opg.valgArt === 'bogstav' ? 'Det er den, der lyser. Tryk på den.' : opg.valgArt ? 'Det er ' + opg.svar + '. Tryk på den, der lyser.' : 'Det er ' + opg.svar + '. Tryk på det.';
+    if (opg.fag === 'dansk') tekst = opg.valgArt === 'bogstav' ? 'Det er den, der lyser. Tryk på den.' : opg.valgArt === 'scene' ? stort(navn) + ' Tryk på den, der lyser.' : opg.valgArt ? 'Det er ' + opg.svar + '. Tryk på den, der lyser.' : 'Det er ' + opg.svar + '. Tryk på det.';
     S.gentagFn = null;
     S.gentagTale = tekst;
     Tale.sig(tekst);
@@ -2626,6 +3513,7 @@
   // ---------- Runden er slut: dyret, vi hjalp, kommer med ----------
   function afslutRunde() {
     const r = S.runde;
+    if (r.quiz) { visQuizSlut(r.quiz); return; } // 🤔: intet dyr, ingen lysperle
     // Data kan være læst igen midt i runden (storage-hændelse) uden dette emne — normalisér som i registrer()
     const lagerE = emneLager(r.emne);
     const ed = lagerE[r.emne] = G.normaliserEmne(lagerE[r.emne]);
@@ -3108,6 +3996,9 @@
     const tegn = tegnefelt('historie-' + nr, () => { if (!hd.tegnet) { hd.tegnet = true; gem(); tjekFaerdig(); } });
     // --- ✏️ Skriv ---
     const skrivKnap = h('button', { class: 'stor-knap trin-knap skriv-knap' + (hd.skrevet ? ' ok' : ''), type: 'button', 'aria-label': 'Skriv', onclick: () => { Lyd.init(); Lyd.tryk(); visSkriv(nr, frit, 0); } }, '✏️');
+    const quizKnap = h('button', { class: 'stor-knap trin-knap quiz-knap', type: 'button', 'aria-label': 'Hvad skete der?', onclick: () => { Lyd.init(); Lyd.tryk(); gemHistorieTid(); startHistorieQuiz(nr, frit); } }, '🤔');
+    // ✏️ og 🤔 følges ad: er der ikke plads på én linje, kommer de to sammen på næste linje (🤔 står aldrig alene)
+    const videreKnapper = h('div', { class: 'laes-videre' }, skrivKnap, quizKnap);
     const trinMaerker = h('div', { class: 'historie-trin', 'aria-hidden': 'true' },
       h('span', { class: hd.bobler ? 'ok' : '' }, '📖'), h('span', { class: hd.tegnet ? 'ok' : '' }, '🖍️'), h('span', { class: hd.skrevet ? 'ok' : '' }, '✏️'));
     function tjekFaerdig() {
@@ -3125,7 +4016,7 @@
         hoejttaler()),
       h('div', { class: 'historie-krop' },
         h('div', { class: 'historie-laes' }, linjer,
-          h('div', { class: 'laes-knapper' }, h('button', { class: 'stor-knap trin-knap laes-hele', type: 'button', 'aria-label': 'Læs hele historien', onclick: laesHele }, '▶'), bobler, skrivKnap)),
+          h('div', { class: 'laes-knapper' }, h('button', { class: 'stor-knap trin-knap laes-hele', type: 'button', 'aria-label': 'Læs hele historien', onclick: laesHele }, '▶'), bobler, videreKnapper)),
         h('div', { class: 'historie-tegn' }, tegn.node))),
     (e) => {
       if (e.key === 'Escape') tilbage();
@@ -3134,6 +4025,36 @@
     tegn.start();
     Tale.sig('Historie ' + H.nr + '. ' + H.titel + '. Tryk på et ord, så hører du det. Tegn ' + H.tegn + ', og skriv bagefter.');
     tjekFaerdig(); // det sidste trin kan være klaret på en anden skærm (✏️ Skriv)
+  }
+
+  // 🤔 Hvad skete der? (D1): en lille runde med tre opgaver om små historier. Den bruger rundemotoren, men gemmer
+  // intet — ingen statistik, ingen gentagelser, intet dyr og ingen lysperle — og fører tilbage til historiesiden.
+  // Trinnet følger antallet af færdige historier: 0–5 → 1, 6–11 → 2, 12+ → 3.
+  function startHistorieQuiz(nr, frit) {
+    const faerdige = Object.keys(data.historier || {}).filter((k) => data.historier[k] && data.historier[k].faerdig).length;
+    const trin = faerdige >= 12 ? 3 : faerdige >= 6 ? 2 : 1;
+    const rng = O.lavRng((Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0);
+    const verden = DANSK_VERDENER.find((v) => v.id === 'historiebog');
+    S.historie = null;
+    S.runde = {
+      verden: verden, emne: verden.emne, opgaver: D.lavHistorieQuiz(trin, rng, 3), i: 0, forsoeg: 0, sidstAktiv: Date.now(), aktivMs: 0,
+      niveauOp: false, registreret: -1, test: true, quiz: { nr: nr, frit: !!frit }, maerke: { e: '🤔', bestemt: '' },
+    };
+    visRundeSkaerm();
+  }
+  // Runden er slut: en rolig «Godt lyttet!» — så tilbage til historien
+  function visQuizSlut(q) {
+    S.runde = null;
+    const tilbage = () => visHistorieSide(q.nr, q.frit);
+    const token = skift(h('div', { class: 'skaerm quiz-slut' },
+      h('div', { class: 'topbar' }, ikonKnap('📖', 'Tilbage til historien', tilbage), h('div', { class: 'topbar-plads' }), hoejttaler()),
+      h('div', { class: 'quiz-slut-midte' },
+        h('div', { class: 'quiz-slut-e', 'aria-hidden': 'true' }, '👂'),
+        h('div', { class: 'quiz-slut-tekst' }, 'Godt lyttet!'),
+        h('button', { class: 'stor-knap ok-knap', type: 'button', 'aria-label': 'Tilbage til historien', onclick: () => { Lyd.init(); tilbage(); } }, '📖'))),
+    (e) => { if (e.key === 'Escape' || e.key === 'Enter') tilbage(); });
+    S.gentagTale = 'Godt lyttet!';
+    Tale.sig('Godt lyttet!', () => setTimeout(() => { if (token === S.token) tilbage(); }, 1600 * TEMPO));
   }
 
   function gemHistorieTid() {
@@ -3388,7 +4309,14 @@
     const pointTal = h('span', { class: 'jagt-point' }, '0');
     const lyde = h('div', { class: 'jagt-lyde', 'aria-hidden': 'true' }, runde.map(() => h('i')));
     const tilbage = () => { st.aktiv = false; gemJagtTid(); if (frit) visVaelgSelv(); else visKort(false); };
-    const sigLyd = () => { const b = runde[st.i].bogstav; return Lyd.klip(D.lydId(b), D.lydReserve(b)); };
+    // En stille bølge (D1, «boblerne venter på barnet»): «Find de to bobler med» + lyden
+    const sigLyd = async () => {
+      const r = runde[st.i];
+      // Et nyt 🔊/mellemrum afbryder sætningen — så må det ældre kald ikke spille lyden oven i den nye (review #6)
+      const n = st.lydGen = (st.lydGen || 0) + 1;
+      if (r.stille === 'alle') { await Tale.sigVent('Find de to bobler med'); if (!st.aktiv || token !== S.token || runde[st.i] !== r || st.lydGen !== n) return; }
+      return Lyd.klip(D.lydId(r.bogstav), D.lydReserve(r.bogstav));
+    };
     S.gentagFn = () => sigLyd();
     S.gentagTale = 'Stryg gennem det bogstav, du hører.';
     const token = skift(h('div', { class: 'skaerm bogstavjagt' },
@@ -3418,14 +4346,30 @@
       st.bobler = [];
       const w = felt.clientWidth, hh = felt.clientHeight;
       const nu = performance.now();
+      st.forkerteStille = 0;
       r.bobler.forEach((bogstav, k) => {
         const el = h('div', { class: 'jagt-boble', 'data-b': bogstav, 'aria-hidden': 'true' }, h('span', null, bogstav));
         // Hjælp: efter to boelger uden et ramt lyser det rigtige bogstav
         if (st.forsoeg >= 2 && bogstav === r.bogstav) el.classList.add('hjaelp');
         felt.append(el);
+        if (r.stille === 'alle') {
+          // Stille bølge: boblerne står jævnt fordelt i tre forskellige højder, så et vandret strøg kun rammer én (review #5)
+          const b = { b: bogstav, el: el, stille: { fx: (k + 1) / (r.bobler.length + 1), fy: [0.22, 0.68, 0.45][k % 3] }, t0: nu, ramt: false };
+          stilBoble(b, w, hh);
+          st.bobler.push(b);
+          return;
+        }
         st.bobler.push({ b: bogstav, el: el, bane: D.lavBane(rng, trin, w, hh, langsom), t0: nu + k * 450 * (langsom ? 1.4 : 1), ramt: false });
       });
       setTimeout(() => { if (st.aktiv && token === S.token) sigLyd(); }, 150);
+    }
+    // En stille boble står på sin plads i feltet. Banen står stille (samme form som de flyvende, uden fart og tyngde)
+    function stilBoble(b, w, hh) {
+      const r = boblePx() / 2;
+      const x = w * b.stille.fx, y = Math.max(r + 8, hh * b.stille.fy);
+      b.pos = { x: x, y: y };
+      b.bane = { x0: x, y0: y + r, vx: 0, vy: 0, g: 0, T: Infinity };
+      b.el.style.transform = 'translate(' + (x - r) + 'px, ' + (y - r) + 'px)';
     }
     // Animationen: hver boble følger sin bue (requestAnimationFrame); når alle er landet, kommer en ny boelge
     function frame(nu) {
@@ -3434,6 +4378,7 @@
       let iLuften = 0;
       for (const b of st.bobler) {
         if (b.ramt) continue;
+        if (b.stille) { iLuften++; continue; } // venter på barnet
         const t = (nu - b.t0) / 1000;
         if (t < 0) { b.el.style.transform = 'translate(-999px, -999px)'; iLuften++; continue; }
         if (t > b.bane.T) { b.el.style.transform = 'translate(-999px, -999px)'; b.ude = true; continue; }
@@ -3450,11 +4395,18 @@
       if (st.laast || b.ramt) return;
       const r = runde[st.i];
       // Forkert: boblen ryster og flyver videre — ingen straf, men det tæller ikke som rigtigt i første forsøg
-      if (b.b !== r.bogstav) { st.forkertHer = true; b.el.classList.remove('forbi'); void b.el.offsetWidth; b.el.classList.add('forbi'); return; }
+      if (b.b !== r.bogstav) {
+        st.forkertHer = true; b.el.classList.remove('forbi'); void b.el.offsetWidth; b.el.classList.add('forbi');
+        // Stille bølge: efter to forkerte lyser de rigtige
+        if (r.stille === 'alle' && ++st.forkerteStille >= 2) st.bobler.forEach((x) => { if (!x.ramt && x.b === r.bogstav) x.el.classList.add('hjaelp'); });
+        return;
+      }
       b.ramt = true;
-      st.laast = true;
       b.el.classList.add('delt');
       Lyd.pling();
+      // Stille bølge: begge bobler med lyden skal rammes, før der er point og en ny lyd
+      if (r.stille === 'alle' && st.bobler.some((x) => !x.ramt && x.b === r.bogstav)) return;
+      st.laast = true;
       st.point++;
       pointTal.textContent = String(st.point);
       lyde.children[st.i].classList.add('fuld');
@@ -3518,7 +4470,10 @@
       if (!w || !hh) return;
       if (felStr && (felStr.w !== w || felStr.h !== hh)) {
         const sx = w / felStr.w, sy = hh / felStr.h;
-        st.bobler.forEach((x) => { const B = x.bane; x.bane = Object.assign({}, B, { x0: B.x0 * sx, vx: B.vx * sx, y0: B.y0 * sy, vy: B.vy * sy, g: B.g * sy }); });
+        st.bobler.forEach((x) => {
+          if (x.stille) { if (!x.ramt) stilBoble(x, w, hh); return; }
+          const B = x.bane; x.bane = Object.assign({}, B, { x0: B.x0 * sx, vx: B.vx * sx, y0: B.y0 * sy, vy: B.vy * sy, g: B.g * sy });
+        });
       }
       felStr = { w: w, h: hh };
     });

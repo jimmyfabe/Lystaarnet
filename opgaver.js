@@ -149,11 +149,19 @@
   // taelHop: spørgsmålet er «hvor mange» (mangler, forskel) — så tælles hoppene 1, 2, 3 i stedet for landingstallet
   const tallinje = (start, hop, taelHop) => (taelHop ? { art: 'tallinje', start: start, hop: hop, taelHop: true } : { art: 'tallinje', start: start, hop: hop });
 
-  // Klokken som ord til oplæsning: '4:00' → 'fire', '4:30' → 'halv fem'
+  // Klokken som ord til oplæsning: '4:00' → 'fire', '4:30' → 'halv fem', '4:15' → 'kvart over fire', '4:45' → 'kvart i fem'
   const TIME_ORD = ['tolv', 'et', 'to', 'tre', 'fire', 'fem', 'seks', 'syv', 'otte', 'ni', 'ti', 'elleve', 'tolv'];
+  // 5-minutter: '7:05' → 'fem minutter over syv', '7:25' → 'fem minutter i halv otte', '7:40' → 'tyve minutter i otte'
   function klokkeNavn(klokke) {
     const [t, m] = String(klokke).split(':').map(Number);
-    return m === 30 ? 'halv ' + TIME_ORD[(t % 12) + 1] : TIME_ORD[t];
+    const naeste = TIME_ORD[(t % 12) + 1];
+    if (m === 30) return 'halv ' + naeste;
+    if (m === 15) return 'kvart over ' + TIME_ORD[t];
+    if (m === 45) return 'kvart i ' + naeste;
+    const fem = { 5: 'fem minutter over ' + TIME_ORD[t], 10: 'ti minutter over ' + TIME_ORD[t], 20: 'tyve minutter over ' + TIME_ORD[t],
+      25: 'fem minutter i halv ' + naeste, 35: 'fem minutter over halv ' + naeste, 40: 'tyve minutter i ' + naeste,
+      50: 'ti minutter i ' + naeste, 55: 'fem minutter i ' + naeste }[m];
+    return fem || TIME_ORD[t];
   }
   // Varer på markedet (bestemt form, så «Isen koster 7 kroner» lyder rigtigt)
   const VARER = [
@@ -183,13 +191,16 @@
     // Gentagne punkter i træk væk (også et sidste punkt = det første, som lukker figuren)
     let p = gyldig.filter((q, i) => i === 0 || q[0] !== gyldig[i - 1][0] || q[1] !== gyldig[i - 1][1]);
     if (p.length > 1 && p[0][0] === p[p.length - 1][0] && p[0][1] === p[p.length - 1][1]) p = p.slice(0, -1);
-    // Punkter på linje med naboerne er ikke hjørner — fjern dem, til intet ændrer sig
+    // Punkter på linje med naboerne er ikke hjørner — fjern dem, til intet ændrer sig. Men kun når punktet ligger
+    // MELLEM naboerne: går stregen frem og tilbage ad samme linje (en «pig»), er det ingen figur (E #5).
     let aendret = true;
     while (aendret && p.length >= 3) {
       aendret = false;
       for (let i = 0; i < p.length; i++) {
         const a = p[(i - 1 + p.length) % p.length], b = p[i], c = p[(i + 1) % p.length];
-        if ((b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]) === 0) { p.splice(i, 1); aendret = true; break; }
+        if ((b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]) !== 0) continue;
+        if ((a[0] - b[0]) * (c[0] - b[0]) + (a[1] - b[1]) * (c[1] - b[1]) >= 0) return ud; // pig: ingen figur
+        p.splice(i, 1); aendret = true; break;
       }
     }
     if (p.length < 3) return ud;
@@ -246,6 +257,89 @@
     }
     return null;
   }
+
+  // ---------- D (forslaget 09-10): fælles hjælpere til de nye opgavetyper ----------
+  // De nye typer tegnes som en «scene» af små dele (vis.art 'scene', se docs/SCENE.md). vis.fakta er opgavens tal
+  // med rene ord — testen regner facit ud fra dem, uafhængigt af generatoren.
+
+  // Tal-svar ud fra typiske fejl — aldrig et tilfældigt nabotal.
+  // Fejl, der kolliderer (ens med facit eller en anden, uden for [min, max]), springes over. Er der for få, bliver
+  // der færre valg (testen fanger det).
+  function lavValgFejl(svar, fejl, antal, min, max, rng) {
+    const gyldige = [];
+    for (const f of fejl) if (Number.isInteger(f) && f >= min && f <= max && f !== svar && gyldige.indexOf(f) < 0) gyldige.push(f);
+    // Med rng: et tilfældigt udvalg af de typiske fejl og tilfældig rækkefølge. Sorteret ville facit stå samme sted
+    // hver gang (fx altid i midten ved n − 1, n, n + 1), og barnet lærer pladsen i stedet for at regne (UI-review D1)
+    const ud = [svar].concat(rng ? bland(rng, gyldige).slice(0, antal - 1) : gyldige.slice(0, antal - 1));
+    return rng ? bland(rng, ud) : ud.sort((x, y) => x - y);
+  }
+
+  // Svarkort (valgArt 'scene'): facit + fejlkort i prioriteret rækkefølge → id'erne a, b, c i tilfældig rækkefølge.
+  // Hvert kort: { dele: [...], navn: 'oplæst/aria-navn', fakta: {...} }. To kort med samme fakta kommer aldrig med.
+  function lavKort(rng, facit, fejl, antal) {
+    const noegle = (k) => JSON.stringify(k.fakta);
+    const unik = [];
+    for (const k of [facit].concat(fejl)) if (k && !unik.some((u) => noegle(u) === noegle(k))) unik.push(k);
+    const valgte = unik.slice(0, antal);
+    const blandet = bland(rng, valgte);
+    const ids = ['a', 'b', 'c', 'd'];
+    const kort = {};
+    blandet.forEach((k, i) => { kort[ids[i]] = k; });
+    return { kort: kort, valg: ids.slice(0, blandet.length), svar: ids[blandet.indexOf(facit)] };
+  }
+
+  const TAL_ORD = ['nul', 'ét', 'to', 'tre', 'fire', 'fem', 'seks', 'syv', 'otte', 'ni', 'ti'];
+
+  // Tegnebyen: en rute på prikgitteret. Retninger med y nedad (som på skærmen): op = y − 1.
+  const RETNING = { hoejre: [1, 0], venstre: [-1, 0], op: [0, -1], ned: [0, 1] };
+  const RETNING_ORD = { hoejre: 'til højre', venstre: 'til venstre', op: 'op', ned: 'ned' };
+  const RETNING_PIL = { hoejre: '➡️', venstre: '⬅️', op: '⬆️', ned: '⬇️' };
+  // Opskriften [[retning, antal], …] → alle punkter fra start til slut
+  function ruteFraOpskrift(start, opskrift) {
+    const ud = [start.slice()];
+    let [x, y] = start;
+    for (const [r, n] of opskrift) for (let i = 0; i < n; i++) { x += RETNING[r][0]; y += RETNING[r][1]; ud.push([x, y]); }
+    return ud;
+  }
+  // Passer den tegnede vej (punkter fra start) præcis til opskriften? Samme slutpunkt ad en anden vej er ikke nok.
+  function rutePasser(start, opskrift, punkter) {
+    const maal = ruteFraOpskrift(start, opskrift);
+    return Array.isArray(punkter) && punkter.length === maal.length &&
+      punkter.every((p, i) => Array.isArray(p) && p[0] === maal[i][0] && p[1] === maal[i][1]);
+  }
+
+  // Formbyen: brik-puslespil. En figur er skåret i to; den ene halvdel ligger fast, den anden er et hul.
+  // En brik: { form, b, h, … } i et koordinatsystem, hvor kvadratet er 100 × 100. Trekanten har den rette vinkel i
+  // hjørnet 'nv', 'no', 'sv' eller 'so'; halvcirklen har den flade side 'op', 'ned', 'venstre' eller 'hoejre'.
+  const PUSLESPIL = [];
+  (function () {
+    const tre = (hj) => ({ form: 'trekant', b: 100, h: 100, hjoerne: hj });
+    // Kvadrat skåret over diagonalen: to snit × to halvdele
+    [['/', 'nv', 'so'], ['\\', 'no', 'sv']].forEach(([snit, a, b]) => {
+      PUSLESPIL.push({ figur: 'kvadrat', b: 100, h: 100, snit: snit, fast: Object.assign(tre(b), { x: 0, y: 0 }), hul: Object.assign(tre(a), { x: 0, y: 0 }) });
+      PUSLESPIL.push({ figur: 'kvadrat', b: 100, h: 100, snit: snit, fast: Object.assign(tre(a), { x: 0, y: 0 }), hul: Object.assign(tre(b), { x: 0, y: 0 }) });
+    });
+    // Liggende rektangel skåret lodret (to kvadrater) og stående skåret vandret
+    const kv = (x, y) => ({ form: 'kvadrat', b: 100, h: 100, x: x, y: y });
+    PUSLESPIL.push({ figur: 'rektangel', b: 200, h: 100, snit: '|', fast: kv(100, 0), hul: kv(0, 0) });
+    PUSLESPIL.push({ figur: 'rektangel', b: 200, h: 100, snit: '|', fast: kv(0, 0), hul: kv(100, 0) });
+    PUSLESPIL.push({ figur: 'rektangel', b: 100, h: 200, snit: '-', fast: kv(0, 100), hul: kv(0, 0) });
+    PUSLESPIL.push({ figur: 'rektangel', b: 100, h: 200, snit: '-', fast: kv(0, 0), hul: kv(0, 100) });
+    // Kvadrat skåret lodret (to stående rektangler) og vandret (to liggende)
+    const re = (b, h, x, y) => ({ form: 'rektangel', b: b, h: h, x: x, y: y });
+    PUSLESPIL.push({ figur: 'kvadrat', b: 100, h: 100, snit: '|', fast: re(50, 100, 50, 0), hul: re(50, 100, 0, 0) });
+    PUSLESPIL.push({ figur: 'kvadrat', b: 100, h: 100, snit: '|', fast: re(50, 100, 0, 0), hul: re(50, 100, 50, 0) });
+    PUSLESPIL.push({ figur: 'kvadrat', b: 100, h: 100, snit: '-', fast: re(100, 50, 0, 50), hul: re(100, 50, 0, 0) });
+    PUSLESPIL.push({ figur: 'kvadrat', b: 100, h: 100, snit: '-', fast: re(100, 50, 0, 0), hul: re(100, 50, 0, 50) });
+    // Cirkel skåret i to halvcirkler
+    const hc = (flad, x, y) => ({ form: 'halvcirkel', b: flad === 'op' || flad === 'ned' ? 100 : 50, h: flad === 'op' || flad === 'ned' ? 50 : 100, flad: flad, x: x, y: y });
+    PUSLESPIL.push({ figur: 'cirkel', b: 100, h: 100, snit: '|', fast: hc('venstre', 50, 0), hul: hc('hoejre', 0, 0) });
+    PUSLESPIL.push({ figur: 'cirkel', b: 100, h: 100, snit: '|', fast: hc('hoejre', 0, 0), hul: hc('venstre', 50, 0) });
+    PUSLESPIL.push({ figur: 'cirkel', b: 100, h: 100, snit: '-', fast: hc('op', 0, 50), hul: hc('ned', 0, 0) });
+    PUSLESPIL.push({ figur: 'cirkel', b: 100, h: 100, snit: '-', fast: hc('ned', 0, 0), hul: hc('op', 0, 50) });
+  })();
+  const BRIK_NAVN = { trekant: 'en trekant', kvadrat: 'et kvadrat', rektangel: 'et rektangel', halvcirkel: 'en halvcirkel' };
+  const brikUdenSted = (b) => { const k = Object.assign({}, b); delete k.x; delete k.y; return k; };
 
   const G = {
     // ===== Tælleskoven: tal til 20 =====
@@ -958,15 +1052,32 @@
       };
     },
 
-    // ===== Klokketårnet: hel og halv (ekstra) =====
-    // Dansk tidssprog: «halv fem» er 4:30. Tal skrives som «t:mm» (fx '4:30') — én tekstværdi pr. svar.
+    // ===== Klokketårnet: hel og halv, på niveau 3 også kvart over og kvart i (ekstra) =====
+    // Dansk tidssprog: «halv fem» er 4:30, «kvart i fem» er 4:45. Tal skrives som «t:mm» (fx '4:30') — én tekstværdi pr. svar.
     klokkeLaes(niveau, rng) {
-      const halv = niveau >= 2 && rng() < 0.6;
+      const kvart = niveau >= 3 && rng() < 0.55; // niveau 1 og 2 trækker de samme tal som før
+      const halv = !kvart && niveau >= 2 && rng() < 0.6;
+      const kvartI = kvart && rng() < 0.5;
       const t = heltal(rng, 1, 12);
-      const svar = t + ':' + (halv ? '30' : '00');
+      const m = kvart ? (kvartI ? 45 : 15) : halv ? 30 : 0;
+      const svar = t + ':' + (m < 10 ? '0' : '') + m;
       const naeste = (t % 12) + 1, forrige = t === 1 ? 12 : t - 1;
-      // Typiske fejl: hel/halv byttet, «halv fem» læst som 5:30, timen før/efter
-      const andre = halv ? [naeste + ':30', t + ':00', naeste + ':00', forrige + ':30'] : [naeste + ':00', forrige + ':00', t + ':30'];
+      let andre;
+      if (kvart) {
+        // Typiske fejl i prioriteret rækkefølge: kvart over ↔ kvart i; ved kvart i den nævnte time
+        // («kvart i otte» læst som 8:45 — så barnet også skal aflæse timen); viserne byttet om
+        // (den store visers tal læst som timer, den lilles nærmeste tal som minutter: 7:15 → 3:07),
+        // og som reserve: den nævnte time uden kvarteret / kvarteret læst som halv
+        const lilleTal = (Math.round(t + m / 60) + 11) % 12 + 1;
+        const byttet = (m / 5) + ':' + (lilleTal < 10 ? '0' : '') + lilleTal;
+        const kandidater = kvartI
+          ? [t + ':15', naeste + ':45', byttet, naeste + ':00', t + ':30']
+          : [t + ':45', byttet, t + ':00', t + ':30', naeste + ':15'];
+        andre = kandidater.filter((k, i) => k !== svar && kandidater.indexOf(k) === i).slice(0, antalValg(niveau) - 1);
+      } else {
+        // Typiske fejl: hel/halv byttet, «halv fem» læst som 5:30, timen før/efter
+        andre = halv ? [naeste + ':30', t + ':00', naeste + ':00', forrige + ':30'] : [naeste + ':00', forrige + ':00', t + ':30'];
+      }
       return {
         emne: 'maaling', type: 'klokkeLaes', niveau, noegle: 'klokkeLaes:' + svar, ikon: '🕰️',
         tale: 'Hvad er klokken?',
@@ -975,18 +1086,34 @@
         svar: svar,
         valg: lavValgTekst(rng, svar, [svar].concat(andre), antalValg(niveau)),
         valgArt: 'tid',
+        // Kvart: trin 1 markerer en kvart omgang og tæller 5, 10, 15 — trin 2 viser svaret og siger det
         hjaelp: [{ art: 'urVisere' }, { art: 'visUr', klokke: svar }],
       };
     },
 
-    // Lyt og find uret («Find klokken halv fem») — svarene er analoge ure
+    // Lyt og find uret («Find klokken halv fem») — svarene er analoge ure. Niveau 3: også kvart over og kvart i
     klokkeFind(niveau, rng) {
-      const halv = niveau >= 2 && rng() < 0.6;
-      const tNavn = heltal(rng, 1, 12);                        // timen, man siger
-      const t = halv ? (tNavn === 1 ? 12 : tNavn - 1) : tNavn; // timen, uret viser
-      const svar = t + ':' + (halv ? '30' : '00');
+      const kvart = niveau >= 3 && rng() < 0.55; // niveau 1 og 2 trækker de samme tal som før
+      const halv = !kvart && niveau >= 2 && rng() < 0.6;
+      const kvartI = kvart && rng() < 0.5;
+      const tNavn = heltal(rng, 1, 12);                                  // timen, man siger
+      const t = halv || kvartI ? (tNavn === 1 ? 12 : tNavn - 1) : tNavn; // timen, uret viser
+      const m = kvart ? (kvartI ? 45 : 15) : halv ? 30 : 0;
+      const svar = t + ':' + (m < 10 ? '0' : '') + m;
       const naeste = (t % 12) + 1, forrige = t === 1 ? 12 : t - 1;
-      const andre = halv ? [tNavn + ':30', tNavn + ':00', t + ':00', forrige + ':30'] : [naeste + ':00', forrige + ':00', t + ':30'];
+      let andre;
+      if (kvart) {
+        // Typiske fejl i prioriteret rækkefølge: kvart over ↔ kvart i (kun den store viser er anderledes);
+        // ved kvart i den nævnte time («kvart i otte» stillet som 8:45); ved kvart over halv-reglen overført
+        // («kvart over syv» stillet som 6:15, ligesom «halv syv» er 6:30) — begge kræver, at barnet ser på
+        // den lille viser. Som reserve: den nævnte time hel / kvarteret stillet som halv
+        const kandidater = kvartI
+          ? [t + ':15', tNavn + ':45', tNavn + ':00', t + ':30']
+          : [t + ':45', forrige + ':15', t + ':00', t + ':30'];
+        andre = kandidater.filter((k, i) => k !== svar && kandidater.indexOf(k) === i).slice(0, antalValg(niveau) - 1);
+      } else {
+        andre = halv ? [tNavn + ':30', tNavn + ':00', t + ':00', forrige + ':30'] : [naeste + ':00', forrige + ':00', t + ':30'];
+      }
       return {
         emne: 'maaling', type: 'klokkeFind', niveau, noegle: 'klokkeFind:' + svar, ikon: '👂',
         tale: 'Find uret, der viser klokken ' + klokkeNavn(svar) + '.',
@@ -996,6 +1123,35 @@
         valg: lavValgTekst(rng, svar, [svar].concat(andre), antalValg(niveau)),
         valgArt: 'ur',
         hjaelp: [{ art: 'visUr', klokke: svar }],
+      };
+    },
+
+    // Stil viserne («Stil uret på kvart i otte») — kun niveau 3. Uret står på forhånd på den hele time,
+    // tiden ligger i (7:00 ved «kvart i otte»); barnet vælger, hvor den store viser skal hen.
+    // Svar og valg er tider ('7:45'); app.js tegner hvert valg som et mål på urskiven ud fra minuttallet
+    // (0 → 12, 15 → 3, 30 → 6, 45 → 9), og den lille viser følger mekanisk med.
+    klokkeStil(niveau, rng) {
+      const art = vaelg(rng, ['over', 'i', 'halv']);
+      const t = heltal(rng, 1, 12);                           // timen, uret står i
+      const naeste = (t % 12) + 1;
+      const m = art === 'over' ? 15 : art === 'i' ? 45 : 30;
+      const svar = t + ':' + m;
+      const hel = (art === 'over' ? t : naeste) + ':00';      // den hele time, der nævnes («otte» → 8:00)
+      // Typiske fejl (ingen tilfældige mål): kvart over ↔ kvart i, og den nævnte hele time (12-målet).
+      // Ved halv: kvart i (9-målet) — «halv otte» og «kvart i otte» ligger begge før otte og blandes sammen
+      const fejl = art === 'over' ? t + ':45' : t + ':' + (art === 'i' ? 15 : 45);
+      const minut = (k) => Number(k.split(':')[1]);
+      return {
+        emne: 'maaling', type: 'klokkeStil', niveau, noegle: 'klokkeStil:' + svar, ikon: '🕰️',
+        tale: 'Stil uret på ' + klokkeNavn(svar) + '.',
+        tekst: 'Stil uret',
+        vis: { art: 'lyt', start: t + ':00' },
+        svar: svar,
+        valg: [svar, fejl, hel].sort((a, b) => minut(a) - minut(b)), // med uret: 12, 3, 6, 9 (tasterne 3, 6, 9 og 1/0 for 12, og Tab)
+        valgArt: 'stil',
+        // Trin 1: den nævnte hele time. Trin 2: et kvarter (ved halv: en halv time) derfra til facit —
+        // den lille viser er ikke nået til otte endnu. Bagefter viser spillet facit og siger det (visSvaret)
+        hjaelp: [{ art: 'stilHel', klokke: hel }, { art: 'stilFlyt', klokke: svar }],
       };
     },
 
@@ -1044,7 +1200,816 @@
         hjaelp: [tallinje(pris, har - pris, true)],
       };
     },
+
+    // =====================================================================
+    //  D1 · trin 1 (forslaget 09-10). Fejlsvarene bygger på de typiske fejl, som forslaget nævner.
+    // =====================================================================
+
+    // Tælleskoven: tingene flytter sig — er der stadig lige mange? (antallet ændrer sig ikke)
+    flytTing(niveau, rng, tingListe) {
+      const { ting } = vaelgTing(rng, tingListe);
+      const n = heltal(rng, 3, 9); // n + 1 (fejlsvaret) må højst være 10
+      return {
+        emne: 'taelle', type: 'flytTing', niveau, noegle: 'flytTing:' + n, ikon: '🔀',
+        tale: 'Der var ' + antalOrd(n, ting) + '. De flytter sig. Hvor mange er der nu?',
+        tekst: 'Hvor mange nu?',
+        vis: { art: 'scene', fakta: { foer: n, nu: n }, dele: [
+          { t: 'gruppe', id: 'foer', navn: 'Før', dele: [{ t: 'ting', e: ting.e, n: n, taelbar: false }] },
+          { t: 'tegn', s: '→' },
+          { t: 'gruppe', id: 'nu', navn: 'Nu', dele: [{ t: 'ting', e: ting.e, n: n, spredt: true }] },
+        ] },
+        svar: n,
+        // Mere plads ser ud som flere (n + 1) · én bliver overset (n − 1)
+        valg: lavValgFejl(n, [n + 1, n - 1], antalValg(niveau), 1, 10, rng), valgBlandet: true,
+        hjaelp: [{ art: 'lys', trin: [{ tale: 'Se. Ingen kom til, og ingen gik væk.', lys: ['foer', 'nu'] }] }, { art: 'tael' }],
+      };
+    },
+
+    // Formbyen: hvilken brik passer i hullet? (kongruens — samme form, størrelse og retning)
+    brikPuslespil(niveau, rng) {
+      const p = vaelg(rng, PUSLESPIL);
+      const hul = brikUdenSted(p.hul);
+      const kortAf = (b) => ({ dele: [Object.assign({ t: 'brik' }, b)], navn: BRIK_NAVN[b.form], fakta: b });
+      // Fejlbrikker, der næsten passer: følger én kant eller fylder hullets kasse, men har en anden form
+      const fejl = {
+        trekant: [{ form: 'rektangel', b: hul.b, h: hul.h / 2 }, { form: 'halvcirkel', b: hul.b, h: hul.h / 2, flad: 'ned' }],
+        kvadrat: [{ form: 'trekant', b: hul.b, h: hul.h, hjoerne: 'sv' }, { form: 'rektangel', b: hul.b, h: hul.h / 2 }],
+        rektangel: [{ form: 'kvadrat', b: Math.min(hul.b, hul.h), h: Math.min(hul.b, hul.h) }, { form: 'trekant', b: hul.b, h: hul.h, hjoerne: 'sv' }],
+        halvcirkel: [{ form: 'rektangel', b: hul.b, h: hul.h }, { form: 'trekant', b: hul.b, h: hul.h, hjoerne: hul.flad === 'op' ? 'nv' : 'sv' }],
+      }[hul.form];
+      const k = lavKort(rng, kortAf(hul), fejl.map(kortAf), antalValg(niveau));
+      const beskriv = { trekant: 'Hullet har tre hjørner.', kvadrat: 'Hullet har fire lige lange sider.', rektangel: 'Hullet er en aflang firkant.', halvcirkel: 'Hullet er rundt på den ene side.' }[hul.form];
+      return {
+        emne: 'former', type: 'brikPuslespil', niveau, noegle: 'brikPuslespil:' + p.figur + p.snit + p.hul.x + ',' + p.hul.y + (p.hul.hjoerne || p.hul.flad || ''), ikon: '🧩',
+        tale: 'Hvilken brik passer i hullet?',
+        tekst: 'Hvilken brik passer?',
+        vis: { art: 'scene', fakta: { figur: p.figur, snit: p.snit, hul: p.hul }, dele: [{ t: 'puslespil', id: 'puslespil', figur: p.figur, b: p.b, h: p.h, fast: p.fast, hul: p.hul }] },
+        svar: k.svar, valg: k.valg, kort: k.kort, valgArt: 'scene',
+        hjaelp: [{ art: 'lys', trin: [{ tale: beskriv, lys: ['hul'] }] }],
+      };
+    },
+
+    // Tegnebyen: gå efter en opskrift på prikgitteret («to til højre, så ét op») og tegn vejen
+    tegnRute(niveau, rng) {
+      const kol = SOEMBRAET.kol, raek = SOEMBRAET.raek;
+      let opskrift, start, punkter;
+      for (let forsoeg = 0; forsoeg < 200; forsoeg++) {
+        if (niveau <= 1) {
+          // To ben: højre og op i en af de to rækkefølger, 1–2 skridt hver
+          const ben = [['hoejre', heltal(rng, 1, 2)], ['op', heltal(rng, 1, 2)]];
+          opskrift = rng() < 0.5 ? ben : [ben[1], ben[0]];
+        } else {
+          // Tre ben i forskellige retninger, aldrig lige tilbage
+          opskrift = [];
+          let forrige = null;
+          for (let i = 0; i < 3; i++) {
+            const mulige = Object.keys(RETNING).filter((r) => r !== forrige && !(forrige && RETNING[r][0] === -RETNING[forrige][0] && RETNING[r][1] === -RETNING[forrige][1]));
+            const r = vaelg(rng, mulige);
+            opskrift.push([r, heltal(rng, 1, 2)]);
+            forrige = r;
+          }
+        }
+        start = [heltal(rng, 0, kol - 1), heltal(rng, 0, raek - 1)];
+        punkter = ruteFraOpskrift(start, opskrift);
+        const inde = punkter.every(([x, y]) => x >= 0 && y >= 0 && x < kol && y < raek);
+        const unikke = new Set(punkter.map((q) => q.join(','))).size === punkter.length;
+        if (inde && unikke) break;
+      }
+      const tale = opskrift.map(([r, n], i) => (i === 0 ? 'Gå ' : 'Gå så ') + TAL_ORD[n] + ' ' + (n === 1 ? 'felt' : 'felter') + ' ' + RETNING_ORD[r] + '.').join(' ');
+      return {
+        emne: 'tegne', type: 'tegnRute', niveau, noegle: 'tegnRute:' + opskrift.map(([r, n]) => r[0] + n).join(''), ikon: '🧭',
+        tale: tale + ' Tegn vejen.',
+        tekst: 'Tegn vejen',
+        vis: { art: 'rute', kol: kol, raek: raek, start: start, opskrift: opskrift, pile: opskrift.map(([r, n]) => ({ pil: RETNING_PIL[r], antal: n })), fakta: { slut: punkter[punkter.length - 1] } },
+        svar: 'ok', interaktiv: 'rute',
+        // Trin 1: det første ben lyser · trin 2: hele vejen stiplet · bagefter følger barnet den nummererede vej
+        hjaelp: [{ art: 'rute', ben: 1 }, { art: 'rute', ben: opskrift.length }],
+      };
+    },
+
+    // Plusbjerget: tre leverancer i træk (først 1, så 2, så 3) — hvor mange i kassen?
+    treKurve(niveau, rng, tingListe) {
+      const { ting } = vaelgTing(rng, tingListe);
+      const maxSum = niveau >= 2 ? 10 : 5;
+      let a, b, c;
+      do { a = heltal(rng, 1, 3); b = heltal(rng, 1, 3); c = heltal(rng, 1, 4); } while (a + b + c > maxSum || (niveau >= 2 && a + b + c < 6));
+      const sum = a + b + c;
+      const kurv = (id, n) => ({ t: 'gruppe', id: id, ramme: 'kurv', dele: [{ t: 'ting', e: ting.e, n: n }] });
+      return {
+        emne: 'plus10', type: 'treKurve', niveau, noegle: 'treKurve:' + a + '+' + b + '+' + c, ikon: '🧺',
+        tale: 'Først kommer ' + antalOrd(a, ting) + ', så ' + b + ' og så ' + c + '. Hvor mange er der i kassen?',
+        tekst: a + ' + ' + b + ' + ' + c,
+        vis: { art: 'scene', fakta: { a: a, b: b, c: c }, dele: [kurv('a', a), { t: 'tegn', s: '+' }, kurv('b', b), { t: 'tegn', s: '+' }, kurv('c', c), { t: 'tegn', s: '→' }, { t: 'gruppe', id: 'kasse', ramme: 'kasse', dele: [{ t: 'tal', s: '?' }] }] },
+        svar: sum,
+        // Den første leverance glemt (b + c) · kun den sidste (c)
+        valg: lavValgFejl(sum, [b + c, c], antalValg(niveau), 0, maxSum, rng), valgBlandet: true,
+        hjaelp: [{ art: 'lys', trin: [{ tale: 'Først ' + a + '.', lys: ['a'] }, { tale: 'Så ' + b + '.', lys: ['b'] }, { tale: 'Og så ' + c + '.', lys: ['c'] }] }, { art: 'tael' }],
+      };
+    },
+
+    // Venneøen: ret vennerne — venstre side er låst; hvor mange skal der være til højre, så huset er fuldt?
+    retVenner(niveau, rng) {
+      const hel = niveau >= 2 ? 10 : 5;
+      let a, w;
+      // Forkert højre side: huset har tomme pladser. De to typiske fejl skal være forskellige fra facit og hinanden
+      do { a = heltal(rng, 1, hel - 2); w = heltal(rng, 1, hel - a - 1); } while (niveau >= 2 && (a + w === hel - a || hel - a - w === a + w));
+      const svar = hel - a;
+      return {
+        emne: 'venner', type: 'retVenner', niveau, noegle: 'retVenner:' + a + '+' + w + '/' + hel, ikon: '🏠',
+        tale: 'Der skal bo ' + hel + ' her. ' + (a === 1 ? 'Den ene' : 'De ' + a) + ' til venstre bliver. Hvor mange skal der være til højre?',
+        tekst: a + ' + ? = ' + hel,
+        vis: { art: 'scene', fakta: { hel: hel, venstre: a, hoejre: w }, dele: [
+          { t: 'pladser', id: 'hus', n: hel, fyldt: [{ id: 'venstre', fra: 0, til: a, e: '🔵' }, { id: 'hoejre', fra: a, til: a + w, e: '🟠' }], taelbarFra: a },
+          { t: 'gruppe', ramme: 'ingen', dele: [{ t: 'tal', s: String(a), id: 'kort-venstre', laast: true }, { t: 'tegn', s: '+' }, { t: 'tal', s: String(w), id: 'kort-hoejre', ret: true }] },
+        ] },
+        svar: svar,
+        // Antallet af tomme pladser i stedet for hele højre side · den nuværende total
+        valg: lavValgFejl(svar, [hel - a - w, a + w], antalValg(niveau), 0, hel, rng), valgBlandet: true,
+        hjaelp: [{ art: 'lys', trin: [{ tale: 'Huset har ' + hel + ' pladser.', lys: ['hus'] }] },
+          { art: 'lys', trin: [{ tale: (a === 1 ? 'Den ene' : 'De ' + a) + ' til venstre bliver. Tæl de andre pladser.', lys: ['venstre'], tael: 'hus' }] }],
+      };
+    },
+
+    // Minussøen: før og nu — hvor mange svømmede væk?
+    hvorMangeVaek(niveau, rng) {
+      const max = niveau >= 2 ? 10 : 5;
+      let f, e;
+      // Ikke f = 2e: så er «dem, der er tilbage» det samme som facit, og den mest typiske fejl forsvinder
+      do { f = heltal(rng, 3, max); e = heltal(rng, 1, f - 1); } while (f === 2 * e);
+      const svar = f - e;
+      return {
+        emne: 'minus', type: 'hvorMangeVaek', niveau, noegle: 'hvorMangeVaek:' + f + '-' + e, ikon: '🦆',
+        tale: 'Før var der ' + f + ' ænder. Nu er der ' + (e === 1 ? 'én' : e) + '. Hvor mange svømmede væk?',
+        tekst: f + ' − ? = ' + e,
+        vis: { art: 'scene', fakta: { foer: f, nu: e }, dele: [
+          { t: 'gruppe', id: 'foer', navn: 'Før', dele: [{ t: 'ting', e: '🦆', n: f, under: [{ id: 'foer-par', fra: 0, til: e, taelbar: false }, { id: 'foer-vaek', fra: e, til: f, taelbar: true }] }] },
+          { t: 'tegn', s: '→' },
+          { t: 'gruppe', id: 'nu', navn: 'Nu', dele: [{ t: 'ting', e: '🦆', n: e, taelbar: false }] },
+        ] },
+        svar: svar,
+        // Svarer med dem, der er tilbage (e) · lægger før og nu sammen · svarer med før
+        valg: lavValgFejl(svar, [e, f + e, f], antalValg(niveau), 0, max, rng), valgBlandet: true,
+        hjaelp: [{ art: 'lys', trin: [{ tale: (e === 1 ? 'Den ene' : 'De ' + e) + ' er her stadig.', lys: ['nu', 'foer-par'] }] },
+          { art: 'lys', trin: [{ tale: 'Tæl dem, der svømmede væk.', tael: 'foer' }] }],
+      };
+    },
+
+    // Klodsbyen: byt ti små klodser til én tierstang — samme mængde, ny måde at se den på
+    byt10(niveau, rng) {
+      const kortAf = (tiere, enere) => ({ dele: [{ t: 'staenger', tiere: tiere, enere: enere }], navn: tiere + (tiere === 1 ? ' tier' : ' tiere') + ' og ' + enere + (enere === 1 ? ' ener' : ' enere'), fakta: { tiere: tiere, enere: enere } });
+      let T, k, fejl;
+      do {
+        T = heltal(rng, 0, 3);
+        k = heltal(rng, 1, 9);
+        fejl = [kortAf(T, k)];                                                // glemmer den nye tierstang
+        if (k * 10 + T + 1 <= 50 && k !== T + 1) fejl.push(kortAf(k, T + 1)); // bytter tiere og enere om
+        if ((T + 2) * 10 + k <= 50) fejl.push(kortAf(T + 2, k));               // tæller en tier for meget
+        if (k + 1 <= 9) fejl.push(kortAf(T + 1, k + 1));                       // tæller en ener for meget
+      } while (fejl.length < 2); // tre kort på niveau 2 og 3
+      const kort = lavKort(rng, kortAf(T + 1, k), fejl, antalValg(niveau));
+      return {
+        emne: 'tiere', type: 'byt10', niveau, noegle: 'byt10:' + T + '+' + (10 + k), ikon: '🔁',
+        tale: 'Byt ti små klodser til én tierstang. Hvordan ser det ud bagefter?',
+        tekst: 'Byt ti til én tier',
+        vis: { art: 'scene', fakta: { tiere: T, enere: 10 + k }, dele: [{ t: 'staenger', id: 'start', tiere: T, enere: 10 + k, rammeOmTi: true }] },
+        svar: kort.svar, valg: kort.valg, kort: kort.kort, valgArt: 'scene',
+        hjaelp: [{ art: 'lys', trin: [{ tale: 'Ti små klodser er lige så lange som én tierstang.', lys: ['ti'] }] },
+          { art: 'lys', trin: [{ tale: 'Så kommer der én tierstang mere, og ' + (k === 1 ? 'én lille klods' : k + ' små klodser') + ' er tilbage.', lys: ['tiere', 'rest'] }] }],
+      };
+    },
+
+    // Tierbroen: næsten dobbelt — 6 og 6 er 12, så er 6 og 7 én mere
+    naestenDobbelt(niveau, rng, tingListe) {
+      const { ting } = vaelgTing(rng, tingListe);
+      const a = heltal(rng, niveau >= 2 ? 5 : 2, niveau >= 2 ? 9 : 6);
+      const stoerstFoerst = rng() < 0.5;
+      const x = stoerstFoerst ? a + 1 : a, y = stoerstFoerst ? a : a + 1;
+      const svar = 2 * a + 1;
+      const raekke = (id, n) => ({ t: 'ting', id: id, e: ting.e, n: n, linje: true, under: n > a ? [{ id: 'ekstra', fra: a, til: a + 1 }] : [] });
+      return {
+        emne: 'tierbro', type: 'naestenDobbelt', niveau, noegle: 'naestenDobbelt:' + x + '+' + y, ikon: '👯',
+        tale: a + ' og ' + a + ' er ' + 2 * a + '. Her er ' + x + ' og ' + y + '. Hvor mange er der tilsammen?',
+        tekst: x + ' + ' + y,
+        vis: { art: 'scene', lag: 'stak', fakta: { a: x, b: y }, dele: [raekke('r1', x), raekke('r2', y)] },
+        svar: svar,
+        // Glemmer den ekstra (dobbelt af det mindste) · fordobler det største
+        valg: lavValgFejl(svar, [2 * a, 2 * a + 2], antalValg(niveau), 0, 20, rng), valgBlandet: true,
+        hjaelp: [{ art: 'lys', trin: [{ tale: a + ' par. Og så én ekstra.', lys: ['ekstra'] }] }, tallinje(2 * a, 1)],
+      };
+    },
+
+    // Mønsterslottet: hvilken lille pakke gentages fra pilen?
+    gentagPakke(niveau, rng) {
+      const t = vaelg(rng, niveau >= 2 ? ['AB', 'ABB', 'AAB', 'ABC'] : ['AB', 'ABB', 'AAB']);
+      const brikker = bland(rng, Object.keys(MOENSTER_BRIKKER)).slice(0, 3);
+      const enhed = t.split('').map((c) => brikker['ABC'.indexOf(c)]);
+      const frise = [].concat(enhed, enhed, enhed);
+      const roter = (l, k) => l.slice(k).concat(l.slice(0, k));
+      const kortAf = (celler) => ({ dele: [{ t: 'raekke', celler: celler }], navn: celler.map((c) => MOENSTER_BRIKKER[c].navn).join(', '), fakta: { celler: celler } });
+      // Starter et forkert sted (pakken roteret) · udelader en brik · tager en brik for meget
+      const fejl = [kortAf(roter(enhed, 1)), kortAf(enhed.slice(0, -1)), kortAf(enhed.concat([enhed[0]])), kortAf(roter(enhed, 2))];
+      const kort = lavKort(rng, kortAf(enhed), fejl.filter((k) => k.fakta.celler.length >= 2), antalValg(niveau));
+      return {
+        emne: 'moenstre', type: 'gentagPakke', niveau, noegle: 'gentagPakke:' + t + ':' + enhed.join(''), ikon: '📦',
+        tale: 'Hvilken lille pakke gentages fra pilen?',
+        tekst: 'Hvad gentages?',
+        vis: { art: 'scene', fakta: { enhed: enhed, gange: 3 }, dele: [{ t: 'raekke', id: 'frise', celler: frise, pil: true, pakke: enhed.length }] },
+        svar: kort.svar, valg: kort.valg, kort: kort.kort, valgArt: 'scene',
+        hjaelp: [{ art: 'lys', trin: [{ tale: 'Se på de første ' + enhed.length + '.', lys: ['g0'] }, { tale: 'Så kommer de samme igen.', lys: ['g1'] }] }],
+      };
+    },
+
+    // Klokketorvet: betal præcis — der ligger én mønt; vælg én mønt mere
+    betalPrecis(niveau, rng) {
+      const forste = niveau >= 2 ? [5, 10] : [1, 2, 5];
+      const andre = niveau >= 2 ? [1, 2, 5, 10] : [1, 2, 5];
+      const max = niveau >= 2 ? 20 : 10;
+      let c1, c2;
+      do { c1 = vaelg(rng, forste); c2 = vaelg(rng, andre); } while (c1 + c2 > max);
+      const pris = c1 + c2;
+      const vare = vaelg(rng, VARER);
+      const kortAf = (kr) => ({ dele: [{ t: 'moent', kr: kr }], navn: kr + (kr === 1 ? ' krone' : ' kroner'), fakta: { kr: kr } });
+      // En for lille mønt (kommer ikke op til prisen) og en for stor (betaler for meget) — de nærmeste først
+      const mindre = andre.filter((m) => m < c2).reverse(), stoerre = andre.filter((m) => m > c2);
+      const fejl = [];
+      for (let i = 0; i < 3; i++) { if (mindre[i] !== undefined) fejl.push(kortAf(mindre[i])); if (stoerre[i] !== undefined) fejl.push(kortAf(stoerre[i])); }
+      const kort = lavKort(rng, kortAf(c2), fejl, antalValg(niveau));
+      return {
+        emne: 'maaling', type: 'betalPrecis', niveau, noegle: 'betalPrecis:' + c1 + '+' + c2, ikon: '🪙',
+        tale: vare.navn + ' koster ' + pris + ' kroner. Du har lagt ' + c1 + (c1 === 1 ? ' krone' : ' kroner') + '. Vælg én mønt mere, så du betaler præcis.',
+        tekst: pris + ' kr',
+        vis: { art: 'scene', fakta: { pris: pris, lagt: c1 }, dele: [
+          { t: 'vare', id: 'vare', e: vare.e, pris: pris },
+          { t: 'gruppe', id: 'maatte', ramme: 'maatte', dele: [{ t: 'moenter', liste: [c1] }, { t: 'tegn', s: '+' }, { t: 'tal', s: '?' }] },
+        ] },
+        svar: kort.svar, valg: kort.valg, kort: kort.kort, valgArt: 'scene',
+        hjaelp: [{ art: 'lys', trin: [{ tale: 'Du har lagt ' + c1 + '. Det skal blive ' + pris + '.', lys: ['maatte', 'vare'] }] }, tallinje(c1, c2)],
+      };
+    },
+
+    // Klokketorvet: digitalt → analogt. Det digitale ur viser tiden; find uret med visere, der viser det samme
+    urDigital(niveau, rng) {
+      const kvart = niveau >= 3 && rng() < 0.5;
+      const halv = !kvart && niveau >= 2 && rng() < 0.6;
+      const kvartI = kvart && rng() < 0.5;
+      const t = heltal(rng, 1, 12);
+      const m = kvart ? (kvartI ? 45 : 15) : halv ? 30 : 0;
+      const svar = t + ':' + (m < 10 ? '0' : '') + m;
+      const naeste = (t % 12) + 1, forrige = t === 1 ? 12 : t - 1;
+      // Typiske fejl: den lille viser ved den næste time (halv/kvart i læst som «snart»), store viser forkert kvarter
+      // eller hel time, og timen før
+      const kandidater = m === 0 ? [naeste + ':00', t + ':30', forrige + ':00']
+        : m === 30 ? [naeste + ':30', t + ':00', forrige + ':30']
+          : m === 15 ? [t + ':45', t + ':00', naeste + ':15']
+            : [t + ':15', naeste + ':45', t + ':30'];
+      return {
+        emne: 'maaling', type: 'urDigital', niveau, noegle: 'urDigital:' + svar, ikon: '⌚',
+        tale: 'Find uret med visere, der viser det samme.',
+        tekst: 'Find det samme',
+        vis: { art: 'scene', fakta: { klokke: svar }, dele: [{ t: 'digital', id: 'digital', klokke: svar }] },
+        svar: svar,
+        valg: lavValgTekst(rng, svar, [svar].concat(kandidater.slice(0, antalValg(niveau) - 1)), antalValg(niveau)),
+        valgArt: 'ur',
+        hjaelp: [{ art: 'lys', trin: [{ tale: 'Der står ' + klokkeNavn(svar) + '.', lys: ['digital'] }] }, { art: 'visUr', klokke: svar }],
+      };
+    },
+
+    // Klokketorvet: 5-minutter (Jimmys ønske 08-10). Tæl 5, 10, 15 … på den store viser
+    klokke5(niveau, rng) {
+      const t = heltal(rng, 1, 12);
+      const m = vaelg(rng, [5, 10, 20, 25, 35, 40, 50, 55]);
+      const pad = (x) => (x < 10 ? '0' : '') + x;
+      const svar = t + ':' + pad(m);
+      const naeste = (t % 12) + 1;
+      // Læser tallet, den store viser peger på, som minutter (7:25 → 7:05) · efter halv: den næste time, fordi
+      // den lille viser er tæt på den (7:40 → 8:40) · før halv: spejlet om 6 (7:20 → 7:40)
+      const fejl = [t + ':' + pad(m / 5), m > 30 ? naeste + ':' + pad(m) : t + ':' + pad(60 - m)];
+      return {
+        emne: 'maaling', type: 'klokke5', niveau, noegle: 'klokke5:' + svar, ikon: '🕰️',
+        tale: 'Hvad er klokken? Tæl fem ad gangen på den store viser.',
+        tekst: 'Hvad er klokken?',
+        vis: { art: 'ur', klokke: svar },
+        svar: svar,
+        valg: lavValgTekst(rng, svar, [svar].concat(fejl.slice(0, antalValg(niveau) - 1)), antalValg(niveau)),
+        valgArt: 'tid',
+        hjaelp: [{ art: 'urFem', klokke: svar }, { art: 'visUr', klokke: svar }],
+      };
+    },
+
+    // Lystårnet (tæller i Formbyen): to krav på én gang — den rigtige kurv med det rigtige antal bær
+    formOgAntal(niveau, rng) {
+      const former = ['trekant', 'cirkel', 'firkant'];
+      const form = vaelg(rng, former);
+      const n = heltal(rng, 2, niveau >= 2 ? 6 : 5);
+      const andenForm = vaelg(rng, former.filter((f) => f !== form));
+      const andetAntal = vaelg(rng, [n - 1, n + 1].filter((x) => x >= 1 && x <= 6));
+      const kortAf = (f, k) => ({ dele: [{ t: 'form', id: 'f-' + f, form: f, farve: 1 }, { t: 'ting', e: '🍓', n: k }], navn: FORMER[f].ubestemt + ' med ' + k + ' bær', fakta: { form: f, antal: k } });
+      // Kun antallet passer · kun formen passer
+      const kort = lavKort(rng, kortAf(form, n), [kortAf(andenForm, n), kortAf(form, andetAntal)], antalValg(niveau));
+      return {
+        emne: 'former', type: 'formOgAntal', niveau, noegle: 'formOgAntal:' + form + n, ikon: '🍓',
+        tale: 'Vælg ' + FORMER[form].bestemt + ' med ' + n + ' bær.',
+        tekst: 'Find formen med bærrene',
+        vis: { art: 'scene', fakta: { form: form, antal: n }, dele: [{ t: 'form', form: form, farve: 1, id: 'maal-form' }, { t: 'tal', s: String(n) }, { t: 'ting', e: '🍓', n: 1, taelbar: false }] },
+        svar: kort.svar, valg: kort.valg, kort: kort.kort, valgArt: 'scene',
+        hjaelp: [{ art: 'lys', trin: [{ tale: 'Find ' + FORMER[form].flertal + '.', lys: ['f-' + form] }, { tale: 'Tæl bærrene.' }] }],
+      };
+    },
+
+    // =====================================================================
+    //  D2 · trin 2 (forslaget 09-10): en ny sammenhæng
+    // =====================================================================
+
+    // Tælleskoven: hver skål får ét bær — hvor mange bær er tilbage?
+    fordelBaer(niveau, rng) {
+      const max = niveau >= 3 ? 20 : 10;
+      let b, s;
+      // Resten må ikke være lig antallet af skåle (så forsvinder fejlen «tæller skålene»)
+      do { b = heltal(rng, 4, max - 2); s = heltal(rng, 2, Math.min(6, b - 1)); } while (b + s > max || b - s === s);
+      const rest = b - s;
+      return {
+        emne: 'taelle', type: 'fordelBaer', niveau, noegle: 'fordelBaer:' + b + '-' + s, ikon: '🥣',
+        tale: 'Der er ' + b + ' jordbær. Hver af de ' + s + ' skåle får ét. Hvor mange jordbær bliver tilbage?',
+        tekst: 'Hvor mange er tilbage?',
+        vis: { art: 'scene', lag: 'stak', fakta: { baer: b, skaale: s }, dele: [
+          { t: 'ting', id: 'baer', e: '🍓', n: b, under: [{ id: 'parret', fra: 0, til: s, taelbar: false }, { id: 'rest', fra: s, til: b, taelbar: true }] },
+          { t: 'ting', id: 'skaale', e: '🥣', n: s, linje: true, taelbar: false },
+        ] },
+        svar: rest,
+        // Tæller skålene · lægger bær og skåle sammen
+        valg: lavValgFejl(rest, [s, b + s], antalValg(niveau), 0, max, rng), valgBlandet: true,
+        hjaelp: [{ art: 'lys', trin: [{ tale: 'Hver skål får ét jordbær.', lys: ['parret', 'skaale'] }] },
+          { art: 'lys', trin: [{ tale: 'Tæl dem, der er tilbage.', tael: 'baer' }] }],
+      };
+    },
+
+    // Formbyen: spejlbilledet — hvad ser man på den anden side af spejlet?
+    spejlBillede(niveau, rng) {
+      const e = vaelg(rng, SPEJL_MOTIVER);
+      const kortAf = (vend) => ({ dele: [{ t: 'motiv', e: e, vend: vend }], navn: { spejl: 'spejlet', ingen: 'som det er', drej: 'på hovedet' }[vend], fakta: { vend: vend } });
+      // Kopierer uden at spejle · drejer i stedet for at spejle
+      const kort = lavKort(rng, kortAf('spejl'), [kortAf('ingen'), kortAf('drej')], antalValg(niveau));
+      return {
+        emne: 'former', type: 'spejlBillede', niveau, noegle: 'spejlBillede:' + e, ikon: '🪞',
+        tale: 'Her er et spejl. Hvilket billede passer på den anden side?',
+        tekst: 'Hvad ser man i spejlet?',
+        vis: { art: 'scene', fakta: { motiv: e }, dele: [{ t: 'spejl', id: 'spejl', e: e }] },
+        svar: kort.svar, valg: kort.valg, kort: kort.kort, valgArt: 'scene',
+        hjaelp: [{ art: 'lys', trin: [{ tale: 'I et spejl kigger den den anden vej. Men den står ikke på hovedet.', lys: ['spejl'] }] }],
+      };
+    },
+
+    // Tegnebyen: hvilken lineal ligger klar til at måle stregen? (nul ved starten, langs stregen)
+    linealNul(niveau, rng) {
+      const cm = heltal(rng, 2, niveau >= 3 ? 8 : 6);
+      const kortAf = (start, skraa) => ({ dele: [{ t: 'linealPlacering', cm: cm, start: start, skraa: skraa }], navn: skraa ? 'linealen ligger skråt' : start === 0 ? 'nul ved starten' : 'et ved starten', fakta: { start: start, skraa: skraa } });
+      // Starter ved 1 (målingen bliver én for stor) · linealen ligger skråt
+      const kort = lavKort(rng, kortAf(0, false), [kortAf(1, false), kortAf(0, true)], antalValg(niveau));
+      return {
+        emne: 'tegne', type: 'linealNul', niveau, noegle: 'linealNul:' + cm, ikon: '📏',
+        tale: 'Hvilken lineal ligger klar til at måle stregen?',
+        tekst: 'Hvilken lineal er klar?',
+        vis: { art: 'scene', fakta: { cm: cm }, dele: [{ t: 'streg', id: 'streg', cm: cm }] },
+        svar: kort.svar, valg: kort.valg, kort: kort.kort, valgArt: 'scene',
+        hjaelp: [{ art: 'lys', trin: [{ tale: 'Nul skal stå ved starten af stregen.', lys: ['streg', 'nul'] }, { tale: 'Og linealen skal ligge langs stregen.' }] }],
+      };
+    },
+
+    // Plusbjerget: samme antal, delt på en anden måde (3 + 4 og 2 + 5 er begge 7)
+    sammeSum(niveau, rng) {
+      const kortAf = (x, y) => ({ dele: [{ t: 'klodser', a: x, b: y }], navn: x + ' og ' + y, fakta: { a: x, b: y } });
+      let a, b, c, d, sum, fejl;
+      do {
+        sum = heltal(rng, 5, 10);
+        a = heltal(rng, 1, sum - 1); b = sum - a;
+        c = heltal(rng, 1, sum - 1); d = sum - c;
+        const stor = Math.max(a, b);
+        // Én del næsten ens, men én for lidt · tæller den største del to gange · én for meget
+        fejl = [kortAf(c, d - 1), kortAf(stor, stor), kortAf(c, d + 1)].filter((k) => k.fakta.a + k.fakta.b !== sum && k.fakta.b >= 1 && k.fakta.a + k.fakta.b <= 10);
+      } while (c === a || c === b || a === b || fejl.length < 2);
+      const kort = lavKort(rng, kortAf(c, d), fejl, antalValg(niveau));
+      return {
+        emne: 'plus10', type: 'sammeSum', niveau, noegle: 'sammeSum:' + a + '+' + b + '=' + c + '+' + d, ikon: '⚖️',
+        tale: 'Hvilken måtte har lige så mange klodser som den øverste, men delt på en anden måde?',
+        tekst: a + ' + ' + b,
+        vis: { art: 'scene', fakta: { a: a, b: b }, dele: [{ t: 'klodser', id: 'top', a: a, b: b }] },
+        svar: kort.svar, valg: kort.valg, kort: kort.kort, valgArt: 'scene',
+        hjaelp: [{ art: 'lys', trin: [{ tale: 'Tæl klodserne øverst.', tael: 'top' }, { tale: 'Find en måtte med ' + sum + ' i alt.' }] }],
+      };
+    },
+
+    // Venneøen: én (eller to) flytter fra venstre til højre — de ti er stadig ti, men delt anderledes
+    flytVen(niveau, rng) {
+      const k = niveau >= 3 ? heltal(rng, 1, 2) : 1;
+      const L = heltal(rng, k + 1, 9 - k);
+      const R = 10 - L;
+      const kortAf = (x, y) => ({ dele: [{ t: 'tal', s: x + ' + ' + y }], navn: x + ' og ' + y, fakta: { v: x, h: y } });
+      // Flytter den modsatte vej · lægger til højre uden at tage fra venstre
+      const kort = lavKort(rng, kortAf(L - k, R + k), [kortAf(L + k, R - k), kortAf(L, R + k)], antalValg(niveau));
+      return {
+        emne: 'venner', type: 'flytVen', niveau, noegle: 'flytVen:' + L + '+' + R + '>' + k, ikon: '➡️',
+        tale: 'Vi flytter ' + (k === 1 ? 'én' : 'to') + ' fra venstre til højre. Hvordan er de ti nu delt?',
+        tekst: L + ' + ' + R,
+        vis: { art: 'scene', fakta: { venstre: L, hoejre: R, flyt: k }, dele: [
+          { t: 'gruppe', id: 'venstre', ramme: 'boks', dele: [{ t: 'ting', e: '🔵', n: L, under: [{ id: 'flyt', fra: L - k, til: L, maerk: true }] }] },
+          { t: 'tegn', s: '→' },
+          { t: 'gruppe', id: 'hoejre', ramme: 'boks', dele: [{ t: 'ting', e: '🔵', n: R }] },
+        ] },
+        svar: kort.svar, valg: kort.valg, kort: kort.kort, valgArt: 'scene',
+        hjaelp: [{ art: 'lys', trin: [{ tale: (k === 1 ? 'Den her flytter' : 'De her to flytter') + ' over til højre.', lys: ['flyt'] }, { tale: 'Til venstre bliver der ' + (k === 1 ? 'én' : 'to') + ' færre. Til højre bliver der ' + (k === 1 ? 'én' : 'to') + ' flere.' }] }],
+      };
+    },
+
+    // Minussøen: begge tårne mister lige mange — forskellen er den samme
+    sammeForskel(niveau, rng) {
+      const k = heltal(rng, 1, 2);
+      let a, b;
+      do { b = heltal(rng, k + 1, 8); a = heltal(rng, b + 1, 10); } while (a - b <= k); // ellers forsvinder fejlen «d − k»
+      const d = a - b;
+      return {
+        emne: 'minus', type: 'sammeForskel', niveau, noegle: 'sammeForskel:' + a + '-' + b + '-' + k, ikon: '🏰',
+        tale: 'Begge tårne mister ' + k + (k === 1 ? ' klods' : ' klodser') + '. Hvor mange klodser er det høje tårn nu højere?',
+        tekst: (a - k) + ' − ' + (b - k),
+        vis: { art: 'scene', fakta: { a: a, b: b, vaek: k }, dele: [{ t: 'taarne', id: 'taarne', a: a, b: b, vaek: k }] },
+        svar: d,
+        // Trækker det fjernede fra forskellen · lægger det til
+        valg: lavValgFejl(d, [d - k, d + k], antalValg(niveau), 0, 10, rng), valgBlandet: true,
+        hjaelp: [{ art: 'lys', trin: [{ tale: 'Tag ' + k + ' væk fra begge tårne.', lys: ['vaek'] }] },
+          { art: 'lys', trin: [{ tale: 'Tæl de klodser, der ikke har en makker.', tael: 'taarne' }] }],
+      };
+    },
+
+    // Klodsbyen: hvilken port hører tallet til (30–39)?
+    talIInterval(niveau, rng) {
+      const kortAf = (fra) => ({ dele: [{ t: 'tal', s: fra + '–' + (fra + 9) }], navn: 'fra ' + fra + ' til ' + (fra + 9), fakta: { fra: fra } });
+      let T, e, fejl;
+      do {
+        T = heltal(rng, 2, 4); e = heltal(rng, 1, 9);
+        // Bruger enerens ciffer som tier (32 → 20–29) · runder op uden at kontrollere (40–49) · porten før
+        fejl = [e <= 4 ? e * 10 : null, T + 1 <= 4 ? (T + 1) * 10 : null, (T - 1) * 10].filter((f, i, l) => f !== null && f >= 10 && f !== T * 10 && l.indexOf(f) === i);
+      } while (e === T || fejl.length < 2);
+      const n = T * 10 + e;
+      fejl = fejl.map(kortAf);
+      const kort = lavKort(rng, kortAf(T * 10), fejl, antalValg(niveau));
+      return {
+        emne: 'tiere', type: 'talIInterval', niveau, noegle: 'talIInterval:' + n, ikon: '🚪',
+        tale: 'Hvilken port hører ' + n + ' til? Tallet skal ligge mellem portens to tal.',
+        tekst: 'Hvilken port?',
+        vis: { art: 'scene', fakta: { tal: n }, dele: [{ t: 'staenger', id: 'tal', tiere: T, enere: e }] },
+        svar: kort.svar, valg: kort.valg, kort: kort.kort, valgArt: 'scene',
+        hjaelp: [{ art: 'lys', trin: [{ tale: 'Tæl tierstængerne: ' + T + ' tiere.', lys: ['tiere'] }, { tale: 'Så ligger tallet mellem ' + T * 10 + ' og ' + (T * 10 + 9) + '.' }] }],
+      };
+    },
+
+    // Tierbroen: fyld op til ti først — hvordan skal tallet deles? (8 + 7: først 2, så 5)
+    delTilTi(niveau, rng) {
+      const a = heltal(rng, 6, 9);
+      const b = heltal(rng, 12 - a, 9); // resten mindst 2, så fejlen «første del for stor» findes
+      const f = 10 - a, r = b - f;
+      const kortAf = (x, y) => ({ dele: [{ t: 'tal', s: x + ' + ' + y }], navn: 'først ' + x + ', så ' + y, fakta: { foerst: x, saa: y } });
+      // Første del fylder for meget (summen er stadig b) · bruger de samme to igen (f + b) · første del for lille
+      const fejl = [r >= 2 ? kortAf(f + 1, r - 1) : null, kortAf(f, b), f >= 2 ? kortAf(f - 1, r + 1) : null].filter(Boolean);
+      const kort = lavKort(rng, kortAf(f, r), fejl, antalValg(niveau));
+      return {
+        emne: 'tierbro', type: 'delTilTi', niveau, noegle: 'delTilTi:' + a + '+' + b, ikon: '🔟',
+        tale: 'Vi vil først fylde op til ti. Hvordan skal de ' + b + ' deles: først op til ti, og så resten?',
+        tekst: a + ' + ' + b,
+        vis: { art: 'scene', fakta: { a: a, b: b }, dele: [
+          { t: 'pladser', id: 'ramme', n: 10, fyldt: [{ id: 'fyldt', fra: 0, til: a, e: '🔵' }], taelbarFra: a },
+          { t: 'tegn', s: '+' },
+          { t: 'gruppe', id: 'kurv', ramme: 'kurv', dele: [{ t: 'ting', e: '🟠', n: b, taelbar: false }] },
+        ] },
+        svar: kort.svar, valg: kort.valg, kort: kort.kort, valgArt: 'scene',
+        hjaelp: [{ art: 'lys', trin: [{ tale: 'Tæl de tomme pladser.', tael: 'ramme' }] }, tallinje(a, b)],
+      };
+    },
+
+    // Mønsterslottet: oversæt figurer til bevægelser (blad = klap, stjerne = tramp)
+    bevaegelsesKode(niveau, rng) {
+      const A = '🍁', B = '⭐', KLAP = '👏', TRAMP = '🦶';
+      let frise;
+      do { frise = [0, 1, 2].map(() => (rng() < 0.5 ? A : B)); } while (new Set(frise).size < 2);
+      const oversaet = (l, byt) => l.map((c) => ((c === A) !== !!byt ? KLAP : TRAMP));
+      const navn = (l) => l.map((c) => (c === KLAP ? 'klap' : 'tramp')).join(', ');
+      const kortAf = (l) => ({ dele: [{ t: 'raekke', celler: l }], navn: navn(l), fakta: { celler: l } });
+      const roter = frise.slice(1).concat(frise.slice(0, 1));
+      // Flytter gentagelsen (rækken roteret) · bytter betydningen af figurerne
+      const kort = lavKort(rng, kortAf(oversaet(frise)), [kortAf(oversaet(roter)), kortAf(oversaet(frise, true))], antalValg(niveau));
+      return {
+        emne: 'moenstre', type: 'bevaegelsesKode', niveau, noegle: 'bevaegelsesKode:' + frise.join(''), ikon: '👏',
+        tale: 'Blade betyder klap. Stjerner betyder tramp. Hvilken række bevægelser passer?',
+        tekst: 'Blad = klap · stjerne = tramp',
+        vis: { art: 'scene', lag: 'stak', fakta: { frise: frise }, dele: [
+          { t: 'gruppe', id: 'kode', ramme: 'boks', dele: [{ t: 'raekke', celler: [A, KLAP] }, { t: 'raekke', celler: [B, TRAMP] }] },
+          { t: 'raekke', id: 'frise', celler: frise, pil: true, pakke: 1 },
+        ] },
+        svar: kort.svar, valg: kort.valg, kort: kort.kort, valgArt: 'scene',
+        hjaelp: [{ art: 'lys', trin: frise.map((c, i) => ({ tale: (c === A ? 'Blad: klap.' : 'Stjerne: tramp.'), lys: ['g' + i] })) }],
+      };
+    },
+
+    // Klokketorvet: hvilken bakke kan byttes lige over med ti-kronen (eller tyve-kronen)?
+    bytMoent(niveau, rng) {
+      const maal = niveau >= 3 && rng() < 0.5 ? 20 : 10;
+      const muligheder = maal === 10
+        ? [[5, 2, 2, 1], [5, 5], [5, 2, 1, 1, 1], [2, 2, 2, 2, 2], [5, 1, 1, 1, 1, 1], [2, 2, 2, 2, 1, 1], [5, 2, 2, 1]]
+        : [[10, 5, 5], [10, 5, 2, 2, 1], [10, 10], [5, 5, 5, 5], [10, 2, 2, 2, 2, 2], [10, 5, 2, 1, 1, 1]];
+      const rigtig = vaelg(rng, muligheder);
+      // Overser en 2-krone (2 for lidt) · én krone for meget
+      const uden2 = rigtig.indexOf(2) >= 0 ? rigtig.filter((m, i) => i !== rigtig.indexOf(2)) : rigtig.slice(0, -1);
+      const plus1 = rigtig.concat([1]);
+      const sum = (l) => l.reduce((s, m) => s + m, 0);
+      const kortAf = (l) => ({ dele: [{ t: 'moenter', liste: l }], navn: l.join(' og ') + ' kroner', fakta: { liste: l } });
+      const kort = lavKort(rng, kortAf(rigtig), [kortAf(uden2), kortAf(plus1)].filter((k) => sum(k.fakta.liste) !== maal), antalValg(niveau));
+      return {
+        emne: 'maaling', type: 'bytMoent', niveau, noegle: 'bytMoent:' + maal + ':' + rigtig.join('+'), ikon: '🔁',
+        tale: 'Hvilken bakke kan byttes lige over med ' + (maal === 10 ? 'ti-kronen' : 'tyve-kronen') + '?',
+        tekst: 'Byt ' + maal + ' kr',
+        vis: { art: 'scene', fakta: { maal: maal }, dele: [{ t: 'moenter', id: 'moent', liste: [maal] }] },
+        svar: kort.svar, valg: kort.valg, kort: kort.kort, valgArt: 'scene',
+        hjaelp: [{ art: 'lys', trin: [{ tale: 'Tæl kronerne i hver bakke. Det skal blive ' + maal + '.' }] }],
+      };
+    },
+
+    // Lystårnet (tæller i Plusbjerget): en lille billedtabel — hvor mange lamper tilsammen?
+    tabelPlus(niveau, rng) {
+      const dyr = bland(rng, TABEL_DYR).slice(0, 2);
+      let a, b;
+      do { a = heltal(rng, 1, 7); b = heltal(rng, 1, 7); } while (a === b || a + b > 10);
+      const raekke = (id, d, n) => ({ t: 'gruppe', id: id, ramme: 'ingen', dele: [{ t: 'ting', e: d.e, n: 1, taelbar: false }, { t: 'ting', e: '🏮', n: n, linje: true }] });
+      return {
+        emne: 'plus10', type: 'tabelPlus', niveau, noegle: 'tabelPlus:' + a + '+' + b, ikon: '📊',
+        tale: 'Hvor mange lamper har ' + dyr[0].bestemt + ' og ' + dyr[1].bestemt + ' tilsammen?',
+        tekst: 'Hvor mange lamper i alt?',
+        vis: { art: 'scene', lag: 'stak', fakta: { a: a, b: b }, dele: [raekke('r1', dyr[0], a), raekke('r2', dyr[1], b)] },
+        svar: a + b,
+        // Finder forskellen · læser kun den største række
+        valg: lavValgFejl(a + b, [Math.abs(a - b), Math.max(a, b)], antalValg(niveau), 0, 10, rng), valgBlandet: true,
+        hjaelp: [{ art: 'lys', trin: [{ tale: stort(dyr[0].bestemt) + ' har ' + a + '.', lys: ['r1'] }, { tale: stort(dyr[1].bestemt) + ' har ' + b + '.', lys: ['r2'] }] }, { art: 'tael' }],
+      };
+    },
+
+    // =====================================================================
+    //  D3 · trin 3 (forslaget 09-10): en valgfri udfordring — her på niveau 3
+    // =====================================================================
+
+    // Tælleskoven: hvilken vogn er nummer tre i køen? (tæl fra flaget — køen kan vende begge veje)
+    koePlads(niveau, rng) {
+      let n, k;
+      do { n = heltal(rng, 4, 8); k = heltal(rng, 2, Math.min(5, n - 1)); } while (n - k + 1 === k || n - k + 1 === k - 1);
+      const flag = vaelg(rng, ['venstre', 'hoejre']);
+      const kortAf = (m) => ({ dele: [{ t: 'koe', n: n, flag: flag, maerk: m }], navn: 'vogn nummer ' + m + ' fra flaget', fakta: { maerk: m } });
+      // Starter med at tælle ved nul (én for tidligt) · tæller fra den forkerte ende
+      const kort = lavKort(rng, kortAf(k), [kortAf(k - 1), kortAf(n - k + 1)], antalValg(niveau));
+      return {
+        emne: 'taelle', type: 'koePlads', niveau, noegle: 'koePlads:' + n + '-' + k + flag[0], ikon: '🚃',
+        tale: 'Begynd ved flaget. Hvilken vogn er den ' + ORDENSTAL[k] + ' i køen?',
+        tekst: 'Nummer ' + k + ' fra flaget',
+        vis: { art: 'scene', fakta: { n: n, nummer: k }, dele: [{ t: 'koe', id: 'koe', n: n, flag: flag }] },
+        svar: kort.svar, valg: kort.valg, kort: kort.kort, valgArt: 'scene',
+        hjaelp: [{ art: 'lys', trin: [{ tale: 'Her er flaget. Den første vogn står ved flaget.', lys: ['flag', 'v1'] }] },
+          { art: 'lys', trin: Array.from({ length: k }, (_, i) => ({ tale: ORDENSTAL[i + 1].charAt(0).toUpperCase() + ORDENSTAL[i + 1].slice(1) + '.', lys: ['v' + (i + 1)] })) }],
+      };
+    },
+
+    // Formbyen: to regler på én gang — fx tre hjørner OG striber
+    toRegler(niveau, rng) {
+      const former = ['trekant', 'firkant', 'cirkel'], moenstre = ['striber', 'prikker'];
+      const form = vaelg(rng, former), m = vaelg(rng, moenstre);
+      const andenForm = vaelg(rng, former.filter((f) => f !== form)), andetM = moenstre.find((x) => x !== m);
+      const kortAf = (f, mm) => ({ dele: [{ t: 'form', id: 'f-' + f, form: f, farve: 3, moenster: mm }], navn: FORMER[f].ubestemt + ' med ' + mm, fakta: { form: f, moenster: mm } });
+      // Bruger kun mønstret · bruger kun hjørnerne
+      const kort = lavKort(rng, kortAf(form, m), [kortAf(andenForm, m), kortAf(form, andetM)], antalValg(niveau));
+      const hj = FORMER[form].hjoerner;
+      return {
+        emne: 'former', type: 'toRegler', niveau, noegle: 'toRegler:' + form + '-' + m, ikon: '🔍',
+        tale: 'Find figuren, som både har ' + (hj ? TAL_ORD[hj].replace('ét', 'et') + ' hjørner' : 'ingen hjørner') + ' og ' + m + '.',
+        tekst: 'To regler',
+        vis: { art: 'scene', fakta: { hjoerner: hj, moenster: m }, dele: [{ t: 'skilt', id: 'skilt', hjoerner: hj, moenster: m }] },
+        svar: kort.svar, valg: kort.valg, kort: kort.kort, valgArt: 'scene',
+        hjaelp: [{ art: 'lys', trin: [{ tale: hj ? 'Find figurerne med ' + TAL_ORD[hj] + ' hjørner.' : 'Find figuren uden hjørner.', lys: ['f-' + form] }, { tale: 'Hvilken af dem har ' + m + '?' }] }],
+      };
+    },
+
+    // Tegnebyen: ret den knækkede vej ud — hvilken lige vej er lige så lang?
+    retVej(niveau, rng) {
+      const a = heltal(rng, 1, 3), b = heltal(rng, 1, 3);
+      const L = a + b;
+      const kortAf = (l) => ({ dele: [{ t: 'gitterStreg', laengde: l }], navn: 'en lige vej på ' + l + ' felter', fakta: { laengde: l } });
+      // Bruger kun bredden · tæller hjørner/prikker i stedet for vejstykker (én for meget) · bruger kun højden
+      const kort = lavKort(rng, kortAf(L), [kortAf(a), kortAf(L + 1), kortAf(b)].filter((k) => k.fakta.laengde !== L), antalValg(niveau));
+      return {
+        emne: 'tegne', type: 'retVej', niveau, noegle: 'retVej:' + a + '+' + b, ikon: '📐',
+        tale: 'Den knækkede vej skal rettes ud. Hvilken lige vej er lige så lang?',
+        tekst: 'Lige så lang',
+        vis: { art: 'scene', fakta: { hen: a, op: b }, dele: [{ t: 'gitterRute', id: 'vej', opskrift: [['hoejre', a], ['op', b]] }] },
+        svar: kort.svar, valg: kort.valg, kort: kort.kort, valgArt: 'scene',
+        hjaelp: [{ art: 'lys', trin: [{ tale: 'Tæl stykkerne på vejen.', tael: 'vej' }] }],
+      };
+    },
+
+    // Plusbjerget: hvilken historie viser regnestykket? (3 + 4: tre fugle, og fire kommer til)
+    regneHistorie(niveau, rng, tingListe) {
+      const { ting } = vaelgTing(rng, tingListe);
+      let a, b;
+      do { a = heltal(rng, 2, 6); b = heltal(rng, 2, 6); } while (a + b > 10 || a === b);
+      const plus = (x, y) => ({ dele: [{ t: 'ting', e: ting.e, n: x, taelbar: false }, { t: 'tegn', s: '+' }, { t: 'ting', e: ting.e, n: y, taelbar: false, kommer: true }], navn: x + ', og ' + y + ' kommer til', fakta: { start: x, op: '+', n: y } });
+      const minus = (x, y) => ({ dele: [{ t: 'ting', e: ting.e, n: x, taelbar: false, under: [{ id: 'vaek', fra: x - y, til: x, vaek: true }] }], navn: x + ', og ' + y + ' går væk', fakta: { start: x, op: '−', n: y } });
+      // Overser den præcise nye mængde (én for mange) · de samme tal, men den modsatte handling
+      const kort = lavKort(rng, plus(a, b), [plus(a, b + 1), minus(a + b, b)], antalValg(niveau));
+      return {
+        emne: 'plus10', type: 'regneHistorie', niveau, noegle: 'regneHistorie:' + a + '+' + b, ikon: '📖',
+        tale: a + ' plus ' + b + '. Hvilken historie viser det regnestykke?',
+        tekst: a + ' + ' + b,
+        vis: { art: 'scene', fakta: { a: a, b: b }, dele: [{ t: 'tal', id: 'stykke', s: a + ' + ' + b }] },
+        svar: kort.svar, valg: kort.valg, kort: kort.kort, valgArt: 'scene',
+        hjaelp: [{ art: 'lys', trin: [{ tale: 'Plus betyder, at der kommer nogen til.', lys: ['stykke'] }, { tale: 'Find historien, hvor der er ' + a + ', og ' + b + ' kommer til.' }] }],
+      };
+    },
+
+    // Venneøen: ti deles mellem tre venner — hvor mange får den sidste?
+    treVenner(niveau, rng) {
+      let a, b;
+      do { a = heltal(rng, 1, 7); b = heltal(rng, 1, 8 - a); } while (10 - a - b < 1 || a + b === 10 - a - b || a + b === 10 - a);
+      const svar = 10 - a - b;
+      return {
+        emne: 'venner', type: 'treVenner', niveau, noegle: 'treVenner:' + a + '+' + b, ikon: '👨‍👩‍👧',
+        tale: 'Ti skal deles mellem tre venner. Den første har ' + a + '. Den anden har ' + b + '. Hvor mange får den sidste?',
+        tekst: a + ' + ' + b + ' + ? = 10',
+        vis: { art: 'scene', fakta: { a: a, b: b }, dele: [{ t: 'pladser', id: 'ti', n: 10, fyldt: [{ id: 'v1', fra: 0, til: a, e: '🔵' }, { id: 'v2', fra: a, til: a + b, e: '🟠' }], taelbarFra: a + b }] },
+        svar: svar,
+        // Svarer med det, der allerede er delt ud · trækker kun den første fra
+        valg: lavValgFejl(svar, [a + b, 10 - a], antalValg(niveau), 0, 10, rng), valgBlandet: true,
+        hjaelp: [{ art: 'lys', trin: [{ tale: 'Den første har ' + a + ', og den anden har ' + b + '.', lys: ['v1', 'v2'] }] },
+          { art: 'lys', trin: [{ tale: 'Tæl de tomme pladser.', tael: 'ti' }] }],
+      };
+    },
+
+    // Minussøen: hvilket minusstykke efterlader lige så mange? (9 − 4 og 8 − 3 efterlader begge 5)
+    sammeRest(niveau, rng) {
+      const kortAf = (x, y) => ({ dele: [{ t: 'tal', s: x + ' − ' + y }, { t: 'ting', e: '🪨', n: x, taelbar: false, under: [{ id: 'vaek', fra: x - y, til: x, vaek: true }] }], navn: x + ' minus ' + y, fakta: { a: x, b: y } });
+      let a, b, c, d, r, fejl;
+      do {
+        a = heltal(rng, 5, 10); b = heltal(rng, 1, a - 2); r = a - b; c = heltal(rng, r + 1, 10); d = c - r;
+        // Bevarer kun det, der fjernes (c − b) · bevarer kun begyndelsen (a − d)
+        fejl = [kortAf(c, b), kortAf(a, d)].filter((k) => k.fakta.a - k.fakta.b !== r && k.fakta.b >= 1 && k.fakta.b < k.fakta.a);
+      } while (c === a || d === b || d < 1 || fejl.length < 2);
+      const kort = lavKort(rng, kortAf(c, d), fejl, antalValg(niveau));
+      return {
+        emne: 'minus', type: 'sammeRest', niveau, noegle: 'sammeRest:' + a + '-' + b + '=' + c + '-' + d, ikon: '🪨',
+        tale: a + ' minus ' + b + '. Hvilket af de nye minusstykker efterlader lige så mange sten?',
+        tekst: a + ' − ' + b,
+        vis: { art: 'scene', fakta: { a: a, b: b }, dele: [{ t: 'tal', s: a + ' − ' + b }, { t: 'ting', id: 'sten', e: '🪨', n: a, under: [{ id: 'rest', fra: 0, til: r, taelbar: true }, { id: 'vaek', fra: r, til: a, vaek: true, taelbar: false }] }] },
+        svar: kort.svar, valg: kort.valg, kort: kort.kort, valgArt: 'scene',
+        hjaelp: [{ art: 'lys', trin: [{ tale: 'Her er der ' + r + ' tilbage.', tael: 'sten' }] }],
+      };
+    },
+
+    // Klodsbyen: tag én lille klods væk, og læg én tierstang til — hvilket tal har vi nu?
+    enerTilTier(niveau, rng) {
+      let T, e;
+      do { T = heltal(rng, 1, 3); e = heltal(rng, 1, 9); } while (T * 10 + e - 1 + 10 > 50);
+      const n = T * 10 + e, svar = n - 1 + 10;
+      return {
+        emne: 'tiere', type: 'enerTilTier', niveau, noegle: 'enerTilTier:' + n, ikon: '🔄',
+        tale: 'Her er ' + n + '. Tag én lille klods væk. Læg én tierstang til. Hvilket tal har vi nu?',
+        tekst: n + ' − 1 + 10',
+        vis: { art: 'scene', fakta: { tal: n }, dele: [{ t: 'staenger', id: 'start', tiere: T, enere: e }, { t: 'tegn', s: '−' }, { t: 'staenger', id: 'ener', tiere: 0, enere: 1 }, { t: 'tegn', s: '+' }, { t: 'staenger', id: 'tier', tiere: 1, enere: 0 }] },
+        svar: svar,
+        // Glemmer at tage eneren væk · behandler tierstangen som én ener
+        valg: lavValgFejl(svar, [n + 10, n + 1], antalValg(niveau), 0, 50, rng), valgBlandet: true,
+        hjaelp: [{ art: 'lys', trin: [{ tale: 'En tierstang er ti små klodser lang.', lys: ['tier'] }] },
+          { art: 'lys', trin: [{ tale: 'Først ' + (n - 1) + '. Så ' + svar + '.', lys: ['start'] }] }],
+      };
+    },
+
+    // Tierbroen: en returrejse — de nye flyver hjem igen. Hvilket regnestykke viser det?
+    tilbageHistorie(niveau, rng) {
+      let a, b;
+      do { a = heltal(rng, 5, 9); b = heltal(rng, 3, 9); } while (a === b);
+      const sum = a + b;
+      const kortAf = (x, y) => ({ dele: [{ t: 'tal', s: x + ' − ' + y }], navn: x + ' minus ' + y, fakta: { a: x, b: y } });
+      // Sender de oprindelige hjem (sum − a) · glemmer, at der nu er flere (a − b)
+      const fejl = [kortAf(sum, a), a > b ? kortAf(a, b) : kortAf(b, a)].filter((k) => !(k.fakta.a === sum && k.fakta.b === b));
+      const kort = lavKort(rng, kortAf(sum, b), fejl, antalValg(niveau));
+      return {
+        emne: 'tierbro', type: 'tilbageHistorie', niveau, noegle: 'tilbageHistorie:' + a + '+' + b, ikon: '🏡',
+        tale: a + ' fugle fik ' + b + ' nye venner. Nu er de ' + sum + '. Nu flyver netop de ' + b + ' nye hjem igen. Hvilket regnestykke viser det?',
+        tekst: a + ' + ' + b + ' = ' + sum,
+        vis: { art: 'scene', fakta: { a: a, b: b }, dele: [
+          { t: 'ting', id: 'gamle', e: '🐦', n: a, taelbar: false }, { t: 'tegn', s: '+' }, { t: 'ting', id: 'nye', e: '🐤', n: b, taelbar: false }, { t: 'tegn', s: '=' }, { t: 'tal', s: String(sum) }] },
+        svar: kort.svar, valg: kort.valg, kort: kort.kort, valgArt: 'scene',
+        hjaelp: [{ art: 'lys', trin: [{ tale: 'Det er de ' + b + ' nye, der flyver hjem.', lys: ['nye'] }, { tale: 'Vi starter med ' + sum + ' og tager ' + b + ' væk.' }] }],
+      };
+    },
+
+    // Mønsterslottet: skiftende hop (+1, +2, +1, +2 …) — reglen siges altid
+    skiftendeHop(niveau, rng) {
+      const regler = [[1, 2], [2, 1], [1, 3], [2, 3]];
+      const [h1, h2] = vaelg(rng, regler);
+      const start = heltal(rng, 0, 4);
+      const raekke = [start];
+      for (let i = 1; i < 7; i++) raekke.push(raekke[i - 1] + (i % 2 ? h1 : h2));
+      const svar = raekke[6] + h1; // det næste hop er h1 igen
+      if (svar > 20) return G.skiftendeHop(niveau, rng);
+      const ord = (h) => (h === 1 ? 'én' : TAL_ORD[h]);
+      return {
+        emne: 'moenstre', type: 'skiftendeHop', niveau, noegle: 'skiftendeHop:' + start + ':' + h1 + h2, ikon: '🦘',
+        tale: 'Først ' + ord(h1) + ' frem, så ' + ord(h2) + ' frem. Gentag den regel. Hvilket tal kommer så?',
+        tekst: '+' + h1 + ', +' + h2 + ' …',
+        vis: { art: 'scene', fakta: { start: start, hop1: h1, hop2: h2 }, dele: [{ t: 'raekke', id: 'tal', celler: raekke.map(String).concat(['?']) }, { t: 'tal', id: 'regel', s: '+' + h1 + ', +' + h2 }] },
+        svar: svar,
+        // Gentager kun det sidste hop (h2) · lægger begge hop til på én gang
+        valg: lavValgFejl(svar, [raekke[6] + h2, raekke[6] + h1 + h2], antalValg(niveau), 0, 50, rng), valgBlandet: true,
+        hjaelp: [{ art: 'lys', trin: [{ tale: 'Hoppene skifter: ' + ord(h1) + ', ' + ord(h2) + ', ' + ord(h1) + ', ' + ord(h2) + '.', lys: ['regel'] }] }, tallinje(raekke[6], h1)],
+      };
+    },
+
+    // Klokketorvet: hvad er klokken 10 minutter senere? (ofte over en hel time — aldrig over 12)
+    tidFrem(niveau, rng) {
+      const spring = vaelg(rng, [5, 10, 15, 30, 60]);
+      const pad = (x) => (x < 10 ? '0' : '') + x;
+      const tid = (tt, mm) => tt + ':' + pad(mm);
+      let t, m, fejl, svar;
+      do {
+        t = heltal(rng, 1, 10);
+        // Timeskiftet er det svære: to ud af tre gange går springet over en hel time
+        m = rng() < 0.67 && spring < 60 ? vaelg(rng, [60 - spring, 55, 50, 45].filter((x) => x >= 60 - spring && x < 60)) : 5 * heltal(rng, 0, 11);
+        const total = m + spring;
+        svar = tid(t + Math.floor(total / 60), total % 60);
+        const over = total >= 60;
+        fejl = [
+          over && total < 100 ? t + ':' + total : null,                                   // minutterne som et almindeligt tal (7:60)
+          (() => { const d = m + 2 * spring; return t + Math.floor(d / 60) <= 12 ? tid(t + Math.floor(d / 60), d % 60) : null; })(), // springer to gange (8:10)
+          over ? tid(t, total % 60) : tid(t + 1, total % 60),                              // glemmer timen — eller skifter time for tidligt
+        ].filter((f, i, l) => f && f !== svar && l.indexOf(f) === i);
+      } while (fejl.length < 2);
+      const fra = tid(t, m);
+      return {
+        emne: 'maaling', type: 'tidFrem', niveau, noegle: 'tidFrem:' + fra + '+' + spring, ikon: '⏩',
+        tale: 'Klokken er ' + klokkeNavn(fra) + '. Hvad er klokken ' + (spring === 60 ? 'en time' : spring + ' minutter') + ' senere?',
+        tekst: '+ ' + (spring === 60 ? '1 time' : spring + ' min'),
+        vis: { art: 'scene', fakta: { fra: fra, spring: spring }, dele: [{ t: 'ur', id: 'ur', klokke: fra }, { t: 'tal', s: '+ ' + (spring === 60 ? '1 time' : spring + ' min') }] },
+        svar: svar,
+        valg: lavValgTekst(rng, svar, [svar].concat(fejl.slice(0, antalValg(niveau) - 1)), antalValg(niveau)),
+        valgArt: 'tid',
+        hjaelp: [{ art: 'urFem', klokke: fra, spring: spring }, { art: 'visUr', klokke: svar }],
+      };
+    },
+
+    // Klokketorvet: to køb — hvor mange kroner har du tilbage?
+    toKoeb(niveau, rng) {
+      const har = vaelg(rng, [10, 10, 20]);
+      let p1, p2;
+      do { p1 = heltal(rng, 2, har === 10 ? 6 : 9); p2 = heltal(rng, 1, har === 10 ? 5 : 9); } while (p1 === p2 || p1 + p2 >= har);
+      const [v1, v2] = bland(rng, VARER).slice(0, 2);
+      const svar = har - p1 - p2;
+      return {
+        emne: 'maaling', type: 'toKoeb', niveau, noegle: 'toKoeb:' + har + '-' + p1 + '-' + p2, ikon: '🧺',
+        tale: 'Du har ' + har + ' kroner og køber begge ting. ' + v1.navn + ' koster ' + p1 + ' kroner. ' + v2.navn + ' koster ' + p2 + ' kroner. Hvor mange kroner har du tilbage?',
+        tekst: har + ' − ' + p1 + ' − ' + p2,
+        vis: { art: 'scene', fakta: { har: har, p1: p1, p2: p2 }, dele: [{ t: 'moenter', id: 'pung', liste: [har] }, { t: 'tegn', s: '→' }, { t: 'vare', id: 'v1', e: v1.e, pris: p1 }, { t: 'vare', id: 'v2', e: v2.e, pris: p2 }] },
+        svar: svar,
+        // Betaler kun den ene · betaler kun den anden
+        valg: lavValgFejl(svar, [har - p1, har - p2, p1 + p2], antalValg(niveau), 0, 20, rng), valgBlandet: true,
+        hjaelp: [{ art: 'lys', trin: [{ tale: 'Først betaler du ' + p1 + '. Så har du ' + (har - p1) + '.', lys: ['v1'] }, { tale: 'Så betaler du ' + p2 + '.', lys: ['v2'] }] }, tallinje(har - p1, -p2)],
+      };
+    },
+
+    // Lystårnet (tæller i Tierbroen): to handlinger i træk — 8 sten, 5 mere, 3 bruges
+    toTrin(niveau, rng) {
+      let s, plus, minus;
+      do { s = heltal(rng, 3, 10); plus = heltal(rng, 2, 6); minus = heltal(rng, 2, 6); } while (s + plus > 20 || minus >= s + plus || s - minus < 0 || minus === plus);
+      const svar = s + plus - minus;
+      return {
+        emne: 'tierbro', type: 'toTrin', niveau, noegle: 'toTrin:' + s + '+' + plus + '-' + minus, ikon: '🧱',
+        tale: 'Vi har ' + s + ' sten. Vi finder ' + plus + ' mere. Vi bruger ' + minus + '. Hvor mange sten ligger nu i kurven?',
+        tekst: s + ' + ' + plus + ' − ' + minus,
+        vis: { art: 'scene', fakta: { start: s, plus: plus, minus: minus }, dele: [
+          { t: 'gruppe', id: 'kurv', ramme: 'kurv', dele: [{ t: 'ting', e: '🪨', n: s, taelbar: false }] },
+          { t: 'tegn', s: '+' }, { t: 'gruppe', id: 'plus', ramme: 'ingen', dele: [{ t: 'ting', e: '🪨', n: plus, taelbar: false }] },
+          { t: 'tegn', s: '−' }, { t: 'gruppe', id: 'minus', ramme: 'ingen', dele: [{ t: 'ting', e: '🪨', n: minus, taelbar: false, under: [{ id: 'brugt', fra: 0, til: minus, vaek: true }] }] },
+        ] },
+        svar: svar,
+        // Stopper efter første handling · glemmer de nye (trækker fra begyndelsen)
+        valg: lavValgFejl(svar, [s + plus, s - minus], antalValg(niveau), 0, 20, rng), valgBlandet: true,
+        hjaelp: [{ art: 'lys', trin: [{ tale: s + ' og ' + plus + ' mere er ' + (s + plus) + '.', lys: ['kurv', 'plus'] }] }, tallinje(s + plus, -minus)],
+      };
+    },
   };
+
+  const ORDENSTAL = ['nulte', 'første', 'anden', 'tredje', 'fjerde', 'femte', 'sjette', 'syvende', 'ottende'];
+
+  const stort = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+  // Spejl: emoji, der tydeligt vender til én side (en spejling kan ses)
+  const SPEJL_MOTIVER = ['🐌', '🐟', '🚗', '🦆', '🐕', '🐎', '🚂', '🐦', '🐢', '🦒', '🐘', '🦕', '🛴', '👟', '🐓', '🐇'];
+  const TABEL_DYR = [{ e: '🦊', bestemt: 'ræven' }, { e: '🦉', bestemt: 'uglen' }, { e: '🐻', bestemt: 'bjørnen' }, { e: '🐰', bestemt: 'kaninen' }];
+
+  // Lystårnets egne opgaver: hver tæller i et eksisterende emne (intet nyt felt i de gemte data) og kommer kun
+  // med i Lystårnets blandede runde — fra emnets niveau 'fra' og op.
+  const LYSTAARN_TYPER = [
+    { type: 'formOgAntal', emne: 'former', fra: 1 },
+  ];
 
   // ---------- Emner og niveauer (i bogens rækkefølge) ----------
   // typer[0] er den letteste på niveauet — runden starter altid med den (succes fra start)
@@ -1052,82 +2017,82 @@
     taelle: {
       navn: 'Tal til 20', omraade: 'Tal og algebra', maxNiveau: 3,
       niveauer: {
-        1: ['antal', 'terning', 'flest', 'findTal'],
-        2: ['antal', 'klodser', 'efter', 'findTal', 'ligeUlige', 'flest'],
+        1: ['antal', 'terning', 'flest', 'findTal', 'flytTing'],
+        2: ['antal', 'klodser', 'efter', 'findTal', 'ligeUlige', 'flest', 'flytTing'],
         3: ['klodser', 'streger', 'efter', 'foer', 'findTal', 'ligeUlige', 'stoerst'],
       },
     },
     former: {
       navn: 'Figurer', omraade: 'Geometri og måling', maxNiveau: 3,
       niveauer: {
-        1: ['findForm', 'formScene'],
-        2: ['findForm', 'hjoerner', 'kanter', 'formScene'],
+        1: ['findForm', 'formScene', 'brikPuslespil'],
+        2: ['findForm', 'hjoerner', 'kanter', 'formScene', 'brikPuslespil'],
         3: ['findForm', 'hjoerner', 'kanter', 'formScene'],
       },
     },
     tegne: {
       navn: 'Tegn og mål', omraade: 'Geometri og måling', maxNiveau: 3,
       niveauer: {
-        1: ['maalKlodser', 'tegnFigur', 'maalStreg'],
-        2: ['maalKlodser', 'tegnFigur', 'maalStreg', 'tegnStreg'],
+        1: ['maalKlodser', 'tegnFigur', 'maalStreg', 'tegnRute'],
+        2: ['maalKlodser', 'tegnFigur', 'maalStreg', 'tegnStreg', 'tegnRute'],
         3: ['tegnFigur', 'maalStreg', 'tegnStreg'],
       },
     },
     plus10: {
       navn: 'Plus til 10', omraade: 'Tal og algebra', maxNiveau: 3,
       niveauer: {
-        1: ['plusTing', 'plusFingre', 'plusTerning'],
-        2: ['plusTing', 'plusFingre', 'plusTerning', 'plusKlodser', 'plusTal'],
+        1: ['plusTing', 'plusFingre', 'plusTerning', 'treKurve'],
+        2: ['plusTing', 'plusFingre', 'plusTerning', 'plusKlodser', 'plusTal', 'treKurve'],
         3: ['plusKlodser', 'plusTal', 'plusTalTast', 'plusMangler'],
       },
     },
     venner: {
       navn: "5'er- og 10'er-venner", omraade: 'Tal og algebra', maxNiveau: 3,
       niveauer: {
-        1: ['venFingre', 'venTal'],
-        2: ['venKugle', 'venTal'],
+        1: ['venFingre', 'venTal', 'retVenner'],
+        2: ['venKugle', 'venTal', 'retVenner'],
         3: ['venKugle', 'venTal', 'venTalTast'],
       },
     },
     minus: {
       navn: 'Minus og forskel', omraade: 'Tal og algebra', maxNiveau: 3,
       niveauer: {
-        1: ['minusTing', 'minusKlodser'],
-        2: ['minusTing', 'minusKlodser', 'forskel', 'minusTal'],
+        1: ['minusTing', 'minusKlodser', 'hvorMangeVaek'],
+        2: ['minusTing', 'minusKlodser', 'forskel', 'minusTal', 'hvorMangeVaek'],
         3: ['minusKlodser', 'forskel', 'minusTal', 'minusTalTast'],
       },
     },
     tiere: {
       navn: 'Tiere og enere', omraade: 'Tal og algebra', maxNiveau: 3,
       niveauer: {
-        1: ['staenger', 'tiere'],
-        2: ['staenger', 'tiere', 'efter50'],
+        1: ['staenger', 'tiere', 'byt10'],
+        2: ['staenger', 'tiere', 'efter50', 'byt10'],
         3: ['staenger', 'efter50', 'foer50', 'findTal50'],
       },
     },
     tierbro: {
       navn: 'Plus og minus til 20', omraade: 'Tal og algebra', maxNiveau: 3,
       niveauer: {
-        1: ['tiPlus', 'dobbelt'],
-        2: ['tiPlus', 'dobbelt', 'overTi'],
+        1: ['tiPlus', 'dobbelt', 'naestenDobbelt'],
+        2: ['tiPlus', 'dobbelt', 'overTi', 'naestenDobbelt'],
         3: ['overTi', 'overTiTast', 'minusTi', 'dobbelt'],
       },
     },
     moenstre: {
       navn: 'Mønstre og talrækker', omraade: 'Tal og algebra', maxNiveau: 3,
       niveauer: {
-        1: ['moenster'],
-        2: ['moenster', 'talRaekke'],
+        1: ['moenster', 'gentagPakke'],
+        2: ['moenster', 'talRaekke', 'gentagPakke'],
         3: ['talRaekke', 'moenster'],
       },
     },
-    // Ekstra: klokken hel og halv, kroner til 20 (Fælles Mål: måling — tid og penge)
+    // Ekstra: klokken hel og halv (niveau 3: også kvart over og kvart i), kroner til 20 (Fælles Mål: måling — tid og penge)
     maaling: {
       navn: 'Klokken og penge', omraade: 'Måling', maxNiveau: 3,
       niveauer: {
-        1: ['klokkeLaes', 'moenter', 'klokkeFind'],
-        2: ['klokkeLaes', 'klokkeFind', 'moenter', 'byttepenge'],
-        3: ['klokkeLaes', 'byttepenge', 'moenter', 'klokkeFind'],
+        1: ['klokkeLaes', 'moenter', 'klokkeFind', 'betalPrecis', 'urDigital'],
+        2: ['klokkeLaes', 'klokkeFind', 'moenter', 'byttepenge', 'betalPrecis', 'urDigital'],
+        3: ['klokkeLaes', 'byttepenge', 'moenter', 'klokkeFind', 'klokkeStil', 'urDigital', 'klokke5'],
       },
     },
   };
@@ -1144,7 +2109,7 @@
 
   // En runde = 5 korte opgaver. Svære opgaver fra sidst (gentag) sættes ind på plads 3 og 4.
   // Opgaver, der kun kan løses ved at høre oplæsningen
-  const LYT_TYPER = ['findTal', 'findTal50', 'findForm', 'klokkeFind'];
+  const LYT_TYPER = ['findTal', 'findTal50', 'findForm', 'klokkeFind', 'klokkeStil'];
   function brugbareTyper(typer, opts) {
     if (!opts || !opts.udenLyt) return typer;
     const uden = typer.filter((t) => LYT_TYPER.indexOf(t) < 0);
@@ -1171,7 +2136,9 @@
       brugte[o.noegle] = true;
       runde.push(o);
     }
-    const gentag = (opts.gentag || []).filter((o) => o && o.emne === emneId && G[o.type] && Array.isArray(o.hjaelp) && !brugte[o.noegle] && !(opts.udenLyt && LYT_TYPER.indexOf(o.type) >= 0)).slice(0, 2);
+    // Lystårnets egne opgaver kommer kun igen i Lystårnet — ikke i deres emnes egen verden (review #4)
+    const gentag = (opts.gentag || []).filter((o) => o && o.emne === emneId && G[o.type] && Array.isArray(o.hjaelp) && !brugte[o.noegle] && !(opts.udenLyt && LYT_TYPER.indexOf(o.type) >= 0) &&
+      !LYSTAARN_TYPER.some((l) => l.type === o.type)).slice(0, 2);
     gentag.forEach((o, i) => {
       const plads = Math.min(runde.length - 1, 2 + i);
       runde[plads] = Object.assign({}, o, { gentaget: true });
@@ -1190,7 +2157,9 @@
     while (runde.length < antal && emner.length) {
       const e = emner[i % emner.length];
       const n = klemNiveau(e, niveauer[e]);
-      const typer = brugbareTyper(EMNER[e].niveauer[n], opts);
+      // Lystårnets egne opgaver tæller i emnet, de hører til — så hvert emne stadig kun kommer med én gang pr. omgang
+      const egne = LYSTAARN_TYPER.filter((l) => l.emne === e && n >= l.fra).map((l) => l.type);
+      const typer = brugbareTyper(EMNER[e].niveauer[n].concat(egne), opts);
       const o = lavOpgave(vaelg(rng, typer), n, rng, opts.ting);
       if (!runde.some((x) => x.noegle === o.noegle)) runde.push(o);
       i++;
@@ -1339,8 +2308,45 @@
       talRaekke: () => 'Talrække fra ' + r,
       klokkeLaes: () => 'Aflæse klokken ' + klokkeNavn(r),
       klokkeFind: () => 'Finde uret, der viser ' + klokkeNavn(r),
+      klokkeStil: () => 'Stille uret på ' + klokkeNavn(r),
       moenter: () => 'Tælle mønter: ' + r.split('+').join(' + ') + ' kr',
       bytte: () => 'Byttepenge: ' + r.replace('-', ' kr − ') + ' kr',
+      flytTing: () => 'Lige mange, når ' + r + ' ting flytter sig',
+      brikPuslespil: () => 'Finde brikken, der passer i hullet',
+      tegnRute: () => 'Tegne en vej efter en opskrift',
+      treKurve: () => 'Tre leverancer: ' + r.split('+').join(' + '),
+      retVenner: () => 'Rette vennerne: ' + r.split('/')[0].split('+')[0] + ' + ? = ' + r.split('/')[1],
+      hvorMangeVaek: () => 'Hvor mange gik væk: ' + r.replace('-', ' → '),
+      byt10: () => 'Bytte ti enere til en tier',
+      naestenDobbelt: () => 'Næsten dobbelt: ' + r.replace('+', ' + '),
+      gentagPakke: () => 'Finde det, der gentages i et mønster',
+      betalPrecis: () => 'Betale præcis med ' + r.split('+').join(' kr + ') + ' kr',
+      urDigital: () => 'Digitalt ur → ur med visere: ' + r,
+      klokke5: () => 'Aflæse klokken ' + klokkeNavn(r),
+      formOgAntal: () => 'Form og antal på én gang',
+      fordelBaer: () => 'Fordele: ' + r.replace('-', ' bær, ') + ' skåle — hvor mange tilbage',
+      spejlBillede: () => 'Finde spejlbilledet',
+      linealNul: () => 'Lægge linealen rigtigt (nul ved starten)',
+      sammeSum: () => 'Samme antal, delt anderledes: ' + r.replace('=', ' = ').split('+').join(' + '),
+      flytVen: () => 'Flytte mellem venner: ' + r.split('>')[0].replace('+', ' + '),
+      sammeForskel: () => 'Samme forskel, når begge tårne mister lige mange',
+      talIInterval: () => 'Hvilket interval ' + r + ' ligger i',
+      delTilTi: () => 'Dele op til ti: ' + r.replace('+', ' + '),
+      bevaegelsesKode: () => 'Oversætte figurer til bevægelser',
+      bytMoent: () => 'Bytte ' + r.split(':')[0] + ' kr til mindre mønter',
+      tabelPlus: () => 'Læse en billedtabel: ' + r.replace('+', ' + '),
+      koePlads: () => 'Finde nummer ' + r.split('-')[1].replace(/\D/g, '') + ' i en kø fra flaget',
+      toRegler: () => 'To regler på én gang: ' + r.replace('-', ' og '),
+      retVej: () => 'Rette en knækket vej ud: ' + r.replace('+', ' + '),
+      regneHistorie: () => 'Finde historien til ' + r.replace('+', ' + '),
+      treVenner: () => 'Dele ti mellem tre: ' + r.replace('+', ' + ') + ' + ?',
+      sammeRest: () => 'Samme rest: ' + r.split('=')[0].replace('-', ' − '),
+      enerTilTier: () => r + ' − 1 + 10',
+      tilbageHistorie: () => 'Returhistorie: ' + r.replace('+', ' + '),
+      skiftendeHop: () => 'Skiftende hop fra ' + r.split(':')[0],
+      tidFrem: () => 'Tiden frem: ' + r.replace('+', ' + ') + ' min',
+      toKoeb: () => 'To køb for ' + r.split('-')[0] + ' kr',
+      toTrin: () => 'To trin: ' + r.replace('+', ' + ').replace('-', ' − '),
     };
     return tekster[art] ? tekster[art]() : String(noegle);
   }
@@ -1356,7 +2362,7 @@
     tiere: 'Saml ting i bunker af 10 (tiere) og resten løse (enere). Tæl tikroner og enkroner i sparegrisen.',
     tierbro: 'Dobbelt: 6 og 6, 7 og 7. Brug en æggebakke med 10 huller: fyld op til 10 først, så resten.',
     moenstre: 'Lav mønstre med klodser eller perler: rød-blå-rød-blå. Tæl i 2\'ere på trappen.',
-    maaling: 'Kig på uret sammen ved hele og halve timer: «Nu er klokken halv fem — den store viser peger på 6.» Lad barnet betale med mønter i bageren og tælle byttepengene.',
+    maaling: 'Kig på uret sammen ved hele og halve timer: «Nu er klokken halv fem — den store viser peger på 6.» Senere kvart over og kvart i: «Kvart over syv — den store viser peger på 3. Kvart i otte — den peger på 9.» Lad barnet betale med mønter i bageren og tælle byttepengene.',
   };
 
   const Opgaver = {
@@ -1366,6 +2372,7 @@
     lavOpgave, lavRunde, lavBlandetRunde, klemNiveau, opdaterNiveau, maerkeForRunde,
     beskrivNoegle, HJEMME_IDEER, klokkeNavn,
     SOEMBRAET, MAALE_TING, vurderFigur, figurPasser, stregPasser, eksempelFigur,
+    lavValgFejl, lavKort, LYSTAARN_TYPER, PUSLESPIL, RETNING, ruteFraOpskrift, rutePasser,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Opgaver;

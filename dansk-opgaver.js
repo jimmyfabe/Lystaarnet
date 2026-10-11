@@ -541,7 +541,502 @@
         hjaelp: [{ art: 'hoerIgen', langsomt: true }, { art: 'visOrd', ord: ord.join(' ') }],
       });
     },
+
+    // =====================================================================
+    //  D1 · trin 1 (forslaget 09-10). Dansk indhold kommer fra håndskrevne banker — aldrig blind bogstavudskiftning.
+    // =====================================================================
+
+    // Rim: kortene vises og navngives, så vendes de. Hvilket skjult kort rimer på billedet?
+    huskRim(niveau, rng) {
+      const gruppe = vaelg(rng, RIM);
+      const [stik, rigtig] = bland(rng, gruppe);
+      const alle = Object.keys(ORD).filter((o) => !ORD[o].ny && o !== stik && gruppe.indexOf(o) < 0 && !rimerPaa(stik, o) && ORD[o].e !== ORD[stik].e);
+      // Samme forlyd som billedordet (rimer ikke — «hus/hat») · et ord, der hverken rimer eller deler forlyd
+      const sammeForlyd = bland(rng, alle.filter((o) => o[0] === stik[0]));
+      const andre = bland(rng, alle.filter((o) => o[0] !== stik[0] && o[0] !== rigtig[0]));
+      const forkerte = sammeForlyd.slice(0, 1).concat(andre).slice(0, antalValg(niveau) - 1);
+      const valg = bland(rng, forkerte.concat([rigtig]));
+      return opgave({
+        emne: 'rim', type: 'huskRim', niveau, noegle: 'huskRim:' + stik + '-' + rigtig, ikon: '🃏',
+        tale: stort(stik) + '. Husk kortene: ' + valg.join(' … ') + '. Hvilket skjult kort rimer på ' + stik + '?',
+        tekst: 'Hvad rimer på ' + stik + '?',
+        vis: { art: 'ordBillede', ord: stik, e: ORD[stik].e },
+        svar: rigtig, valg: valg, valgArt: 'skjult',
+        // Trin 1: kortene vendes op igen (og bliver liggende) · trin 2: hør billedordet med hvert kort
+        hjaelp: [{ art: 'vendOp' }, { art: 'rimLyt', stik: stik, valg: valg }],
+      });
+    },
+
+    // Lyde: byt den første lyd — «mus», byt /m/ ud med /h/ → hus. Ingen bogstaver, kun billeder og lyd
+    bytLyd(niveau, rng) {
+      const [fra, til, alt] = vaelg(rng, BYT_LYD);
+      const ny = til[0];
+      // Beholder den oprindelige lyd (fra) · en anden ny lyd (alt) — kun ord med billede
+      const forkerte = [fra, alt].filter((o) => o && ORD[o]).slice(0, antalValg(niveau) - 1);
+      const valg = bland(rng, forkerte.concat([til]));
+      // Reserven («samme lyd som …») må ikke være svaret selv
+      const eks = eksempelOrd(rng, ny, [fra, til, alt]);
+      return opgave({
+        emne: 'lyde', type: 'bytLyd', niveau, noegle: 'bytLyd:' + fra + '-' + til, ikon: '🔄',
+        tale: stort(fra) + '. Byt den første lyd ud med',
+        lyd: [{ klip: lydId(ny), reserve: eks ? 'samme lyd som i ' + eks : lydReserve(ny) }],
+        efterTale: 'Hvilket ord får vi? ' + valg.map(stort).join(', eller ') + '?',
+        tekst: 'Byt den første lyd',
+        vis: { art: 'ordBillede', ord: fra, e: ORD[fra].e },
+        svar: til, valg: valg, valgArt: 'emoji',
+        hjaelp: [{ art: 'hoerIgen', langsomt: true }, { art: 'rimLyt', stik: fra, valg: valg }],
+      });
+    },
+
+    // Alfabetet: det trykte bogstav og det håndskrevne er det samme bogstav. Bogstavets NAVN bruges med vilje
+    haandskrift(niveau, rng) {
+      const pulje = Object.keys(HAANDSKRIFT_LIGNER);
+      const b = vaelg(rng, pulje);
+      const forkerte = HAANDSKRIFT_LIGNER[b].slice(0, antalValg(niveau) - 1);
+      const valg = bland(rng, forkerte.concat([b]));
+      return opgave({
+        emne: 'alfabet', type: 'haandskrift', niveau, noegle: 'haandskrift:' + b, ikon: '✍️',
+        tale: 'Det samme bogstav kan se lidt forskelligt ud. Find det håndskrevne',
+        lyd: [{ klip: navnId(b), reserve: NAVNE[b], navn: true }],
+        tekst: 'Find det håndskrevne',
+        vis: { art: 'tryktBogstav', bogstav: b },
+        svar: b, valg: valg, valgArt: 'haandskrift',
+        // Trin 1: hør igen · trin 2: det håndskrevne bogstav skrives langsomt ved siden af det trykte
+        hjaelp: [{ art: 'hoerIgen' }, { art: 'skrivBogstav', bogstav: b }],
+      });
+    },
+
+    // Lydering: ret det midterste bogstav, så der står det, billedet viser («mis» → mus). Stavning med mundtligt mål
+    retVokal(niveau, rng) {
+      const ord = ordIGruppe(['B']).filter((o) => o.length === 3 && !erVokal(o[0]) && erVokal(o[1]) && !erVokal(o[2]));
+      const rigtig = vaelg(rng, ord);
+      const v = rigtig[1];
+      const vokaler = 'aeiou'.split('').filter((x) => x !== v);
+      const forkert = vaelg(rng, vokaler);                        // vokalen, der står i det forkerte ord
+      const anden = vaelg(rng, vokaler.filter((x) => x !== forkert));
+      // Beholder det forkerte bogstav · en anden vokal uden at lytte til målordet
+      const valg = bland(rng, [forkert, anden].slice(0, antalValg(niveau) - 1).concat([v]));
+      const vist = rigtig[0] + forkert + rigtig[2];
+      return opgave({
+        emne: 'lydering', type: 'retVokal', niveau, noegle: 'retVokal:' + rigtig + '-' + vist, ikon: '🩹',
+        tale: stort(rigtig) + '. Ret det midterste bogstav, så der står ' + rigtig + '.',
+        tekst: 'Ret bogstavet',
+        vis: { art: 'retOrd', ord: rigtig, e: ORD[rigtig].e, vist: vist, plads: 1 },
+        svar: v, valg: valg, valgArt: 'bogstav', kunLille: true,
+        hjaelp: [{ art: 'hoerIgen', langsomt: true }, Object.assign(hjaelpBogstav(v, rigtig), { midt: true })],
+      });
+    },
+
+    // Små ord: er tingen I eller PÅ kassen? Billedet gør placeringen utvetydig; ordene læses ikke op
+    hvorErTingen(niveau, rng) {
+      const ting = vaelg(rng, PLACERING_TING);
+      const beholder = vaelg(rng, PLACERING_BEHOLDER);
+      const rel = vaelg(rng, ['i', 'på']);
+      const valg = bland(rng, ['i', 'på']);
+      return opgave({
+        emne: 'smaaord', type: 'hvorErTingen', niveau, noegle: 'hvorErTingen:' + ting.id + '-' + rel, ikon: '📦',
+        tale: 'Vælg det lille ord, der passer til, hvor ' + ting.bestemt + ' er.',
+        tekst: 'Hvor er ' + ting.bestemt + '?',
+        vis: { art: 'scene', fakta: { rel: rel }, dele: [{ t: 'placering', id: 'placering', ting: ting.e, beholder: beholder.id, rel: rel }] },
+        svar: rel, valg: valg, valgArt: 'skrevet',
+        hjaelp: [{ art: 'lys', trin: [{ tale: 'Se på ' + beholder.bestemt + '. Er ' + ting.bestemt + ' inde i den eller oven på den?', lys: ['beholder'] }] }],
+      });
+    },
+
+    // =====================================================================
+    //  D2 · trin 2 (forslaget 09-10)
+    // =====================================================================
+
+    // Rim: en lille remse slutter med et hul — vælg det ord, der rimer (fejlene passer til remsen, men rimer ikke)
+    rimRemse(niveau, rng) {
+      const R = vaelg(rng, RIM_REMSER);
+      const valg = bland(rng, R.fejl.slice(0, antalValg(niveau) - 1).concat([R.rigtig]));
+      return opgave({
+        emne: 'rim', type: 'rimRemse', niveau, noegle: 'rimRemse:' + R.stik + '-' + R.rigtig, ikon: '🎶',
+        tale: R.remse + ' Vælg det sidste ord, så det rimer på ' + R.stik + '.',
+        efterTale: valg.map(stort).join(', eller ') + '?',
+        tekst: 'Hvad rimer på ' + R.stik + '?',
+        vis: { art: 'ordBillede', ord: R.stik, e: ORD[R.stik].e },
+        svar: R.rigtig, valg: valg, valgArt: 'emoji',
+        hjaelp: [{ art: 'rimLyt', stik: R.stik, valg: valg }],
+      });
+    },
+
+    // Lyde: hvor mange lyde er der i ordet? Svarene er lydprikker (ingen bogstaver). Bank kontrolleret i hånden
+    taelLyde(niveau, rng) {
+      const pulje = Object.keys(LYD_ANTAL).filter((o) => ORD[o] && (niveau >= 3 || LYD_ANTAL[o] <= 3));
+      const ord = vaelg(rng, pulje);
+      const n = LYD_ANTAL[ord];
+      const kortAf = (k) => ({ dele: [{ t: 'prikker', n: k }], navn: k + (k === 1 ? ' lyd' : ' lyde'), fakta: { n: k } });
+      // Tæller ordet som én · deler en lang vokal i to (én for meget)
+      const fejl = [1, n + 1, n - 1].filter((k) => k >= 1 && k !== n).map(kortAf);
+      const k = O.lavKort(rng, kortAf(n), fejl, antalValg(niveau));
+      return opgave({
+        emne: 'lyde', type: 'taelLyde', niveau, noegle: 'taelLyde:' + ord, ikon: '🔵',
+        tale: 'Lyt til ordet ' + ord + '. Hvor mange lyde kan du høre?',
+        tekst: 'Hvor mange lyde?',
+        vis: { art: 'ordBillede', ord: ord, e: ORD[ord].e },
+        svar: k.svar, valg: k.valg, kort: k.kort, valgArt: 'scene',
+        hjaelp: [{ art: 'hoerIgen', langsomt: true }],
+      });
+    },
+
+    // Alfabetet: læg tre bogstaver i alfabetisk rækkefølge (tryk på dem ét ad gangen, fra venstre)
+    alfabetOrden(niveau, rng) {
+      const pulje = ALFABET.filter((b) => KUN_NAVN.indexOf(b) < 0);
+      let tre;
+      // Ikke naboer i alfabetet (så rækkefølgen kræver opslag) og ikke allerede i rigtig rækkefølge
+      do { tre = bland(rng, pulje).slice(0, 3); } while (tre.some((b, i) => tre.some((c, j) => i !== j && Math.abs(ALFABET.indexOf(b) - ALFABET.indexOf(c)) < 2)));
+      const sorteret = tre.slice().sort((a, b) => ALFABET.indexOf(a) - ALFABET.indexOf(b));
+      let brikker;
+      do { brikker = bland(rng, tre); } while (brikker.join('') === sorteret.join(''));
+      return opgave({
+        emne: 'alfabet', type: 'alfabetOrden', niveau, noegle: 'alfabetOrden:' + sorteret.join(''), ikon: '🔠',
+        tale: 'Læg de tre bogstaver i rækkefølge, som i alfabetet. Begynd fra venstre.',
+        tekst: 'Som i alfabetet',
+        vis: { art: 'bygAlfabet', dele: 3 },
+        svar: sorteret.join(''), byg: { brikker: brikker, dele: 3, adskil: '', navn: true },
+        // Trin 1: alfabetet vises (de tre bogstaver markeret) · trin 2: det første lyser
+        hjaelp: [{ art: 'alfabetVis', bogstaver: sorteret }, { art: 'foersteBrik', brik: sorteret[0], tale: 'Først ' + NAVNE[sorteret[0]] + '.' }],
+      });
+    },
+
+    // Lydering: skift ét bogstav, så ordet bliver til billedet (sol → sæl). Pladsen vises først i hjælpen
+    skiftBogstav(niveau, rng) {
+      const par = vaelg(rng, SKIFT_PAR);
+      const [fra, til] = rng() < 0.5 ? par : [par[1], par[0]];
+      const plads = fra.split('').findIndex((b, i) => b !== til[i]);
+      const ny = til[plads], gammel = fra[plads];
+      const klasse = erVokal(ny) ? 'aeiouyæøå' : 'bdfghjklmnprstv';
+      const anden = vaelg(rng, klasse.split('').filter((b) => b !== ny && b !== gammel && (fra.slice(0, plads) + b + fra.slice(plads + 1)) !== til));
+      // Beholder bogstavet (ingen ændring) · et andet bogstav af samme slags
+      const valg = bland(rng, [gammel, anden].slice(0, antalValg(niveau) - 1).concat([ny]));
+      return opgave({
+        emne: 'lydering', type: 'skiftBogstav', niveau, noegle: 'skiftBogstav:' + fra + '-' + til, ikon: '🔀',
+        tale: 'Her står ' + fra + '. Lav ordet om til ' + til + ' ved at skifte ét bogstav.',
+        tekst: fra + ' → ' + til,
+        vis: { art: 'retOrd', ord: til, e: ORD[til].e, vist: fra, plads: plads, skjulPlads: true },
+        svar: ny, valg: valg, valgArt: 'bogstav', kunLille: true,
+        hjaelp: [{ art: 'visPlads' }, Object.assign(hjaelpBogstav(ny, til), { midt: plads > 0 && plads < til.length - 1, slut: plads === til.length - 1 })],
+      });
+    },
+
+    // Små ord: læs ordet (i eller på) — vælg billedet, der passer. Ordet siges ikke
+    laesPlacering(niveau, rng) {
+      const ting = vaelg(rng, PLACERING_TING);
+      const beholder = vaelg(rng, PLACERING_BEHOLDER);
+      const ord = vaelg(rng, ['i', 'på']);
+      const kortAf = (rel) => ({ dele: [{ t: 'placering', ting: ting.e, beholder: beholder.id, rel: rel }], navn: { i: 'inde i', 'på': 'oven på', bag: 'bagved' }[rel], fakta: { rel: rel } });
+      // Det andet lille ord · en anden placering (bagved)
+      const k = O.lavKort(rng, kortAf(ord), [kortAf(ord === 'i' ? 'på' : 'i'), kortAf('bag')], antalValg(niveau));
+      return opgave({
+        emne: 'smaaord', type: 'laesPlacering', niveau, noegle: 'laesPlacering:' + ord + '-' + ting.id, ikon: '👀',
+        tale: 'Læs det lille ord. Vælg billedet, der passer.',
+        tekst: 'Læs ordet',
+        vis: { art: 'skrevetOrd', ord: ord },
+        svar: k.svar, valg: k.valg, kort: k.kort, valgArt: 'scene',
+        hjaelp: [{ art: 'visBogstav', bogstav: ord[0], ord: '', e: '' }],
+      });
+    },
   };
+
+  // =====================================================================
+  //  D3 · trin 3 (forslaget 09-10) — opgaverne her bruges via GEN (verdenerne) og HISTORIE_QUIZ
+  // =====================================================================
+  Object.assign(GEN, {
+    // Rim: to store billeder — find ordparret, der BÅDE passer til billederne OG rimer
+    rimPar(niveau, rng) {
+      const [x, y] = vaelg(rng, RIM_PAR);
+      const andetPar = vaelg(rng, RIM_PAR.filter((p) => p.indexOf(x) < 0 && p.indexOf(y) < 0));
+      const ikkeRim = vaelg(rng, Object.keys(ORD).filter((o) => !ORD[o].ny && o !== x && o !== y && !rimerPaa(x, o) && ORD[o].e !== ORD[x].e));
+      const kortAf = (a, b) => ({ dele: [{ t: 'ting', e: ORD[a].e, n: 1, taelbar: false }, { t: 'ting', e: ORD[b].e, n: 1, taelbar: false }], navn: a + ' og ' + b, fakta: { par: [a, b] } });
+      // Ét billede passer, men ordene rimer ikke · ordene rimer, men passer ikke til billederne
+      const k = O.lavKort(rng, kortAf(x, y), [kortAf(x, ikkeRim), kortAf(andetPar[0], andetPar[1])], antalValg(niveau));
+      return opgave({
+        emne: 'rim', type: 'rimPar', niveau, noegle: 'rimPar:' + x + '-' + y, ikon: '🎭',
+        tale: 'Find ordparret, som både passer til de to store billeder og rimer.',
+        tekst: 'Passer og rimer',
+        vis: { art: 'scene', fakta: { par: [x, y] }, dele: [{ t: 'ting', id: 'x', e: ORD[x].e, n: 1, taelbar: false }, { t: 'ting', id: 'y', e: ORD[y].e, n: 1, taelbar: false }] },
+        svar: k.svar, valg: k.valg, kort: k.kort, valgArt: 'scene',
+        hjaelp: [{ art: 'laesKort' }, { art: 'lys', trin: [{ tale: stort(x) + ' og ' + y + '. De rimer.', lys: ['x', 'y'] }] }],
+      });
+    },
+
+    // Lyde: tag den allerførste lyd væk — gris → ris. Kun få naturlige par (forslaget: «kræv ikke 16»)
+    fjernLyd(niveau, rng) {
+      const [fra, til, anden] = vaelg(rng, FJERN_LYD);
+      // Fjerner intet · fjerner for meget / tager et ord, der bare rimer
+      const valg = bland(rng, [fra, anden].slice(0, antalValg(niveau) - 1).concat([til]));
+      return opgave({
+        emne: 'lyde', type: 'fjernLyd', niveau, noegle: 'fjernLyd:' + fra, ikon: '✂️',
+        tale: stort(fra) + '. Tag den allerførste lyd væk. Hvilket ord bliver tilbage? ' + valg.map(stort).join(', ') + '?',
+        tekst: 'Tag den første lyd væk',
+        vis: { art: 'ordBillede', ord: fra, e: ORD[fra].e },
+        svar: til, valg: valg, valgArt: 'emoji',
+        hjaelp: [{ art: 'hoerIgen', langsomt: true }, { art: 'rimLyt', stik: fra, valg: valg }],
+      });
+    },
+
+    // Alfabetet: på hvilken hylde hører bogstavet hjemme? (A–G, H–P, Q–Å)
+    alfabetHylde(niveau, rng) {
+      const b = vaelg(rng, ALFABET);
+      const i = ALFABET.indexOf(b);
+      const hylde = HYLDER.find((h) => i >= ALFABET.indexOf(h[0]) && i <= ALFABET.indexOf(h[1]));
+      const kortAf = (h) => ({ dele: [{ t: 'tal', s: h[0].toUpperCase() + '–' + h[1].toUpperCase() }], navn: 'fra ' + NAVNE[h[0]] + ' til ' + NAVNE[h[1]], fakta: { fra: h[0], til: h[1] } });
+      // Vælger den første hylde uden opslag · forveksler «et stykke henne» med den sidste
+      const fejl = HYLDER.filter((h) => h !== hylde).map(kortAf);
+      const k = O.lavKort(rng, kortAf(hylde), fejl, antalValg(niveau));
+      return opgave({
+        emne: 'alfabet', type: 'alfabetHylde', niveau, noegle: 'alfabetHylde:' + b, ikon: '📚',
+        tale: 'På hvilken hylde hører bogstavet',
+        lyd: [{ klip: navnId(b), reserve: NAVNE[b], navn: true }],
+        efterTale: 'hjemme? Brug alfabetet.',
+        tekst: 'Hvilken hylde?',
+        vis: { art: 'stortBogstav', bogstav: b },
+        svar: k.svar, valg: k.valg, kort: k.kort, valgArt: 'scene',
+        hjaelp: [{ art: 'alfabetVis', bogstaver: [b] }],
+      });
+    },
+
+    // Lydering: to billedord skrevet uden mellemrum — sæt skillemærket mellem dem
+    delOrd(niveau, rng) {
+      const [a, b] = vaelg(rng, DEL_ORD);
+      const ord = a + b, rigtig = a.length;
+      const kortAf = (p) => ({ dele: [{ t: 'strimmel', ord: ord, skille: p }], navn: ord.slice(0, p) + ' og ' + ord.slice(p), fakta: { skille: p } });
+      // Deler før sidste lyd i det første ord · lader begyndelsen af det andet ord følge med
+      const k = O.lavKort(rng, kortAf(rigtig), [kortAf(rigtig - 1), kortAf(rigtig + 1)], antalValg(niveau));
+      return opgave({
+        emne: 'lydering', type: 'delOrd', niveau, noegle: 'delOrd:' + a + '-' + b, ikon: '✂️',
+        tale: 'Her er to billedord skrevet uden mellemrum. Sæt skillemærket mellem dem.',
+        tekst: 'To ord',
+        vis: { art: 'scene', fakta: { ord: [a, b] }, dele: [{ t: 'ting', id: 'a', e: ORD[a].e, n: 1, taelbar: false }, { t: 'ting', id: 'b', e: ORD[b].e, n: 1, taelbar: false }, { t: 'strimmel', id: 'strimmel', ord: ord }] },
+        svar: k.svar, valg: k.valg, kort: k.kort, valgArt: 'scene',
+        // Trin 1: lydene i det første ord (uden at sige hele svaret) · trin 2: det første billede lyser
+        hjaelp: [{ art: 'lydFoerste', bogstaver: a.split('') }, { art: 'lys', trin: [{ tale: 'Det første billede er ' + a + '.', lys: ['a'] }] }],
+      });
+    },
+
+    // Små ord: «Her er ikke en kat.» — ordet IKKE skal læses; præcis ét billede passer
+    ikkeOrd(niveau, rng) {
+      const [X, Y] = bland(rng, IKKE_DYR).slice(0, 2);
+      const kortAf = (dyr, navn) => ({ dele: dyr.map((d) => ({ t: 'ting', e: d.e, n: 1, taelbar: false })), navn: navn, fakta: { dyr: dyr.map((d) => d.ord) } });
+      // Overser «ikke» · ser en anden figur, men tjekker ikke, at den første stadig er med
+      const k = O.lavKort(rng, kortAf([Y], 'kun en ' + Y.ord), [kortAf([X], 'kun en ' + X.ord), kortAf([X, Y], 'en ' + X.ord + ' og en ' + Y.ord)], antalValg(niveau));
+      return opgave({
+        emne: 'smaaord', type: 'ikkeOrd', niveau, noegle: 'ikkeOrd:' + X.ord + '-' + Y.ord, ikon: '🚫',
+        tale: 'Læs det ord, der lyser. Vælg billedet, der passer til skiltet. Her er … en ' + X.ord + '.',
+        tekst: 'Læs skiltet',
+        vis: { art: 'ikkeSkilt', ord: ['Her', 'er', 'ikke', 'en'], fremhaev: 2, e: X.e, dyr: X.ord },
+        svar: k.svar, valg: k.valg, kort: k.kort, valgArt: 'scene',
+        hjaelp: [{ art: 'visOrd', ord: 'ikke' }, { art: 'laesKort' }],
+      });
+    },
+  });
+  const HYLDER = [['a', 'g'], ['h', 'p'], ['q', 'å']];
+
+  // Hvilken slutning passer? (Historiebogen, trin 3)
+  function historieSlutning(niveau, rng) {
+    const H = vaelg(rng, SLUTNING);
+    const kortAf = ([e, tekst]) => ({ dele: [{ t: 'ting', e: e, n: 1, taelbar: false }], navn: tekst, fakta: { e: e } });
+    const k = O.lavKort(rng, kortAf(H.rigtig), H.fejl.map(kortAf), 3);
+    return opgave({
+      emne: 'historie', type: 'historieSlutning', niveau, noegle: 'historieSlutning:' + H.id, ikon: '🏁',
+      tale: H.s.join(' ') + ' Hvilken slutning passer til det hele?',
+      tekst: 'Hvordan ender det?',
+      vis: { art: 'scene', fakta: { id: H.id }, dele: H.billeder.map((e, i) => ({ t: 'ting', id: 's' + i, e: e, n: 1, taelbar: false })) },
+      svar: k.svar, valg: k.valg, kort: k.kort, valgArt: 'scene',
+      hjaelp: [{ art: 'hoerIgen', langsomt: true }, { art: 'laesKort' }],
+    });
+  }
+
+  // «Hvorfor?» (Historiebogen, trin 2): tre oplysninger og et spørgsmål; svarene er billeder med en kort oplæsning
+  function historieHvorfor(niveau, rng) {
+    const H = vaelg(rng, HVORFOR);
+    const kortAf = ([e, tekst]) => ({ dele: [{ t: 'ting', e: e, n: 1, taelbar: false }], navn: tekst, fakta: { e: e } });
+    const k = O.lavKort(rng, kortAf(H.rigtig), H.fejl.map(kortAf), 3);
+    return opgave({
+      emne: 'historie', type: 'historieHvorfor', niveau, noegle: 'historieHvorfor:' + H.id, ikon: '❓',
+      tale: H.s.join(' ') + ' ' + H.spm,
+      tekst: 'Hvorfor?',
+      vis: { art: 'scene', fakta: { id: H.id }, dele: H.billeder.map((e, i) => ({ t: 'ting', id: 's' + i, e: e, n: 1, taelbar: false })) },
+      svar: k.svar, valg: k.valg, kort: k.kort, valgArt: 'scene',
+      // Trin 1: hør igen langsomt · trin 2: hvert svar læses op ét ad gangen
+      hjaelp: [{ art: 'hoerIgen', langsomt: true }, { art: 'laesKort' }],
+    });
+  }
+
+  // ---------- D1: Historiebogen «🤔 Hvad skete der?» — små egne historier (ikke de 18 læsehistorier) ----------
+  // Tre hændelser i en rækkefølge, der kun kan gå én vej (tid eller årsag). Hver hændelse har ét billede.
+  // Ingen gemt statistik: opgaverne spilles fra historiesiden og gemmer intet (gemte data må ikke ændres).
+  const SMAA_HISTORIER = [
+    { id: 'mus', h: [['Musen finder et æble.', '🍎'], ['Den lægger æblet i tasken.', '👜'], ['Så går den hjem.', '🏠']] },
+    { id: 'froe', h: [['Pigen planter et frø.', '🌱'], ['Det regner.', '🌧️'], ['En blomst vokser op.', '🌷']] },
+    { id: 'aeg', h: [['Der ligger et æg.', '🥚'], ['Ægget går i stykker.', '🐣'], ['En lille kylling kommer ud.', '🐥']] },
+    { id: 'sne', h: [['Det sner.', '❄️'], ['Vi laver en snemand.', '⛄'], ['Solen kommer, og snemanden smelter.', '☀️']] },
+    { id: 'ballon', h: [['Pigen får en ballon.', '🎈'], ['Det blæser.', '🌬️'], ['Ballonen flyver op i himlen.', '☁️']] },
+    { id: 'larve', h: [['En larve spiser et blad.', '🐛'], ['Den sover længe.', '💤'], ['Den bliver til en sommerfugl.', '🦋']] },
+    { id: 'tand', h: [['Drengen spiser slik.', '🍬'], ['Han børster tænder.', '🪥'], ['Han går i seng.', '🛏️']] },
+    { id: 'brev', h: [['Pigen skriver et brev.', '✏️'], ['Hun putter det i postkassen.', '📮'], ['Mormor læser brevet.', '👵']] },
+    { id: 'fisk', h: [['Far fisker.', '🎣'], ['Han fanger en fisk.', '🐟'], ['De spiser fisken.', '🍽️']] },
+    { id: 'taarn', h: [['Vi bygger et tårn.', '🧱'], ['Katten hopper op.', '🐈'], ['Tårnet vælter.', '💥']] },
+    { id: 'sko', h: [['Drengen tager sokker på.', '🧦'], ['Han tager sko på.', '👟'], ['Han løber ud.', '🏃']] },
+    { id: 'regn', h: [['Det regner.', '🌧️'], ['Solen kommer frem.', '☀️'], ['Der kommer en regnbue.', '🌈']] },
+    { id: 'hoene', h: [['Hønen lægger et æg.', '🐔'], ['Mor steger ægget.', '🍳'], ['Barnet spiser ægget.', '😋']] },
+    { id: 'gave', h: [['Pigen får en pakke.', '🎁'], ['Hun åbner pakken.', '🎀'], ['Der er en bamse i.', '🧸']] },
+    { id: 'kage', h: [['Vi rører dejen.', '🥣'], ['Kagen bager i ovnen.', '🔥'], ['Vi spiser kagen.', '🍰']] },
+    { id: 'baal', h: [['Vi samler grene.', '🪵'], ['Vi tænder et bål.', '🔥'], ['Vi spiser pølser ved bålet.', '🌭']] },
+    { id: 'bad', h: [['Hunden er beskidt.', '🐕'], ['Den kommer i bad.', '🛁'], ['Nu er hunden ren.', '✨']] },
+    { id: 'tog', h: [['Vi venter på toget.', '⏰'], ['Toget kommer.', '🚂'], ['Vi kører med toget.', '🧳']] },
+  ];
+
+  // Trin 1: hør historien, og læg de tre billeder i samme rækkefølge (tryk på dem ét ad gangen)
+  function historieRaekke(niveau, rng) {
+    const H = vaelg(rng, SMAA_HISTORIER);
+    const billeder = H.h.map((x) => x[1]);
+    const blandet = (() => { let b; do { b = bland(rng, billeder); } while (b.join() === billeder.join()); return b; })();
+    return opgave({
+      emne: 'historie', type: 'historieRaekke', niveau, noegle: 'historieRaekke:' + H.id, ikon: '🤔',
+      tale: H.h.map((x) => x[0]).join(' ') + ' Læg billederne i samme rækkefølge.',
+      tekst: 'Hvad skete der først?',
+      vis: { art: 'bygHistorie', dele: 3 },
+      svar: billeder.join(' '),
+      // Brikkerne er billeder; et tryk siger hændelsens sætning (ikke emojiens navn)
+      byg: { brikker: blandet, dele: 3, adskil: ' ', tale: blandet.map((b) => H.h.find((x) => x[1] === b)[0]) },
+      // Trin 1: hør historien igen langsomt · trin 2: den første hændelse lyser (sætning og billede)
+      hjaelp: [{ art: 'hoerIgen', langsomt: true }, { art: 'foersteBrik', brik: billeder[0], tale: H.h[0][0] }],
+    });
+  }
+  const HISTORIE_QUIZ = { 1: [historieRaekke], 2: [historieHvorfor], 3: [historieSlutning] };
+  // Tre opgaver til «🤔 Hvad skete der?» fra de trin, barnet er nået (forskellige historier)
+  function lavHistorieQuiz(trin, rng, antal) {
+    antal = antal || 3;
+    const gen = [];
+    for (let t = 1; t <= Math.max(1, Math.min(3, trin)); t++) (HISTORIE_QUIZ[t] || []).forEach((g) => gen.push([g, t]));
+    const ud = [], brugt = {};
+    for (let i = 0; ud.length < antal && i < 200; i++) {
+      const [g, t] = gen[i % gen.length];
+      const o = g(t, rng);
+      if (brugt[o.noegle]) continue;
+      brugt[o.noegle] = true;
+      ud.push(o);
+    }
+    return ud;
+  }
+
+  // ---------- D2: håndskrevne banker ----------
+  // Rimremser: remsen slutter med et hul; facit rimer på billedordet, fejlene passer til remsen, men rimer ikke
+  const RIM_REMSER = [
+    { stik: 'kat', remse: 'Se den lille kat. Den har fået en …', rigtig: 'hat', fejl: ['fisk', 'bold'] },
+    { stik: 'mus', remse: 'Den lille mus bor i et …', rigtig: 'hus', fejl: ['ost', 'seng'] },
+    { stik: 'sol', remse: 'Solen skinner på en …', rigtig: 'stol', fejl: ['træ', 'blomst'] },
+    { stik: 'gris', remse: 'Se den søde gris. Den spiser en …', rigtig: 'is', fejl: ['kage', 'æble'] },
+    { stik: 'ko', remse: 'Den store ko har fået en …', rigtig: 'sko', fejl: ['mælk', 'bold'] },
+    { stik: 'hest', remse: 'Min fine hest har en ny …', rigtig: 'vest', fejl: ['hat', 'sko'] },
+    { stik: 'mand', remse: 'Se den glade mand. Han har en løs …', rigtig: 'tand', fejl: ['næse', 'hat'] },
+    { stik: 'bog', remse: 'Jeg læser en bog om et …', rigtig: 'tog', fejl: ['bil', 'fly'] },
+    { stik: 'ost', remse: 'Musen gemmer sin ost bag en …', rigtig: 'kost', fejl: ['dør', 'stol'] },
+    { stik: 'due', remse: 'Se den hvide due. Den jager en …', rigtig: 'flue', fejl: ['bi', 'æble'] },
+    { stik: 'hane', remse: 'Den røde hane hilser på en …', rigtig: 'svane', fejl: ['and', 'gris'] },
+    { stik: 'rose', remse: 'Pigen har en rose i en …', rigtig: 'pose', fejl: ['vase', 'kjole'] },
+    { stik: 'dreng', remse: 'Den lille dreng hopper i sin …', rigtig: 'seng', fejl: ['sofa', 'stol'] },
+    { stik: 'båd', remse: 'Jeg har en lille båd med en rød …', rigtig: 'tråd', fejl: ['flag', 'ring'] },
+    { stik: 'bi', remse: 'Se, den lille bi står på …', rigtig: 'ski', fejl: ['sne', 'blomst'] },
+    { stik: 'bånd', remse: 'Pigen har et bånd om sin …', rigtig: 'hånd', fejl: ['fod', 'øre'] },
+    { stik: 'lys', remse: 'Mor slukker lyset og giver et …', rigtig: 'kys', fejl: ['bamse', 'seng'] },
+  ];
+  // Lyde i et ord — kontrolleret i hånden (antal bogstaver er IKKE facit: «ø» er én lyd, lange vokaler én lyd)
+  const LYD_ANTAL = {
+    ø: 1, is: 2, ko: 2, bi: 2, fe: 2, ti: 2, ni: 2, to: 2,
+    sol: 3, mus: 3, hus: 3, bus: 3, bil: 3, kat: 3, lam: 3, ris: 3, pen: 3, fem: 3, sok: 3, lys: 3, mål: 3, kål: 3,
+    gul: 3, jul: 3, kys: 3, kok: 3, sæl: 3, fly: 3, sne: 3, ske: 3, tre: 3, frø: 3, sko: 3, ski: 3, bro: 3, ost: 3,
+    hest: 4, telt: 4, kost: 4, post: 4, vest: 4, slot: 4, stol: 4, gris: 4, mælk: 4,
+  };
+  // Skift ét bogstav (ikke det første — det øver «byt lyd»): par af billedord, hvor kun ét bogstav og én lyd er forskellig
+  const SKIFT_PAR = [['sol', 'sæl'], ['sok', 'sol'], ['lyn', 'lys'], ['hul', 'hus'], ['ske', 'sne'], ['ske', 'sko'], ['ske', 'ski'],
+    ['ske', 'sky'], ['sko', 'sky'], ['ski', 'sko'], ['ski', 'sky'], ['tre', 'træ'], ['ti', 'to']];
+  // «Hvorfor?»: tre oplysninger, ét spørgsmål. Facit er den oplyste årsag; fejlene er en nævnt, men ligegyldig
+  // oplysning og noget, historien ikke siger. Hvert svar har ét billede og en kort oplæsning.
+  const HVORFOR = [
+    { id: 'raev', s: ['Ræven har en tung taske.', 'Det regner.', 'Den tager gummistøvler på.'], spm: 'Hvorfor tager ræven støvler på?', billeder: ['🎒', '🌧️', '🥾'], rigtig: ['🌧️', 'Fordi det regner.'], fejl: [['🎒', 'Fordi tasken er tung.'], ['🍽️', 'Fordi den er sulten.']] },
+    { id: 'seng', s: ['Pigen er træt.', 'Solen skinner.', 'Hun går i seng.'], spm: 'Hvorfor går pigen i seng?', billeder: ['👧', '☀️', '🛏️'], rigtig: ['😴', 'Fordi hun er træt.'], fejl: [['☀️', 'Fordi solen skinner.'], ['🍽️', 'Fordi hun er sulten.']] },
+    { id: 'aeble', s: ['Drengen er sulten.', 'Det blæser.', 'Han spiser et æble.'], spm: 'Hvorfor spiser drengen et æble?', billeder: ['👦', '🌬️', '🍎'], rigtig: ['🍽️', 'Fordi han er sulten.'], fejl: [['🌬️', 'Fordi det blæser.'], ['😴', 'Fordi han er træt.']] },
+    { id: 'hue', s: ['Det er koldt.', 'Katten er glad.', 'Musen tager en hue på.'], spm: 'Hvorfor tager musen en hue på?', billeder: ['🥶', '🐈', '🐭'], rigtig: ['🥶', 'Fordi det er koldt.'], fejl: [['🐈', 'Fordi katten er glad.'], ['🌧️', 'Fordi det regner.']] },
+    { id: 'bjoern', s: ['Bjørnen er tørstig.', 'Fuglene synger.', 'Bjørnen drikker vand.'], spm: 'Hvorfor drikker bjørnen vand?', billeder: ['🐻', '🐦', '💧'], rigtig: ['💧', 'Fordi den er tørstig.'], fejl: [['🐦', 'Fordi fuglene synger.'], ['🥶', 'Fordi det er koldt.']] },
+    { id: 'lys', s: ['Det er mørkt.', 'Uglen sidder i træet.', 'Drengen tænder lyset.'], spm: 'Hvorfor tænder drengen lyset?', billeder: ['🌙', '🦉', '💡'], rigtig: ['🌙', 'Fordi det er mørkt.'], fejl: [['🦉', 'Fordi uglen sidder i træet.'], ['🌧️', 'Fordi det regner.']] },
+    { id: 'kage', s: ['Pigen har fødselsdag.', 'Hunden gør.', 'Hun får en kage.'], spm: 'Hvorfor får pigen en kage?', billeder: ['👧', '🐕', '🎂'], rigtig: ['🎉', 'Fordi hun har fødselsdag.'], fejl: [['🐕', 'Fordi hunden gør.'], ['🍽️', 'Fordi hun er sulten.']] },
+    { id: 'vanter', s: ['Det sner.', 'Katten sover.', 'Drengen tager vanter på.'], spm: 'Hvorfor tager drengen vanter på?', billeder: ['❄️', '🐈', '🧤'], rigtig: ['❄️', 'Fordi det sner.'], fejl: [['🐈', 'Fordi katten sover.'], ['☀️', 'Fordi solen skinner.']] },
+    { id: 'hul', s: ['Musen hører katten.', 'Osten ligger på bordet.', 'Musen løber ind i sit hul.'], spm: 'Hvorfor løber musen ind i sit hul?', billeder: ['🐭', '🧀', '🕳️'], rigtig: ['🐈', 'Fordi den hører katten.'], fejl: [['🧀', 'Fordi osten ligger på bordet.'], ['🌧️', 'Fordi det regner.']] },
+    { id: 'plaster', s: ['Pigen falder og slår knæet.', 'Mor er i køkkenet.', 'Pigen får et plaster.'], spm: 'Hvorfor får pigen et plaster?', billeder: ['👧', '👩', '🩹'], rigtig: ['🤕', 'Fordi hun slog knæet.'], fejl: [['👩', 'Fordi mor er i køkkenet.'], ['🎉', 'Fordi hun har fødselsdag.']] },
+    { id: 'is', s: ['Solen er varm.', 'En fugl flyver forbi.', 'Drengens is smelter.'], spm: 'Hvorfor smelter isen?', billeder: ['☀️', '🐦', '🍦'], rigtig: ['☀️', 'Fordi solen er varm.'], fejl: [['🐦', 'Fordi en fugl flyver forbi.'], ['❄️', 'Fordi det sner.']] },
+    { id: 'bamse', s: ['Det regnede i går.', 'Hunden leger.', 'Bamsen i haven er våd.'], spm: 'Hvorfor er bamsen våd?', billeder: ['🌧️', '🐕', '🧸'], rigtig: ['🌧️', 'Fordi det regnede.'], fejl: [['🐕', 'Fordi hunden leger.'], ['☀️', 'Fordi solen skinner.']] },
+    { id: 'drage', s: ['Det blæser meget.', 'Pigen har en drage.', 'Dragen flyver højt.'], spm: 'Hvorfor flyver dragen højt?', billeder: ['🌬️', '👧', '🪁'], rigtig: ['🌬️', 'Fordi det blæser.'], fejl: [['👧', 'Fordi pigen har en drage.'], ['🌧️', 'Fordi det regner.']] },
+    { id: 'bold', s: ['Hundens bold er væk.', 'Katten sover.', 'Hunden er ked af det.'], spm: 'Hvorfor er hunden ked af det?', billeder: ['⚽', '🐈', '🐕'], rigtig: ['⚽', 'Fordi bolden er væk.'], fejl: [['🐈', 'Fordi katten sover.'], ['🍽️', 'Fordi den er sulten.']] },
+    { id: 'gab', s: ['Det er sent.', 'En fugl synger.', 'Barnet gaber.'], spm: 'Hvorfor gaber barnet?', billeder: ['🌙', '🐦', '🥱'], rigtig: ['🌙', 'Fordi det er sent.'], fejl: [['🐦', 'Fordi en fugl synger.'], ['🍽️', 'Fordi barnet er sulten.']] },
+    { id: 'ost', s: ['Musen har fundet en ost.', 'Det regner.', 'Musen er glad.'], spm: 'Hvorfor er musen glad?', billeder: ['🧀', '🌧️', '🐭'], rigtig: ['🧀', 'Fordi den har fundet en ost.'], fejl: [['🌧️', 'Fordi det regner.'], ['🐈', 'Fordi katten kommer.']] },
+    { id: 'baby', s: ['Babyen er sulten.', 'Hunden sover.', 'Babyen græder.'], spm: 'Hvorfor græder babyen?', billeder: ['👶', '🐕', '😢'], rigtig: ['🍼', 'Fordi den er sulten.'], fejl: [['🐕', 'Fordi hunden sover.'], ['❄️', 'Fordi det sner.']] },
+  ];
+
+  // ---------- D3: håndskrevne banker ----------
+  // Rim og billede: to store billeder; find ordparret, der BÅDE passer til billederne OG rimer
+  const RIM_PAR = [['kat', 'hat'], ['mus', 'hus'], ['sol', 'stol'], ['ko', 'sko'], ['hest', 'vest'], ['bog', 'tog'], ['due', 'flue'],
+    ['hane', 'svane'], ['rose', 'pose'], ['dreng', 'seng'], ['båd', 'tråd'], ['hånd', 'bånd'], ['lys', 'kys'], ['mand', 'tand'], ['gris', 'is'], ['rød', 'brød']];
+  // Fjern den første lyd: kun få naturlige par med billeder (forslaget: «kræv ikke 16»). [ord, facit, fejl «fjerner begge»/«bytter»]
+  const FJERN_LYD = [['gris', 'ris', 'is'], ['ris', 'is', 'gris'], ['sko', 'ko', 'to']];
+  // To billedord skrevet uden mellemrum — ikke et almindeligt sammensat ord
+  const DEL_ORD = [['sol', 'mus'], ['kat', 'bil'], ['bus', 'lam'], ['ris', 'sok'], ['lys', 'kat'], ['pen', 'mus'], ['sok', 'hat'],
+    ['bil', 'sæl'], ['mus', 'pen'], ['hat', 'sol'], ['lam', 'kys'], ['nål', 'bus'], ['kål', 'pen'], ['fem', 'sol'], ['jul', 'kat'], ['hul', 'bil']];
+  // «Ikke»: «Her er ikke en kat.» — præcis ét billede passer (kun det andet dyr)
+  const IKKE_DYR = [{ ord: 'kat', e: '🐈' }, { ord: 'hund', e: '🐕' }, { ord: 'mus', e: '🐭' }, { ord: 'ko', e: '🐄' }, { ord: 'gris', e: '🐷' }, { ord: 'fisk', e: '🐟' }];
+  // Hvilken slutning passer? To oplysninger udelukker de to forkerte slutninger
+  const SLUTNING = [
+    { id: 'kat', s: ['Katten vil over åen.', 'Broen er væk.', 'Katten kan ikke svømme.', 'Der ligger en robåd.'], billeder: ['🐈', '🌉', '🚣'], rigtig: ['🚣', 'Katten ror over i båden.'], fejl: [['🌉', 'Katten går over broen.'], ['🏊', 'Katten svømmer over.']] },
+    { id: 'is', s: ['Drengen vil have en is.', 'Isboden er lukket.', 'Der er is i fryseren derhjemme.'], billeder: ['👦', '🏪', '🧊'], rigtig: ['🧊', 'Han får en is fra fryseren.'], fejl: [['🏪', 'Han køber en is i isboden.'], ['🚫', 'Der er ingen is nogen steder.']] },
+    { id: 'drage', s: ['Det blæser slet ikke.', 'Pigens drage ligger stille.', 'Hun har en ballon.'], billeder: ['🪁', '👧', '🎈'], rigtig: ['🎈', 'Hun leger med ballonen.'], fejl: [['🌬️', 'Dragen flyver højt i blæsten.'], ['🚫', 'Hun har intet at lege med.']] },
+    { id: 'mus', s: ['Musen er sulten.', 'Osten står højt oppe.', 'Musen har en stige.'], billeder: ['🐭', '🧀', '🪜'], rigtig: ['🪜', 'Musen klatrer op ad stigen.'], fejl: [['⬇️', 'Musen spiser osten nede på gulvet.'], ['🛌', 'Musen er ikke sulten og sover.']] },
+    { id: 'regn', s: ['Det regner.', 'Drengen vil gå en tur.', 'Han har en paraply.'], billeder: ['🌧️', '👦', '☂️'], rigtig: ['☂️', 'Han går en tur med paraplyen.'], fejl: [['☀️', 'Han går en tur i solskin.'], ['💦', 'Han har ingen paraply og bliver våd.']] },
+    { id: 'baal', s: ['Vi vil grille pølser.', 'Bålet er gået ud.', 'Far har tændstikker.'], billeder: ['🌭', '🪵', '🔥'], rigtig: ['🔥', 'Far tænder bålet igen.'], fejl: [['🌭', 'Vi griller pølserne på det slukkede bål.'], ['🚫', 'Far har ingen tændstikker.']] },
+    { id: 'bus', s: ['Pigen skal i skole.', 'Bussen er kørt.', 'Hun har en cykel.'], billeder: ['👧', '🚌', '🚲'], rigtig: ['🚲', 'Hun cykler i skole.'], fejl: [['🚌', 'Hun kører med bussen.'], ['🏠', 'Hun har ingen cykel og bliver hjemme.']] },
+    { id: 'hund', s: ['Hunden vil ud.', 'Døren er lukket.', 'Drengen kan åbne døren.'], billeder: ['🐕', '🚪', '👦'], rigtig: ['👦', 'Drengen lukker hunden ud.'], fejl: [['🚪', 'Hunden går gennem den lukkede dør.'], ['🚫', 'Ingen kan åbne døren.']] },
+    { id: 'bamse', s: ['Bamsen ligger på et højt skab.', 'Pigen er for lille.', 'Far er høj.'], billeder: ['🧸', '👧', '👨'], rigtig: ['👨', 'Far tager bamsen ned.'], fejl: [['👧', 'Pigen når selv bamsen.'], ['🤏', 'Far er for lille til at nå den.']] },
+    { id: 'kage', s: ['Vi vil bage en kage.', 'Der er ingen æg.', 'Naboen har æg.'], billeder: ['🍰', '🥚', '🏠'], rigtig: ['🏠', 'Vi låner æg hos naboen.'], fejl: [['🥚', 'Vi tager æg fra køleskabet.'], ['🚫', 'Naboen har ingen æg.']] },
+    { id: 'sne', s: ['Børnene vil kælke.', 'Der er ingen sne.', 'Der er en stor bunke blade.'], billeder: ['🛷', '🌤️', '🍂'], rigtig: ['🍂', 'De hopper i bladene.'], fejl: [['🛷', 'De kælker i sneen.'], ['🚫', 'Der er ingen blade at hoppe i.']] },
+    { id: 'bold', s: ['Bolden sidder i træet.', 'Drengen kan ikke nå den.', 'Han har en lang pind.'], billeder: ['⚽', '🌳', '🪵'], rigtig: ['🪵', 'Han skubber bolden ned med pinden.'], fejl: [['✋', 'Han når bolden med hånden.'], ['🚫', 'Han har ingen pind.']] },
+    { id: 'lampe', s: ['Det er mørkt.', 'Lampen virker ikke.', 'Mor har en lommelygte.'], billeder: ['🌙', '💡', '🔦'], rigtig: ['🔦', 'Mor tænder lommelygten.'], fejl: [['💡', 'De tænder lampen, og den lyser.'], ['🚫', 'Mor har ingen lommelygte.']] },
+    { id: 'fugl', s: ['Fuglen er sulten.', 'Der er ingen orme.', 'Pigen har frø i hånden.'], billeder: ['🐦', '🪱', '🌻'], rigtig: ['🌻', 'Fuglen spiser frø fra pigens hånd.'], fejl: [['🪱', 'Fuglen spiser en orm.'], ['🚫', 'Pigen har ingen frø.']] },
+    { id: 'sko', s: ['Drengen vil løbe ud.', 'Hans sko er våde.', 'Han har et par støvler.'], billeder: ['👦', '👟', '🥾'], rigtig: ['🥾', 'Han tager støvlerne på.'], fejl: [['👟', 'Han tager de tørre sko på.'], ['🚫', 'Han har ingen støvler.']] },
+    { id: 'tog', s: ['Mormor skal hjem.', 'Toget kører ikke i dag.', 'Morfar har en bil.'], billeder: ['👵', '🚂', '🚗'], rigtig: ['🚗', 'Morfar kører mormor hjem.'], fejl: [['🚂', 'Mormor tager toget.'], ['🚫', 'Morfar har ingen bil.']] },
+  ];
+
+
+  // ---------- D1: håndskrevne banker ----------
+  // Byt den første lyd: [fra, til, et andet ord i samme familie med en anden første lyd]. Kun ord, hvor resten
+  // lyder ens (kontrolleret: hund/mund er udeladt — vokalen er ikke den samme).
+  const BYT_LYD = [
+    ['mus', 'hus', 'bus'], ['mus', 'bus', 'hus'], ['hus', 'mus', 'bus'], ['hus', 'bus', 'mus'], ['bus', 'mus', 'hus'], ['bus', 'hus', 'mus'],
+    ['kat', 'hat', 'hus'], ['hat', 'kat', 'ko'],
+    ['tand', 'mand', 'vand'], ['mand', 'tand', 'vand'], ['vand', 'mand', 'tand'], ['mand', 'vand', 'tand'],
+    ['bi', 'ti', 'ni'], ['ni', 'ti', 'bi'], ['ti', 'ni', 'bi'], ['ti', 'bi', 'ni'],
+    ['mål', 'nål', 'kål'], ['nål', 'kål', 'mål'], ['kål', 'mål', 'nål'],
+    ['gul', 'hul', 'jul'], ['hul', 'gul', 'jul'], ['jul', 'hul', 'gul'],
+    ['sok', 'kok', 'ko'], ['kok', 'sok', 'sol'], ['hest', 'vest', 'vase'], ['lys', 'kys', 'ko'],
+    ['bog', 'tog', 'ti'], ['tog', 'bog', 'bi'], ['hånd', 'bånd', 'bus'], ['rose', 'pose', 'pen'],
+    ['ko', 'to', 'ti'], ['due', 'bue', 'bus'], ['kost', 'post', 'pen'],
+  ];
+  // Håndskrevne bogstaver, der ligner (efter forlæggene i SKRIFT): den mest typiske forveksling først
+  const HAANDSKRIFT_LIGNER = {
+    a: ['o', 'd'], o: ['a', 'c'], l: ['i', 't'], i: ['l', 'j'], m: ['n', 'w'], u: ['n', 'v'], s: ['e', 'c'],
+    k: ['h', 'x'], t: ['f', 'l'], e: ['c', 'o'], n: ['m', 'h'], r: ['n', 'v'], b: ['d', 'h'], h: ['n', 'b'],
+    f: ['t', 'l'], g: ['q', 'a'], d: ['b', 'a'], y: ['v', 'g'], p: ['b', 'q'], v: ['u', 'y'], j: ['i', 'g'],
+    æ: ['a', 'e'], ø: ['o', 'a'], å: ['a', 'o'],
+  };
+  // Små ord: ting og beholdere (bestemt form til oplæsningen)
+  const PLACERING_TING = [
+    { id: 'bold', e: '⚽', bestemt: 'bolden' }, { id: 'mus', e: '🐭', bestemt: 'musen' }, { id: 'aeble', e: '🍎', bestemt: 'æblet' },
+    { id: 'kat', e: '🐈', bestemt: 'katten' }, { id: 'bamse', e: '🧸', bestemt: 'bamsen' }, { id: 'fisk', e: '🐟', bestemt: 'fisken' },
+  ];
+  const PLACERING_BEHOLDER = [
+    { id: 'kasse', bestemt: 'kassen' }, { id: 'kurv', bestemt: 'kurven' }, { id: 'skaal', bestemt: 'skålen' },
+  ];
 
   // Bogstaver, der ligner hinanden i form eller lyd, står ikke sammen på de første trin (b/d, p/q, n/u, f/v …)
   const LIGNER = ['bd', 'pq', 'nu', 'mn', 'fv', 'bp', 'gk', 'ij', 'oø', 'aæ', 'aå', 'ey', 'iy', 'dt'];
@@ -576,14 +1071,14 @@
   // ---------- Emner (verdener) og niveauer ----------
   // typer[0] er den letteste — en runde starter altid med den
   const EMNER = {
-    rim: { navn: 'Rim', maxNiveau: 3, niveauer: { 1: ['rim'], 2: ['rim'], 3: ['rim', 'passerIkke'] } },
-    lyde: { navn: 'Lyde', maxNiveau: 3, niveauer: { 1: ['lydBogstav'], 2: ['lydBogstav', 'forlyd'], 3: ['forlyd', 'udlyd', 'lydBogstav'] } },
-    alfabet: { navn: 'Alfabetet', maxNiveau: 3, niveauer: { 1: ['findBogstav', 'storLille'], 2: ['storLille', 'findBogstav', 'efterBogstav'], 3: ['efterBogstav', 'foerBogstav', 'findBogstav'] } },
-    lydering: { navn: 'Lydering', maxNiveau: 3, niveauer: { 1: ['lydering'], 2: ['laesOrd', 'lydering'], 3: ['laesOrd', 'bygOrd'] } },
-    smaaord: { navn: 'Små ord', maxNiveau: 3, niveauer: { 1: ['findOrd'], 2: ['findOrd', 'ordISaetning'], 3: ['ordISaetning', 'bygSaetning', 'findOrd'] } },
+    rim: { navn: 'Rim', maxNiveau: 3, niveauer: { 1: ['rim', 'huskRim'], 2: ['rim', 'huskRim'], 3: ['rim', 'passerIkke'] } },
+    lyde: { navn: 'Lyde', maxNiveau: 3, niveauer: { 1: ['lydBogstav', 'bytLyd'], 2: ['lydBogstav', 'forlyd', 'bytLyd'], 3: ['forlyd', 'udlyd', 'lydBogstav'] } },
+    alfabet: { navn: 'Alfabetet', maxNiveau: 3, niveauer: { 1: ['findBogstav', 'storLille', 'haandskrift'], 2: ['storLille', 'findBogstav', 'efterBogstav', 'haandskrift'], 3: ['efterBogstav', 'foerBogstav', 'findBogstav'] } },
+    lydering: { navn: 'Lydering', maxNiveau: 3, niveauer: { 1: ['lydering', 'retVokal'], 2: ['laesOrd', 'lydering', 'retVokal'], 3: ['laesOrd', 'bygOrd'] } },
+    smaaord: { navn: 'Små ord', maxNiveau: 3, niveauer: { 1: ['findOrd', 'hvorErTingen'], 2: ['findOrd', 'ordISaetning', 'hvorErTingen'], 3: ['ordISaetning', 'bygSaetning', 'findOrd'] } },
   };
   // Typer, der kun kan løses ved at høre (springes over uden dansk stemme — medmindre der er indtalte klip)
-  const LYT_TYPER = ['lydBogstav', 'forlyd', 'udlyd', 'findBogstav', 'lydering', 'findOrd', 'ordISaetning', 'rim', 'passerIkke'];
+  const LYT_TYPER = ['lydBogstav', 'forlyd', 'udlyd', 'findBogstav', 'lydering', 'findOrd', 'ordISaetning', 'rim', 'passerIkke', 'huskRim', 'bytLyd'];
 
   function lavOpgave(type, niveau, rng) { return GEN[type](niveau, rng); }
 
@@ -630,6 +1125,11 @@
       findOrd: () => 'Genkende ordet «' + r + '»',
       ordISaetning: () => 'Finde «' + r + '» i en sætning',
       bygSaetning: () => 'Bygge sætningen «' + r + '»',
+      huskRim: () => 'Huske et skjult rimkort: ' + (r || '').replace('-', ' – '),
+      bytLyd: () => 'Bytte første lyd: ' + (r || '').replace('-', ' → '),
+      haandskrift: () => 'Trykt og håndskrevet ' + r,
+      retVokal: () => 'Rette vokalen: ' + (r || '').split('-')[1] + ' → ' + (r || '').split('-')[0],
+      hvorErTingen: () => 'Små ord i/på: ' + (r || '').split('-')[1],
     };
     return t[art] ? t[art]() : null;
   }
@@ -651,15 +1151,43 @@
     return RAEKKEFOELGE.filter((b) => KUN_NAVN.indexOf(b) < 0 && b !== 'c').slice(0, n);
   }
   // En runde: for hver lyd det rigtige bogstav og 1–3 andre (2–4 bobler ad gangen); samme bogstav aldrig to gange i træk
-  function lavJagtRunde(bogstaver, trin, rng) {
+  // D1–D3: hver tredje lyd er en STILLE bølge (forslaget 09-10, «boblerne venter på barnet»): tre bobler, der står stille.
+  // Trin 1 · 'alle': to af boblerne har lyden — find begge. Den tredje er et bogstav, der ligner (m/n), hvis muligt.
+  // Trin 2 · 'raekke': to lyde efter hinanden (m … s) — ram dem i den rækkefølge.
+  // Trin 3 · 'midt': et kendt ord på tre bogstaver står stille øverst — ram bogstavet i midten (ordet siges ikke).
+  // Hvilken stille bølge hvert trin får. Kun de slags, app.js kan vise (review #3): 'raekke' og 'midt' kobles på,
+  // når visningen af dem findes (D2/D3). arter kan gives med (testene prøver dem allerede).
+  const JAGT_STILLE = { 1: 'alle', 2: 'alle', 3: 'alle' };
+  function lavJagtRunde(bogstaver, trin, rng, arter) {
     const T = JAGT_TRIN[trin] || JAGT_TRIN[1];
+    const art = (arter || JAGT_STILLE)[trin] || 'alle';
     const pulje = bogstaver.length >= T.samtidig ? bogstaver : RAEKKEFOELGE.slice(0, 8);
     const ud = [];
     let forrige = null;
     for (let i = 0; i < T.lyde; i++) {
+      const sidst = forrige; // lyden, barnet hørte sidst
       let b;
       do { b = vaelg(rng, pulje); } while (b === forrige && pulje.length > 1);
       forrige = b;
+      if (i % 3 === 2) {
+        const midtOrd = art === 'midt' ? ordIGruppe(['B']).filter((o) => o.length === 3 && new Set(o).size === 3 && o.split('').every((x) => pulje.indexOf(x) >= 0)) : [];
+        if (midtOrd.length) {
+          const ord = vaelg(rng, midtOrd.filter((o) => o[1] !== sidst).length ? midtOrd.filter((o) => o[1] !== sidst) : midtOrd);
+          forrige = ord[1];
+          ud.push({ bogstav: ord[1], ord: ord, bobler: bland(rng, ord.split('')), stille: 'midt' });
+        } else if (art === 'raekke' || art === 'midt') {
+          const b2 = vaelg(rng, pulje.filter((x) => x !== b));
+          const lignende = pulje.filter((x) => x !== b && x !== b2 && (ligner(x, b2) || ligner(x, b)));
+          const tredje = vaelg(rng, lignende.length ? lignende : pulje.filter((x) => x !== b && x !== b2));
+          forrige = b2;
+          ud.push({ bogstav: b, raekke: [b, b2], bobler: bland(rng, [b, b2, tredje]), stille: 'raekke' });
+        } else {
+          const lignende = pulje.filter((x) => x !== b && ligner(x, b));
+          const anden = vaelg(rng, lignende.length ? lignende : pulje.filter((x) => x !== b));
+          ud.push({ bogstav: b, bobler: bland(rng, [b, b, anden]), stille: 'alle' });
+        }
+        continue;
+      }
       // Bogstaver, der ligner hinanden (b/d/p, m/n …), kommer gerne med — det er dem, der skal øves
       const andre = bland(rng, pulje.filter((x) => x !== b)).slice(0, T.samtidig - 1);
       ud.push({ bogstav: b, bobler: bland(rng, [b].concat(andre)) });
@@ -688,10 +1216,11 @@
 
   const Dansk = {
     ALFABET, VOKALER, ORD, ORDLISTE, RIM, RAEKKEFOELGE, HOLDELYDE, STOPLYDE, KUN_NAVN, NAVNE, LYDLISTE, SMAAORD, HISTORIER,
-    EMNER, GEN, LYT_TYPER, SKRIFT, SKRIVEVEJ, BOGSTAV_BREDDE, forlaegOrd, vurderSpor, langs,
+    SMAA_HISTORIER, historieRaekke, historieHvorfor, historieSlutning, lavHistorieQuiz, RIM_PAR, FJERN_LYD, DEL_ORD, IKKE_DYR, SLUTNING, HYLDER, RIM_REMSER, LYD_ANTAL, SKIFT_PAR, HVORFOR,
+    EMNER, GEN, LYT_TYPER, BYT_LYD, HAANDSKRIFT_LIGNER, PLACERING_TING, PLACERING_BEHOLDER, SKRIFT, SKRIVEVEJ, BOGSTAV_BREDDE, forlaegOrd, vurderSpor, langs,
     lydId, navnId, lydReserve, rimdel, rimerPaa, rimGruppe, ordIGruppe, ordILinje, undtagelser, ligner,
     lavOpgave, lavRunde, beskrivNoegle, lavRng,
-    JAGT_TRIN, jagtBogstaver, lavJagtRunde, lavBane, banePunkt, strygRammer,
+    JAGT_TRIN, JAGT_STILLE, jagtBogstaver, lavJagtRunde, lavBane, banePunkt, strygRammer,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Dansk;

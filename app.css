@@ -1211,7 +1211,13 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
 
 /* ---------- Ekstra: Klokketorvet (ur og mønter, egen grafik) ---------- */
 .ur-svg { width: clamp(200px, 40vmin, 340px); height: auto; aspect-ratio: 1; display: block; }
-@supports (width: 1cqw) { .ur-ramme .ur-svg { width: min(340px, 64cqw, 70cqh); } }
+@supports (width: 1cqw) { .ur-ramme .ur-svg { width: min(340px, 64cqw, 70cqh); min-width: 142px; } } /* 142 px: tallene er mindst 17 px */
+/* Telefon på langs: hjælpen (fx uret med svaret) står ved siden af opgavens ur — under det ville uret skrumpe */
+@media (orientation: landscape) and (max-height: 500px) {
+  .runde-krop.ur-opgave .visning-panel.med-hjaelp { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); align-items: stretch; }
+  .runde-krop.ur-opgave .visning-panel.med-hjaelp .spoerg-tekst { grid-column: 1 / -1; }
+  .runde-krop.ur-opgave .visning-panel.med-hjaelp .hjaelp-felt { max-height: none; padding: 0 10px 0 0; }
+}
 .ur-svg.lille { width: auto; height: min(140px, 100%); max-width: 100%; }
 .ur-skive { fill: var(--hvid); stroke: var(--farve-1-moerk); stroke-width: 3; }
 .ur-tal { font: 900 12px var(--skrift); fill: var(--tekst); text-anchor: middle; }
@@ -1221,12 +1227,57 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
 .ur-minut { stroke: var(--farve-1-moerk); stroke-width: 3.5; stroke-linecap: round; transition: stroke 0.2s; }
 .ur-time.lyser, .ur-minut.lyser { stroke: var(--guld); stroke-width: 7; }
 .ur-midte { fill: var(--tekst); }
+/* Hjælpen til kvart over/i: en kvart omgang markeres, og de tre tal, der tælles (5, 10, 15), lyser */
+.ur-kvart { fill: var(--guld); opacity: 0.4; }
+/* Tallet lyser med farve og en guld glorie (strøg under fyldet) — samme skriftstørrelse, så 11 og 12 ikke vokser ind i hinanden */
+.ur-tal.lyser { fill: var(--farve-1-moerk); stroke: var(--guld); stroke-width: 3px; stroke-linejoin: round; paint-order: stroke fill; transition: fill 0.2s; }
 .valg-ur .valg-knap { padding: 4px; display: flex; align-items: center; justify-content: center; }
 .valg-tid .valg-knap { font-variant-numeric: tabular-nums; font-size: clamp(34px, 8vmin, 96px); padding-left: 4px; padding-right: 4px; }
 @media (orientation: portrait) and (max-width: 600px) { .valg-tid .valg-knap { font-size: 30px; } } /* «10:30» skal kunne stå i tre knapper side om side */
 .vis-ur { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4vmin; }
 .vis-ur .ur-svg { width: clamp(150px, 22vmin, 190px); } /* tallene skal være mindst 17 px */
 .vis-ur-tid { font-size: clamp(44px, 8vmin, 90px); font-weight: 900; color: var(--farve-1-moerk); font-variant-numeric: tabular-nums; }
+/* Stil viserne: uret med målene er svaret og får pladsen — spørgsmålet (👂) står smalt ved siden af */
+.runde-krop.stil-opgave { grid-template-columns: clamp(170px, 22vw, 260px) minmax(0, 1fr); }
+.runde-krop.stil-opgave .svar-panel { container-type: size; align-items: center; }
+@media (orientation: portrait) {
+  .runde-krop.stil-opgave { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) min(calc(100vw - 32px), 58vh); }
+}
+.stil-ur { position: relative; flex: 0 0 auto; width: min(540px, 88vw, 62vh); aspect-ratio: 1; container-type: inline-size; }
+@supports (width: 1cqw) { .stil-ur { width: min(540px, 100cqw, 100cqh); } }
+.stil-ur .ur-svg { width: 100%; height: 100%; }
+/* Målene ligger oven på tallene 12, 3, 6 og 9 og viser selv tallet (mindst 64 px) */
+.stil-ur .valg-knap.stil-maal {
+  position: absolute;
+  left: calc(var(--x) * 1% - max(32px, 10%));
+  top: calc(var(--y) * 1% - max(32px, 10%));
+  width: max(64px, 20%);
+  height: auto;
+  aspect-ratio: 1;
+  min-height: 0;
+  flex: none;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 5px solid var(--farve-1);
+  border-radius: 50%;
+  font-size: clamp(26px, 6vmin, 56px);
+  font-size: max(26px, 11cqw);
+  line-height: 1;
+  box-shadow: 0 4px 0 var(--farve-1-moerk);
+}
+.stil-ur .valg-knap.stil-maal:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--farve-1-moerk); }
+.stil-ur .valg-knap.stil-maal:focus-visible { outline: 5px solid var(--farve-2-moerk); outline-offset: 3px; } /* ikke urkantens farve */
+/* Hjælpen peger på timetallet under et mål: målet lyser i farve 2 — guld betyder «tryk her» */
+.stil-ur .valg-knap.stil-maal.lyser { border-color: var(--farve-2-moerk); box-shadow: 0 4px 0 var(--farve-2-moerk); }
+.stil-ur .valg-knap.stil-maal.vis-svar { border-color: var(--guld-moerk); box-shadow: 0 4px 0 var(--guld-moerk), 0 0 0 8px rgba(255, 200, 61, 0.45); }
+.stil-ur .valg-knap.stil-maal.rigtig { border-color: var(--rigtig-moerk); box-shadow: 0 4px 0 var(--rigtig-moerk); }
+.stil-ur .valg-knap.stil-maal.forkert { box-shadow: none; }
+/* Under hjælpen hviler målene — men uret, der forklarer, må ikke blegne */
+.runde-krop.stil-opgave .svar-panel.venter { opacity: 1; }
+.runde-krop.stil-opgave .svar-panel.venter .stil-maal:not(.forkert) { opacity: 0.55; }
+.runde-krop.stil-opgave .svar-panel.venter .stil-maal.lyser { opacity: 1; }
 
 .moenter { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: clamp(8px, 2vmin, 20px); max-width: 100%; }
 .moent-plads { display: block; width: clamp(80px, 15vmin, 150px); transition: transform 0.2s, filter 0.2s; }
@@ -1444,7 +1495,9 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
 .bogstav-lille { font-size: 1em; }
 .dansk-billede { display: flex; align-items: center; justify-content: center; gap: clamp(16px, 4vmin, 40px); flex-wrap: wrap; max-width: 100%; }
 .dansk-billede .bogstav-kort { font-size: clamp(72px, 16vmin, 150px); color: var(--farve-1-moerk); background: var(--hvid); border-radius: 28px; padding: 0.1em 0.3em; box-shadow: 0 6px 0 var(--skygge); }
-.dansk-billede.byg { flex-direction: column; gap: clamp(8px, 2vmin, 20px); }
+/* Luften under 👂/billedet skal kunne rumme knappens skygge (8 px) og pulsen (7 %), så den aldrig rører felterne */
+.dansk-billede.byg { flex-direction: column; gap: clamp(20px, 3vmin, 28px); }
+.dansk-billede.byg > .lyt-knap { width: min(240px, 50cqw, 52cqh); height: min(240px, 50cqw, 52cqh); font-size: min(130px, 27cqw, 28cqh); }
 .ord-emoji { border: none; background: var(--hvid); border-radius: 50%; box-shadow: 0 6px 0 var(--skygge), 0 8px 18px var(--skygge); padding: 0; display: flex; align-items: center; justify-content: center; line-height: 1; }
 .ord-emoji.stor { width: clamp(120px, 26vmin, 240px); height: clamp(120px, 26vmin, 240px); font-size: clamp(76px, 17vmin, 160px); }
 .ord-emoji.mellem { width: clamp(84px, 16vmin, 150px); height: clamp(84px, 16vmin, 150px); font-size: clamp(54px, 10vmin, 100px); }
@@ -1537,6 +1590,7 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
 .trin-knap { width: clamp(64px, 11vmin, 104px); height: clamp(64px, 11vmin, 104px); font-size: clamp(30px, 5.4vmin, 52px); }
 .skriv-knap.ok { box-shadow: 0 0 0 5px var(--rigtig), 0 7px 0 var(--farve-2-moerk); }
 .laes-bobler { display: flex; gap: 8px; }
+.laes-videre { display: flex; gap: inherit; } /* ✏️ og 🤔 brydes sammen til næste linje */
 .laes-boble {
   width: 56px; height: 56px; border-radius: 50%; border: 3px dashed var(--farve-1); background: var(--hvid);
   font-size: 28px; display: inline-flex; align-items: center; justify-content: center; padding: 0;
@@ -1561,12 +1615,13 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
   .historie-tegn { min-height: 220px; }
 }
 @media (orientation: landscape) and (max-height: 500px) {
-  .historie-krop { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); padding-bottom: 8px; }
+  /* D1: fire knapper under teksten (▶, boblerne, ✏️ og 🤔) — tekstsiden får lidt mere af bredden */
+  .historie-krop { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); padding-bottom: 8px; }
   .historie-laes { gap: 0; }
   .laes-ord { font-size: 28px; line-height: 1.1; }
-  .laes-knapper { gap: 6px; margin-top: 4px; flex-wrap: nowrap; }
+  .laes-knapper { gap: 4px; margin-top: 4px; flex-wrap: nowrap; }
   .trin-knap { width: 52px; height: 52px; font-size: 26px; }
-  .laes-bobler { gap: 6px; }
+  .laes-bobler { gap: 4px; }
   .laes-boble { width: 52px; height: 52px; font-size: 24px; }
   .laes-boble.voksen { margin-left: 0; }
   .historie-trin { font-size: 20px; }
@@ -1620,7 +1675,8 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
 .soem-prik i { width: 34%; height: 34%; border-radius: 50%; background: #9c9188; box-shadow: 0 2px 0 rgba(0, 0, 0, 0.15); transition: transform 0.1s; }
 .soem-prik:active i { transform: scale(1.3); }
 .soem-prik.valgt i { background: var(--farve-1-moerk); transform: scale(1.25); }
-.soem-prik.foerste i { background: #2fae66; transform: scale(1.5); box-shadow: 0 0 0 5px rgba(47, 174, 102, 0.3); }
+/* Den grønne startprik er en skydeskive (grøn midte, hvid ring, mørkegrøn ring 4,7:1) — en anden form end alle andre prikker */
+.soem-prik.foerste i { background: #2fae66; transform: scale(1.5); box-shadow: 0 0 0 3px var(--hvid), 0 0 0 6px var(--rigtig); }
 .soem-prik.markoer { box-shadow: inset 0 0 0 4px var(--farve-2); }
 .soem-prik.vis-hjoerne i { background: var(--guld); transform: scale(1.5); }
 .soem-prik.vis-hjoerne.valgt i, .soem-prik.vis-hjoerne.foerste i { background: #2fae66; }
@@ -1714,3 +1770,200 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--guld); outline-
   .runde .prik { width: clamp(12px, calc((100vw - 176px) / var(--n, 5) - 3px), 30px); height: clamp(12px, calc((100vw - 176px) / var(--n, 5) - 3px), 30px); border-width: 2px; font-size: clamp(10px, calc((100vw - 176px) / var(--n, 5) * 0.7), 22px); }
   .runde .fremdrift-dyr { font-size: 26px; margin-left: 2px; }
 }
+
+/* =====================================================================
+   D (forslaget 09-10): scener — de nye opgavetyper tegnes af små dele (docs/SCENE.md).
+   Alle mål er gange --u, som app.js sætter (tilpasScener), så scenen fylder sin plads uden at stikke ud.
+   ===================================================================== */
+.scene { --u: 10px; flex: 0 0 auto; width: max-content; display: flex; flex-direction: column; align-items: center; gap: calc(var(--u) * 1.4); }
+.scene-rad { display: flex; align-items: center; justify-content: center; gap: calc(var(--u) * 1.4); }
+.scene-rad > * { flex: 0 0 auto; }
+/* Stak: rækkerne står under hinanden fra venstre, så de kan sammenlignes ting for ting */
+.scene.lag-stak { align-items: flex-start; }
+.sd-tegn.ned { transform: rotate(90deg); }
+.sd-navngivet { display: flex; flex-direction: column; align-items: center; gap: calc(var(--u) * 0.4); }
+.sd-navn { font-size: max(17px, calc(var(--u) * 2.2)); font-weight: 800; line-height: 1.1; color: var(--farve-1-moerk); }
+
+/* Grupper: en ramme om delene — boks, kurv (med hank), kasse (brædder), måtte (til betaling) eller ingen */
+.sd-gruppe { position: relative; display: flex; align-items: center; justify-content: center; gap: calc(var(--u) * 1); min-width: calc(var(--u) * 7); min-height: calc(var(--u) * 7); padding: calc(var(--u) * 1.2); border-radius: calc(var(--u) * 2); transition: box-shadow 0.2s; }
+.sd-gruppe.ramme-boks { background: var(--hvid); border: calc(var(--u) * 0.35) solid var(--farve-1-lys); }
+.sd-gruppe.ramme-kurv { margin-top: calc(var(--u) * 2.4); background: var(--sti-kant); border: calc(var(--u) * 0.45) solid var(--sti); border-top-width: calc(var(--u) * 0.8); border-radius: calc(var(--u) * 0.7) calc(var(--u) * 0.7) calc(var(--u) * 3.2) calc(var(--u) * 3.2); }
+.sd-gruppe.ramme-kurv::before { content: ''; position: absolute; left: 22%; right: 22%; bottom: 100%; height: calc(var(--u) * 2.6); border: calc(var(--u) * 0.45) solid var(--sti); border-bottom: none; border-radius: calc(var(--u) * 3) calc(var(--u) * 3) 0 0; }
+.sd-gruppe.ramme-kasse { background: repeating-linear-gradient(180deg, var(--sti-kant) 0 calc(var(--u) * 2.6), var(--sti) calc(var(--u) * 2.6) calc(var(--u) * 2.8)); border: calc(var(--u) * 0.5) solid var(--sti); border-radius: calc(var(--u) * 0.6); }
+.sd-gruppe.ramme-maatte { background: var(--baggrund-2); border: calc(var(--u) * 0.3) dashed var(--farve-1); border-radius: calc(var(--u) * 2.4); }
+.sd-gruppe.ramme-ingen { min-width: 0; min-height: 0; padding: 0; background: none; border: none; }
+
+/* Ting: rækker af 5 (eller én lang række). Spredt: tydeligt større afstand og lidt i uorden */
+.scene .ting-gruppe { gap: calc(var(--u) * 1.2); flex-wrap: nowrap; }
+.scene .ting-blok { gap: calc(var(--u) * 0.3); padding: 0; }
+.scene .ting-raekke { gap: calc(var(--u) * 0.3); }
+.scene .ting-gruppe .ting { font-size: calc(var(--u) * 4.4); border-radius: 30%; transition: transform 0.2s, box-shadow 0.2s, background 0.2s; }
+.scene .ting-gruppe.spredt .ting-blok, .scene .ting-gruppe.spredt .ting-raekke { gap: calc(var(--u) * 2); }
+.scene .ting-gruppe.spredt .ting:nth-child(2n) { top: calc(var(--u) * 1); }
+.scene .ting-gruppe.spredt .ting:nth-child(3n) { top: calc(var(--u) * -0.8); }
+
+/* Tegn og tal: «?» er det tomme felt, 🔒 et tal der bliver, og den stiplede kant det tal, der skal rettes */
+.sd-tegn { font-size: calc(var(--u) * 5.4); font-weight: 900; line-height: 1; color: var(--farve-2-moerk); }
+.sd-tal { display: inline-flex; align-items: center; justify-content: center; min-width: 1.25em; padding: 0.04em 0.16em; border: calc(var(--u) * 0.45) solid transparent; border-radius: 0.22em; font-size: calc(var(--u) * 6); font-weight: 900; line-height: 1.05; color: var(--tekst); transition: box-shadow 0.2s; }
+.sd-tal.hul { border-style: dashed; border-color: var(--farve-2-moerk); background: var(--papir); color: var(--farve-2-moerk); } /* kanten mindst 3:1 */
+.sd-tal.ret { border-style: dashed; border-color: var(--farve-1-moerk); background: var(--hvid); }
+.sd-laas { align-self: flex-start; margin-left: 0.08em; font-size: max(17px, calc(var(--u) * 2.4)); font-style: normal; line-height: 1; }
+
+/* Pladser: et hus med en række værelser under et tag */
+.sd-hus { display: flex; flex-direction: column; align-items: stretch; border-radius: calc(var(--u) * 1); transition: box-shadow 0.2s; }
+.hus-tag { display: block; height: calc(var(--u) * 3.4); background: var(--farve-2); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.hus-rum { display: flex; gap: calc(var(--u) * 0.4); margin: 0 calc(var(--u) * 0.8); padding: calc(var(--u) * 0.6); background: var(--sti-kant); border: calc(var(--u) * 0.35) solid var(--sti); border-top: none; border-radius: 0 0 calc(var(--u) * 1) calc(var(--u) * 1); }
+.plads { position: relative; display: flex; align-items: center; justify-content: center; width: calc(var(--u) * 5.6); height: calc(var(--u) * 5.6); border-radius: calc(var(--u) * 1); background: var(--hvid); font-size: calc(var(--u) * 3.8); line-height: 1; box-shadow: inset 0 calc(var(--u) * -0.3) 0 var(--skygge); transition: transform 0.2s, box-shadow 0.2s, background 0.2s; }
+
+/* Tierstænger og enere: samme klodser, målt i --u. Rammen om ti enere er lige så høj som en tierstang */
+.scene .staenger { --k: calc(var(--u) * 1.6); gap: calc(var(--u) * 0.7); }
+.scene .stang { padding: calc(var(--u) * 0.25); gap: calc(var(--u) * 0.15); border-radius: calc(var(--u) * 0.6); }
+.scene .enere { margin-left: calc(var(--u) * 0.5); padding: calc(var(--u) * 0.25) 0; gap: calc(var(--u) * 0.15); border-radius: calc(var(--u) * 0.6); transition: box-shadow 0.2s; }
+.scene .stang .klods, .scene .enere .klods { border-radius: calc(var(--u) * 0.3); }
+.sd-ti { display: flex; margin-left: calc(var(--u) * 0.5); padding: 0 calc(var(--u) * 0.3); border: calc(var(--u) * 0.25) dashed var(--farve-2-moerk); border-radius: calc(var(--u) * 0.6); transition: box-shadow 0.2s, background 0.2s; }
+.scene .sd-ti .enere { margin-left: 0; }
+
+/* Mønsterrækken: brikkerne i én række (en lang frise evt. i to), pilen viser, hvor mønstret begynder */
+.sd-raekke { display: flex; align-items: center; justify-content: center; gap: calc(var(--u) * 0.6); }
+.sd-raekke.to-rader { flex-wrap: wrap; row-gap: calc(var(--u) * 1); }
+.sd-raekke.frise.to-rader { width: calc(var(--u) * (6.6 * var(--halv, 2) + 4.8)); justify-content: flex-start; padding-left: calc(var(--u) * 4.4); }
+.sd-raekke.frise.to-rader .sd-pil { margin-left: calc(var(--u) * -4.4); }
+/* Stak vendt til søjler (to lange rækker på en smal skærm): tingene står parvis ud for hinanden, fra toppen */
+.scene.lodret .scene-rad { align-items: flex-start; }
+.scene.lodret .ting-gruppe.linje .ting-raekke { flex-direction: column; }
+.scene .brik-celle { width: calc(var(--u) * 6); height: calc(var(--u) * 6); border-width: calc(var(--u) * 0.3); border-radius: calc(var(--u) * 1.4); font-size: calc(var(--u) * 3.8); transition: transform 0.2s, background 0.2s, border-color 0.2s; }
+.sd-pakke { display: contents; }
+.sd-pil { display: block; width: calc(var(--u) * 4); height: calc(var(--u) * 4); margin-right: calc(var(--u) * 0.2); }
+.sd-pil svg { display: block; width: 100%; height: 100%; }
+.sd-pil-form { fill: var(--farve-2-moerk); }
+
+/* Mønter (mindst 80 px, så tallet på mønten er mindst 17 px), varen med pris, det digitale ur og figurerne */
+.scene .moenter { gap: calc(var(--u) * 1); flex-wrap: nowrap; }
+.scene .moent-plads { width: max(80px, calc(var(--u) * 8)); }
+.scene .koeb-vare { gap: calc(var(--u) * 0.5); border-radius: calc(var(--u) * 1.4); transition: box-shadow 0.2s; }
+.scene .koeb-emoji { font-size: calc(var(--u) * 7); }
+.scene .koeb-pris { font-size: max(17px, calc(var(--u) * 3)); padding: 0.04em 0.4em; border-width: calc(var(--u) * 0.3); border-radius: 0.4em; }
+.sd-digital-ur { display: inline-flex; align-items: center; padding: calc(var(--u) * 0.8) calc(var(--u) * 1.8); border: calc(var(--u) * 0.6) solid var(--farve-1-moerk); border-radius: calc(var(--u) * 1.6); background: var(--tekst); box-shadow: 0 calc(var(--u) * 0.5) 0 var(--skygge); transition: box-shadow 0.2s; }
+.sd-digital-tal { font-size: calc(var(--u) * 6.4); font-weight: 900; line-height: 1; letter-spacing: 0.04em; color: var(--farve-1-lys); font-variant-numeric: tabular-nums; }
+.sd-figur { display: block; width: calc(var(--u) * 8); height: calc(var(--u) * 8); transition: transform 0.2s, filter 0.2s; }
+
+/* Puslespil og brikker: 100 (et kvadrats side) = 15 --u. Samme målestok på opgaven og svarkortene */
+.sd-pusle, .sd-brik { display: block; width: calc(var(--u) * var(--vb-b) * 0.15); height: calc(var(--u) * var(--vb-h) * 0.15); }
+.sd-pusle svg, .sd-brik svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.pusle-bakke { fill: var(--sti-kant); stroke: var(--sti); stroke-width: 3; }
+.brik-fyld { fill: var(--form-1); stroke: var(--skygge-stor); stroke-width: 3; stroke-linejoin: round; }
+.pusle-hul { fill: var(--papir); stroke: var(--farve-2-moerk); stroke-width: 3; stroke-dasharray: 9 6; stroke-linejoin: round; transition: fill 0.2s; }
+
+/* Hjælpen «lys»: det, der tales om, lyser guld — i opgavefeltet og på svarkortene */
+.sd-gruppe.lyser, .sd-hus.lyser, .sd-ti.lyser, .scene .enere.lyser, .scene .stang.lyser, .sd-digital-ur.lyser, .sd-tal.lyser, .scene .koeb-vare.lyser { box-shadow: 0 0 0 calc(var(--u) * 0.5) var(--guld), 0 0 calc(var(--u) * 1.4) var(--guld); }
+.sd-ti.lyser { background: var(--papir); }
+.scene .ting.lyser, .plads.lyser { background: var(--guld); box-shadow: 0 0 0 calc(var(--u) * 0.3) var(--guld-moerk); }
+.sd-pakke.lyser > .brik-celle { border-color: var(--guld-moerk); background: var(--guld); transform: translateY(calc(var(--u) * -0.5)); }
+.sd-figur.lyser, .scene .moent-plads.lyser { filter: drop-shadow(0 0 calc(var(--u) * 0.6) var(--guld)) drop-shadow(0 0 2px var(--guld-moerk)); transform: scale(1.08); }
+.pusle-hul.lyser { fill: var(--guld); stroke: var(--guld-moerk); stroke-width: 5; }
+
+/* Svarkort med små scener: kortene fylder svarpanelet; scenen inden i tilpasses kortet */
+.runde .valg-scene .valg-knap { flex: 1 1 0; min-height: 0; max-height: 300px; padding: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+/* Scenerne måles i deres naturlige størrelse — de må ikke gøre gitterets kolonne bredere end skærmen */
+.runde-krop.scene-opgave .svar-panel { min-width: 0; }
+/* Under hjælpen hviler kortene — men et kort, hvor noget lyser, må ikke blegne */
+.runde-krop.scene-opgave .svar-panel.venter { opacity: 1; }
+.runde-krop.scene-opgave .svar-panel.venter .valg-knap:not(.forkert):not(.har-lys):not(.lytter) { opacity: 0.55; }
+@media (orientation: portrait) {
+  .runde .valg-scene .valg-knap { height: clamp(150px, 22vh, 250px); max-height: none; }
+}
+/* Telefon på langs: svarkortene får halvdelen af bredden og står side om side */
+@media (orientation: landscape) and (max-height: 500px) {
+  .runde-krop.scene-opgave { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .runde .valg.valg-scene { flex-direction: row; }
+  .runde .valg-scene .valg-knap { max-height: none; align-self: stretch; }
+}
+/* «Vis svaret» på et scenekort (svar-ramme, sat af app.js): guldet bliver en tyk ramme om en lys flade, så
+   indholdet altid kan ses (også gule tierstænger) — og rammen bliver grøn, når barnet trykker. Rammen tager plads
+   (padding), så scenen tilpasses den indre flade (ResizeObserver). Kortet pulserer med ringen i stedet for at
+   vokse — et bredt kort må ikke stikke ud over skærmen */
+.runde .valg-scene .valg-knap.svar-ramme { position: relative; padding: 12px; }
+.runde .valg-scene .valg-knap.svar-ramme::before { content: ''; position: absolute; inset: 12px; border-radius: calc(var(--radius) - 10px); background: var(--hvid); }
+.runde .valg-scene .valg-knap.svar-ramme > .scene { position: relative; }
+.runde .valg-scene .valg-knap.vis-svar { animation-name: pulsRing; }
+/* «Store» kort til høje scener (tierstænger) — app.js vælger det, når det giver størst indhold:
+   iPad på langs: kortene side om side i en bredere kolonne · højkant: højere kort */
+@media (orientation: landscape) and (min-height: 501px) {
+  .runde-krop.scene-opgave.kort-store { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); }
+  .runde-krop.kort-store .valg.valg-scene { flex-direction: row; align-items: center; }
+  .runde-krop.kort-store .valg-scene .valg-knap { height: 100%; max-height: 480px; }
+}
+@media (orientation: portrait) {
+  .runde-krop.kort-store .valg-scene .valg-knap { height: clamp(150px, 40vh, 480px); }
+}
+/* Brede kort (fx en mønsterrække) stables under hinanden — også på højkant og på telefonen på langs */
+.runde .valg.valg-scene.kort-stak { flex-direction: column; }
+@media (orientation: portrait) {
+  .runde .valg-scene.kort-stak .valg-knap { flex: 0 0 auto; width: 100%; height: clamp(84px, 12vh, 150px); }
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  .runde .valg-scene.kort-stak .valg-knap { align-self: auto; width: 100%; }
+}
+
+/* Tegnebyen (D): opskriften (et ben pr. linje) ved siden af prikgitteret — over det på højkant */
+.rute-felt { display: flex; align-items: center; justify-content: center; gap: clamp(12px, 3vmin, 36px); max-width: 100%; }
+.rute-opskrift { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-start; gap: clamp(6px, 1.2vmin, 12px); }
+.rute-ben { display: flex; gap: 2px; padding: 2px 10px; border: 3px solid var(--farve-1-lys); border-radius: 16px; background: var(--hvid); transition: background 0.2s, border-color 0.2s; }
+.rute-ben.nu { border-color: var(--guld-moerk); background: var(--guld); }
+.rute-pil { font-size: clamp(30px, 5.6vmin, 50px); line-height: 1.15; }
+@media (orientation: portrait) { .rute-felt { flex-direction: column; } .rute-opskrift { align-items: center; } }
+.rute-guide { fill: none; stroke: var(--guld); stroke-width: 10; stroke-dasharray: 12 10; stroke-linecap: round; stroke-linejoin: round; }
+.rute-braet .soem-prik:disabled { cursor: default; }
+/* Prikkerne, man kan gå til: hule ringe i tema-farve 2 — aldrig grønne og fyldte som startprikken */
+.rute-braet .soem-prik.aktiv i { background: var(--hvid); transform: scale(1.4); box-shadow: inset 0 0 0 3px var(--farve-2-moerk), 0 0 0 5px var(--farve-2-lys); }
+
+/* ---------- D1 (dansk): i/på, trykt og håndskrevet, ret bogstavet, huskekort ---------- */
+/* Små ord: beholderen i tre lag (bagside, tingen, forside) — tingen er inde i, oven på eller bag (forskudt til siden). Bredde 128:110 som viewBox */
+.sd-placering { position: relative; display: block; width: calc(var(--u) * 23.04); height: calc(var(--u) * 19.8); transition: filter 0.2s; }
+.sd-placering svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.plac-ting { position: absolute; left: 50%; transform: translateX(-50%); font-size: calc(var(--u) * 7.5); line-height: 1; }
+.plac-krop { fill: var(--sti-kant); stroke: var(--sti); stroke-width: 3; stroke-linejoin: round; }
+.plac-inde { fill: var(--sti); }
+.plac-laag { fill: var(--sti); stroke: var(--sti); stroke-width: 2; }
+.plac-hank { fill: none; stroke: var(--sti); stroke-width: 5; stroke-linecap: round; }
+.plac-flet { stroke: var(--sti); stroke-width: 2; opacity: 0.6; }
+.beholder-skaal .plac-krop { fill: var(--farve-1-lys); stroke: var(--farve-1-moerk); }
+.beholder-skaal .plac-inde { fill: var(--farve-1); }
+.beholder-skaal .plac-laag { fill: var(--farve-1); stroke: var(--farve-1-moerk); }
+.sd-placering svg.lyser { filter: drop-shadow(0 0 4px var(--guld)) drop-shadow(0 0 3px var(--guld)) drop-shadow(0 0 1px var(--guld-moerk)); }
+
+/* Det trykte bogstav (systemets skrift — a med to etager) og det håndskrevne ved siden af (hjælpen) */
+.trykt-bogstav { font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif; font-size: clamp(110px, 24vmin, 240px); font-size: min(240px, 42cqw, 62cqh); font-weight: 600; line-height: 1; color: var(--farve-1-moerk); background: var(--hvid); border-radius: 28px; padding: 0.06em 0.3em 0.16em; box-shadow: 0 6px 0 var(--skygge); }
+.skrevet-felt { display: block; height: clamp(110px, 26vmin, 250px); height: min(250px, 66cqh, 40cqw); padding: 6px 4px; border-radius: 28px; background: var(--hvid); box-shadow: 0 6px 0 var(--skygge); }
+.skrevet-felt .haandskrift-svg { display: block; height: 100%; width: auto; aspect-ratio: 64 / 94; }
+.haandskrift-streg { fill: none; stroke: var(--tekst); stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
+.skrevet-felt .haandskrift-streg { stroke: var(--farve-1-moerk); }
+.valg-haandskrift .valg-knap { display: flex; align-items: center; justify-content: center; padding: 6px; }
+.valg-haandskrift .haandskrift-svg { display: block; height: 84%; max-height: 150px; width: auto; aspect-ratio: 64 / 94; }
+.valg-knap.rigtig .haandskrift-streg { stroke: var(--hvid); }
+
+/* Ret bogstavet: brikken, der skal rettes, har en stiplet ring; det rettede bogstav bliver grønt */
+.ord-bogstav.ret, .ord-bogstav.rettet { position: relative; }
+/* Plads til ringen (7 px uden for brikken), så den ikke dækker nabobrikkerne — også når bogstavet er rettet (intet hop) */
+.ord-bogstav.ret, .ord-bogstav.rettet { margin: 0 6px; }
+.ord-bogstav.ret::after { content: ''; position: absolute; inset: -7px; border: 4px dashed var(--farve-2-moerk); border-radius: 24px; pointer-events: none; }
+.ord-bogstav.rettet { background: var(--rigtig); color: var(--hvid); }
+
+/* Huskekort: billedet på forsiden, et mønster på bagsiden. Kortene vendes på stedet (ingen flytning) */
+.valg-skjult .valg-knap { position: relative; padding: 0; overflow: hidden; perspective: 600px; }
+.vende-kort { position: absolute; inset: 0; display: block; }
+.vende-for, .vende-bag { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; border-radius: inherit; -webkit-backface-visibility: hidden; backface-visibility: hidden; transition: transform 0.45s ease-in-out; }
+.vende-bag { transform: rotateY(-180deg); background: repeating-linear-gradient(45deg, var(--farve-1) 0 14px, var(--farve-1-moerk) 14px 28px); color: var(--hvid); font-size: clamp(40px, 8vmin, 72px); font-weight: 900; }
+.valg.vendt .vende-for { transform: rotateY(180deg); }
+.valg.vendt .vende-bag { transform: rotateY(0deg); }
+
+/* Historiebogen (D1): «🤔 Hvad skete der?» — nummererede pladser, billedbrikker og en rolig afslutning */
+.byg-felter.nummereret .byg-felt { min-width: clamp(72px, 13vmin, 120px); height: clamp(72px, 13vmin, 120px); font-size: clamp(40px, 8vmin, 76px); }
+.byg-felter.nummereret .byg-felt:empty::before { content: attr(data-nr); font-size: clamp(28px, 5vmin, 44px); font-weight: 900; color: var(--farve-1); }
+.byg-brik.billede { min-width: clamp(72px, 13vmin, 120px); height: clamp(72px, 13vmin, 120px); font-size: clamp(40px, 8vmin, 72px); }
+.byg-brik.lyser { box-shadow: 0 0 0 6px var(--guld), 0 6px 0 var(--skygge); background: var(--papir); }
+.quiz-slut-midte { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(10px, 3vmin, 28px); padding: 16px; }
+.quiz-slut-e { font-size: clamp(80px, 18vmin, 160px); line-height: 1; }
+.quiz-slut-tekst { font-size: clamp(30px, 6vmin, 56px); font-weight: 900; color: var(--farve-1-moerk); }
+.quiz-slut .stor-knap { position: static; margin: 0; }
+.rute-braet .soem-prik.vis-hjoerne:not(.valgt) i { background: var(--guld); } /* «vis svaret»: den næste prik er guld, også når den kan trykkes */

@@ -24,7 +24,8 @@
   // Tal i et led: 3 → «3», −3 → «(−3)» når det står efter et regnetegn
   const led = (n) => (n < 0 ? par(mn(n)) : mn(n));
   // «+ 3» eller «− 3» (fortegn som regnetegn)
-  const plusLed = (n) => (n < 0 ? mo('−') + '<mn>' + Math.abs(n) + '</mn>' : mo('+') + '<mn>' + n + '</mn>');
+  // Et led «+ n» / «− n». Et nul-led skrives ikke (E #6: «y = 20x + 0» → «y = 20x»)
+  const plusLed = (n) => (n === 0 ? '' : n < 0 ? mo('−') + '<mn>' + Math.abs(n) + '</mn>' : mo('+') + '<mn>' + n + '</mn>');
   function broek(t, n) {
     // forkortet brøk som MathML; heltal vises uden brøkstreg
     const g = gcd(Math.abs(t), Math.abs(n)) || 1;
