@@ -694,10 +694,13 @@
               kanFortryde ? h('button', { class: 'voksen-valg-knap', type: 'button', onclick: fortrydIndlaesning }, '↩️ Fortryd seneste indlæsning') : null)))));
     }
 
-    // Stemme: de danske stemmer på enheden med «Prøv». Valget gemmes som stemmens navn (findes den ikke længere,
-    // vælges der automatisk: «Premium/Enhanced/Forbedret» → ikke «compact» → lokal → første danske).
+    // Stemme: Lystårnets stemme (Piper-filerne i tale/, når de findes) øverst, derunder de danske stemmer på enheden
+    // med «Prøv». Valget gemmes som stemmens navn; tomt = Lystårnets stemme, eller uden filer et automatisk valg
+    // (findes den valgte ikke længere, også): «Premium/Enhanced/Forbedret» → ikke «compact» → lokal → første danske.
     function stemmeSektion() {
       const LK = window.Lydklip;
+      const P = ctx.Piper;
+      const harPiper = !!(P && P.findes && P.findes());
       const alle = Tale.findes ? (window.speechSynthesis.getVoices() || []) : [];
       const da = LK ? LK.danskeStemmer(alle) : [];
       const auto = LK ? LK.vaelgStemme(alle, null) : null;
@@ -707,6 +710,7 @@
       }
       const proev = (v) => {
         Lyd.init();
+        if (Tale.stopPiper) Tale.stopPiper(); // en Piper-prøve, der kører, stopper
         try {
           window.speechSynthesis.cancel();
           const u = new SpeechSynthesisUtterance('Hej! Jeg hedder ' + (v ? v.name.replace(/\s*\(.*\)\s*/g, '') : 'Lystårnet') + '. Tre og to er fem.');
@@ -714,21 +718,42 @@
           window.speechSynthesis.speak(u);
         } catch (e) { /* ingen tale */ }
       };
+      // Lystårnets stemme: den første faste sætning, der findes helt som filer. Spilles direkte fra filerne (ikke
+      // Tale.sig), så prøven lyder af Piper, også når en enhedsstemme er valgt, eller Oplæsning er slået fra.
+      const PIPER_PROEVER = ['Hej! Jeg læser opgaverne højt.', 'Hej! Tre og to er fem.', 'Hvor mange er der i alt?'];
+      const proevPiper = () => {
+        Lyd.init();
+        const s = PIPER_PROEVER.find((x) => window.Talefiler.enheder(x).every((e) => P.noegle(e)));
+        if (!s) { proev(auto); return; }
+        Tale.stop();
+        Tale.spilPiper(s, () => {}, false);
+      };
+      // Hvor meget af stemmen er hentet til brug uden net (Piper.hentAlle i app.js tæller op i baggrunden)
+      const tal = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+      const statusTekst = () => (P.status
+        ? 'Stemmen er hentet til brug uden net: ' + tal(P.status.hentet) + ' af ' + tal(P.status.iAlt)
+        : 'Stemmen hentes, når den bruges.');
+      const status = harPiper && P.slaaetTil() ? h('p', { class: 'voksen-hjaelp stemme-status' }, statusTekst()) : null;
+      if (status) {
+        const t = setInterval(() => { if (!document.body.contains(status)) { clearInterval(t); return; } status.textContent = statusTekst(); }, 2000);
+      }
       const vaelg = (navn) => {
         voksen.stemme = navn;
         gemV();
         if (Tale.opdaterStemmer) Tale.opdaterStemmer();
         visIndstillinger();
       };
-      const raekke = (navn, label, v) => h('div', { class: 'stemme-raekke' },
+      const raekke = (navn, label, proevFn) => h('div', { class: 'stemme-raekke' },
         h('button', { class: 'voksen-valg-knap stemme-valg' + ((voksen.stemme || null) === navn ? ' valgt' : ''), type: 'button', 'aria-pressed': (voksen.stemme || null) === navn ? 'true' : 'false', onclick: () => { Lyd.init(); Lyd.tryk(); vaelg(navn); } }, label),
-        h('button', { class: 'voksen-valg-knap stemme-proev', type: 'button', onclick: () => proev(v) }, '🔊 Prøv'));
+        h('button', { class: 'voksen-valg-knap stemme-proev', type: 'button', onclick: proevFn }, '🔊 Prøv'));
+      const foerste = harPiper ? raekke(null, 'Lystårnets stemme (anbefalet)', proevPiper)
+        : da.length ? raekke(null, 'Automatisk' + (auto ? ' (' + auto.name + ')' : ''), () => proev(auto)) : null;
       return h('section', null, h('h2', null, 'Stemme'),
-        da.length
-          ? h('div', { class: 'stemme-liste' },
-            raekke(null, 'Automatisk' + (auto ? ' (' + auto.name + ')' : ''), auto),
-            da.map((v) => raekke(v.name, v.name + (v.localService ? '' : ' (kræver net)'), v)))
-          : h('p', null, 'Der er ingen danske stemmer på denne enhed endnu. På iPad: Indstillinger → Tilgængelighed → Talt indhold → Stemmer → Dansk. Hent en stemme, hvor der står «Forbedret» eller «Premium».'),
+        foerste ? h('div', { class: 'stemme-liste' },
+          foerste,
+          da.map((v) => raekke(v.name, v.name + (v.localService ? '' : ' (kræver net)'), () => proev(v)))) : null,
+        status,
+        da.length ? null : h('p', null, 'Der er ingen danske stemmer på denne enhed endnu. På iPad: Indstillinger → Tilgængelighed → Talt indhold → Stemmer → Dansk. Hent en stemme, hvor der står «Forbedret» eller «Premium».'),
         h('p', { class: 'voksen-hjaelp' }, 'Bogstavlyde siges aldrig af stemmen — de kommer fra 🎙️ Indtal (ellers siger spillet «lyden i sol»).'));
     }
 
@@ -848,7 +873,7 @@
         const typer = O.EMNER[emne].niveauer[niveau];
         let o;
         let f = 0;
-        do { o = O.lavOpgave(O.vaelg(r, typer), niveau, r, null); f++; } while (!o.valg && f < 20);
+        do { o = O.puljeOpgave(O.vaelg(r, typer), niveau, r, null); f++; } while (!o.valg && f < 20); // fast pulje (Piper)
         barnFelt.textContent = '';
         const vis = h('div', { class: 'visning duel-visning' });
         vis.append(tegnVisning(o));

@@ -6,7 +6,7 @@
   'use strict';
 
   const O = (typeof module !== 'undefined' && module.exports) ? require('./opgaver.js') : root.Opgaver;
-  const { lavRng, heltal, vaelg, bland } = O;
+  const { lavRng, heltal, vaelg, bland, puljeFroe, puljeNr } = O;
 
   const ALFABET = 'abcdefghijklmnopqrstuvwxyzæøå'.split('');
   const VOKALER = 'aeiouyæøå';
@@ -941,7 +941,7 @@
     const ud = [], brugt = {};
     for (let i = 0; ud.length < antal && i < 200; i++) {
       const [g, t] = plan[ud.length];
-      const o = g(t, rng);
+      const o = g(t, lavRng(puljeFroe('quiz:' + (g.name || 'historie'), t, puljeNr(rng)))); // fast pulje (Piper)
       const hist = o.noegle.split(':')[1]; // samme id i to slags opgaver er også en gentagelse (review, fund 3) — strengt,
       // for nogle id'er (kage, regn, tog) er forskellige historier i hver bank; harmløst: der er altid nok
       if (brugt[hist]) continue;
@@ -1117,6 +1117,8 @@
     'rimRemse', 'taelLyde', 'fjernLyd', 'rimPar', 'lydTog', 'rimHave', 'fortaelleBro'];
 
   function lavOpgave(type, niveau, rng) { return GEN[type](niveau, rng); }
+  // Fast pulje som i opgaver.js (Piper-stemmen): rng vælger nummeret, opgaven laves med sit eget frø
+  function puljeOpgave(type, niveau, rng) { return lavOpgave(type, niveau, lavRng(puljeFroe('dansk:' + type, niveau, puljeNr(rng)))); }
 
   function lavRunde(emneId, niveau, rng, opts) {
     opts = opts || {};
@@ -1132,7 +1134,7 @@
       forsoeg++;
       if (!koe.length) koe = bland(rng, typer);
       const type = koe.shift();
-      const o = lavOpgave(type, niveau, rng);
+      const o = puljeOpgave(type, niveau, rng);
       if (brugte[o.noegle] && forsoeg < 400) continue;
       brugte[o.noegle] = true;
       runde.push(o);
@@ -1557,7 +1559,7 @@
     SMAA_HISTORIER, historieRaekke, historieHvorfor, historieSlutning, lavHistorieQuiz, RIM_PAR, FJERN_LYD, DEL_ORD, IKKE_DYR, SLUTNING, HYLDER, RIM_REMSER, LYD_ANTAL, SKIFT_PAR, HVORFOR,
     EMNER, GEN, LYT_TYPER, BYT_LYD, HAANDSKRIFT_LIGNER, PLACERING_TING, PLACERING_BEHOLDER, SKRIFT, SKRIVEVEJ, BOGSTAV_BREDDE, forlaegOrd, vurderSpor, langs,
     lydId, navnId, lydReserve, rimdel, rimerPaa, rimGruppe, ordIGruppe, ordILinje, undtagelser, ligner,
-    lavOpgave, lavRunde, beskrivNoegle, lavRng,
+    lavOpgave, puljeOpgave, lavRunde, beskrivNoegle, lavRng,
     JAGT_TRIN, JAGT_STILLE, jagtBogstaver, jagtMidtOrd, lavJagtRunde, lavBane, banePunkt, strygRammer,
     // C · minispil
     BILLEDE, LYDTOG_ORD, LYDTOG_KLIP, LYDTOG_BYT, vognKort, trinvisPasser, SPOR_TEGN, SPOR_MODEL, TAL_SKRIFT, TAL_LIGNER, sporModel,

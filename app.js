@@ -483,7 +483,98 @@
     },
   };
 
-  // ---------- Oplæsning (speechSynthesis, dansk) ----------
+  // ---------- Piper-stemmen som lydfiler (Jimmy 12-10-2026: «piper stemmen er mega god brug den») ----------
+  // tale/liste.json = { nøgle: ms } og tale/<ab>/<nøgle>.mp3 laves af vaerktoej/lav-tale.js. Tale.sig deler teksten i
+  // sætninger (talefiler.js) og spiller dem, der findes som fil, på spillets AudioContext; resten siges med
+  // talesyntesen som før. Bruges, når den voksne ikke har valgt en bestemt stemme (voksen.stemme tom = «Automatisk»).
+  const Piper = {
+    liste: null,         // { nøgle: ms }, når tale/liste.json er hentet
+    bufre: new Map(),    // nøgle → AudioBuffer (højst 80; den ældste ryger ud)
+    henter: new Map(),   // nøgle → løfte, mens filen hentes og afkodes
+    indlaes() {
+      if (!/^https?:$/.test(location.protocol) || !window.Talefiler) return Promise.resolve();
+      return fetch('tale/liste.json').then((r) => (r.ok ? r.json() : {}))
+        .then((l) => { this.liste = l && typeof l === 'object' && !Array.isArray(l) ? l : {}; })
+        .catch(() => { this.liste = {}; });
+    },
+    // window.__ingenPiper: e2e-delene, der lytter efter den falske stemmes tekst-log (test/test-e2e.js)
+    slaaetTil() { return !!this.liste && !voksen.stemme && !!window.Talefiler && !window.__ingenPiper; },
+    // Filerne findes (uanset den voksnes valg) — voksendelen viser så «Lystårnets stemme» øverst
+    findes() { return !!this.liste && Object.keys(this.liste).length > 0 && !!window.Talefiler && !window.__ingenPiper; },
+    // window.__taleUdenFil: e2e-delen «piper» samler de sætninger, der blev sagt uden fil
+    noter(tekst) {
+      if (!window.__taleUdenFil || !this.slaaetTil() || !Lyd.ctx) return;
+      for (const e of window.Talefiler.enheder(tekst)) if (!this.noegle(e)) window.__taleUdenFil.push(e);
+    },
+    noegle(enhed) { const n = window.Talefiler.noegle(enhed); return this.liste && Object.prototype.hasOwnProperty.call(this.liste, n) ? n : null; },
+    // Mindst én sætning har en fil, og lyden er låst op (efter første tryk) — ellers talesyntesen som før
+    // Lydkanalen skal køre: på iOS kan den være 'suspended'/'interrupted' (opkald, lydløs) — så taler enhedens stemme
+    // (review 12-10, fund 7)
+    kan(tekst) { return this.slaaetTil() && !!Lyd.ctx && (!Lyd.ctx.state || Lyd.ctx.state === 'running') && window.Talefiler.enheder(tekst).some((e) => this.noegle(e)); },
+    // Piper er i brug, og listen er hentet. Alle puljens sætninger har en fil (test-tale), så «hør og find» kan bruges
+    // uden en dansk stemme på enheden. (Gamle «gentag»-opgaver fra før puljen kan mangle filer — de siges med enhedens stemme.)
+    klar() { return this.slaaetTil() && Object.keys(this.liste).length > 0; },
+    buffer(n) {
+      if (this.bufre.has(n)) { const b = this.bufre.get(n); this.bufre.delete(n); this.bufre.set(n, b); return Promise.resolve(b); }
+      if (this.henter.has(n)) return this.henter.get(n);
+      const ctx = Lyd.ctx;
+      const p = fetch(window.Talefiler.sti(n)).then((r) => (r.ok ? r.arrayBuffer() : null))
+        .then((ab) => (ab && ctx ? new Promise((res, rej) => { const q = ctx.decodeAudioData(ab, res, rej); if (q && q.then) q.then(res, rej); }) : null))
+        .then((b) => {
+          this.henter.delete(n);
+          if (b) { this.bufre.set(n, b); if (this.bufre.size > 80) this.bufre.delete(this.bufre.keys().next().value); }
+          return b;
+        }, () => { this.henter.delete(n); return null; });
+      this.henter.set(n, p);
+      // Et svar, der aldrig kommer, må ikke gøre sætningen tavs for altid: efter 8 s prøves der forfra næste gang
+      setTimeout(() => { if (this.henter.get(n) === p) this.henter.delete(n); }, 8000);
+      return p;
+    },
+    // Højst ms på en fil — ellers null (så taler enhedens stemme). Fejl giver også null.
+    medFrist(p, ms) { return Promise.race([p.then((b) => b, () => null), new Promise((r) => setTimeout(() => r(null), ms))]); },
+    // Hent hele stemmen i baggrunden til brug uden net — roligt (to ad gangen) og kun, mens siden er synlig og online.
+    // Filerne lægges i service workerens tale-cache (sw.js: mat-tale). status = { hentet, i_alt } til voksendelen.
+    status: null,
+    async hentAlle() {
+      // Kun når stemmen bruges (ikke med en valgt enhedsstemme eller uden oplæsning) — review 12-10, fund 4
+      if (!this.liste || typeof caches === 'undefined' || this.henterAlle || !this.slaaetTil() || !voksen.tale) return;
+      this.henterAlle = true;
+      try {
+        const c = await caches.open('mat-tale');
+        const gemte = await c.keys();
+        const har = new Set(gemte.map((r) => r.url.slice(r.url.lastIndexOf('/') + 1, -4)));
+        // Filer, der ikke står i listen (en gammel stemme eller fart), fjernes fra cachen (review 12-10, fund 5)
+        for (const r of gemte) { const n = r.url.slice(r.url.lastIndexOf('/') + 1, -4); if (!Object.prototype.hasOwnProperty.call(this.liste, n)) await c.delete(r); }
+        const mangler = Object.keys(this.liste).filter((n) => !har.has(n));
+        const iAlt = Object.keys(this.liste).length;
+        this.status = { hentet: iAlt - mangler.length, iAlt: iAlt };
+        // Styrer service workeren siden, gemmer den selv filen (sw.js) — ellers gør siden det. Første fejl ved gemning
+        // (fx fuld kvote) stopper det hele, så der ikke hentes 66 MB, der ikke kan gemmes.
+        const swGemmer = !!(navigator.serviceWorker && navigator.serviceWorker.controller);
+        let stop = false;
+        const arbejder = async () => {
+          while (mangler.length && !stop) {
+            if (document.hidden || navigator.onLine === false) { await new Promise((r) => setTimeout(r, 5000)); continue; }
+            const n = mangler.shift();
+            let svar = null;
+            try { svar = await fetch(window.Talefiler.sti(n)); } catch (e) { continue; } // prøves næste gang
+            if (!svar || !svar.ok) continue;
+            if (!swGemmer) { try { await c.put(window.Talefiler.sti(n), svar); } catch (e) { stop = true; break; } }
+            this.status.hentet++;
+          }
+        };
+        await Promise.all([arbejder(), arbejder()]);
+      } catch (e) { /* uden Cache API: filerne hentes, når de bruges */ }
+      this.henterAlle = false;
+    },
+    // Hent og afkod på forhånd (næste opgave), så talen starter uden ventetid
+    forhent(tekst) {
+      if (!tekst || !this.slaaetTil() || !Lyd.ctx) return;
+      for (const e of window.Talefiler.enheder(tekst)) { const n = this.noegle(e); if (n) this.buffer(n); }
+    },
+  };
+
+  // ---------- Oplæsning (Piper-filer, ellers speechSynthesis, dansk) ----------
   const Tale = {
     stemme: null,
     udenDansk: false,
@@ -510,6 +601,7 @@
       else window.speechSynthesis.onvoiceschanged = vaelgStemme;
     },
     sig(tekst, efter) {
+      if (window.__taleSagt && tekst) window.__taleSagt(String(tekst)); // e2e: samler alt, spillet siger (Piper-dækning)
       // Hjælpens indledning er i gang: denne sætning venter, til den er sagt færdig (se sigFoerst)
       const f = this.foerst;
       if (f) {
@@ -519,7 +611,24 @@
       }
       let faerdig = false;
       const slut = () => { if (!faerdig) { faerdig = true; if (efter) efter(); } };
-      if (!this.findes || !voksen.tale || !tekst) { if (efter) setTimeout(slut, 0); return; }
+      if (!voksen.tale || !tekst) { if (efter) setTimeout(slut, 0); return; }
+      this.stopPiper(); // et nyt sig afbryder det forrige — også en Piper-sætning
+      Piper.noter(tekst);
+      if (Piper.kan(tekst)) { this.stopSyntese(); this.spilPiper(tekst, slut, !!efter); return; }
+      if (!this.findes) { if (efter) setTimeout(slut, 0); return; }
+      this.sigSyntese(tekst, efter ? slut : null);
+    },
+    // Talesyntesen stoppes, før Piper taler — ellers taler to stemmer oven i hinanden (review 12-10, fund 1)
+    stopSyntese() {
+      if (!this.findes) return;
+      this.aktuel = null; // en sætning, der venter 60 ms efter cancel, må ikke starte alligevel
+      try { const s = window.speechSynthesis; if (s.speaking || s.pending) s.cancel(); } catch (e) { /* ingenting */ }
+    },
+    // Talesyntesen (enhedens stemme). efter kaldes, når sætningen er sagt — eller ved fejl/afbrydelse.
+    sigSyntese(tekst, efter) {
+      let faerdig = false;
+      const slut = () => { if (!faerdig) { faerdig = true; if (efter) efter(); } };
+      if (!this.findes) { if (efter) setTimeout(slut, 0); return; }
       try {
         const s = window.speechSynthesis;
         const travl = s.speaking || s.pending;
@@ -561,9 +670,53 @@
       }, forsinkelse || 0);
       return f;
     },
+    // Piper: sætningerne efter hinanden; en sætning uden fil siges med talesyntesen. Et nyt sig eller stop afbryder
+    // (piperNr), og efter kaldes præcis én gang — også hvis noget går galt (loftet: summen af varighederne + 1,2 s).
+    piperNr: 0,
+    kilde: null,
+    stopPiper() {
+      this.piperNr++;
+      const k = this.kilde;
+      this.kilde = null;
+      if (k) { try { k.s.onended = null; k.s.stop(); } catch (e) { /* allerede stoppet */ } k.res(); }
+    },
+    spilPiper(tekst, slut, medEfter) {
+      const mit = this.piperNr;
+      const lever = () => mit === this.piperNr;
+      const enh = window.Talefiler.enheder(tekst);
+      // Alle sætningers filer hentes på én gang fra starten, hver højst 2,5 s — ellers taler enhedens stemme den sætning
+      // (review 12-10, fund 3: én ad gangen gav huller på langsomt net, og et hængende svar gjorde sætningen tavs)
+      const bufre = enh.map((e) => { const n = Piper.noegle(e); return n ? Piper.medFrist(Piper.buffer(n), 2500) : Promise.resolve(null); });
+      const ms = enh.reduce((s, e) => { const n = Piper.noegle(e); return s + (n ? Piper.liste[n] : e.length * 85); }, 0);
+      if (medEfter) setTimeout(slut, ms + 2500 + 1200 + enh.length * 400); // hvis noget aldrig bliver færdigt
+      const spil = (buf) => new Promise((res) => {
+        try {
+          const s = Lyd.ctx.createBufferSource();
+          s.buffer = buf; s.connect(Lyd.ctx.destination);
+          const k = this.kilde = { s: s, res: res };
+          s.onended = () => { if (this.kilde === k) this.kilde = null; res(); };
+          s.start(0);
+          setTimeout(res, buf.duration * 1000 + 400); // hvis onended aldrig kommer
+        } catch (e) { res(); }
+      });
+      (async () => {
+        // Afbrudt (nyt sig eller stop): efter kaldes alligevel med det samme — som cancel → onerror i talesyntesen
+        for (let i = 0; i < enh.length; i++) {
+          const e = enh[i];
+          if (!lever()) { slut(); return; }
+          let buf = null;
+          try { buf = await bufre[i]; } catch (x) { buf = null; }
+          if (!lever()) { slut(); return; }
+          if (buf && Lyd.ctx) await spil(buf);
+          else await new Promise((r) => this.sigSyntese(e, r)); // ingen fil: enhedens stemme for netop denne sætning
+        }
+        slut();
+      })();
+    },
     stop() {
       this.gen++;
       this.foerst = null;
+      this.stopPiper();
       if (!this.findes) return;
       this.aktuel = null; // så en sætning, der venter på at blive startet (60 ms efter cancel), ikke starter alligevel
       try { window.speechSynthesis.cancel(); } catch (e) { /* ingenting */ }
@@ -1171,7 +1324,8 @@
     saetPauset(fagFelt(verden), null);
     const emne = verden.emne;
     if (Tale.opdaterStemmer) Tale.opdaterStemmer(); // stemmerne kan være kommet siden opstart (iOS)
-    const udenLyt = !voksen.tale || !Tale.findes || Tale.udenDansk;
+    // Uden oplæsning, eller hverken Piper-filer eller en dansk stemme på enheden: «hør og find» springes over
+    const udenLyt = !voksen.tale || (!Piper.klar() && (!Tale.findes || Tale.udenDansk));
     const lagerE = emneLager(emne);
     if (!lagerE[emne]) lagerE[emne] = G.standardEmne();
     const ed = lagerE[emne];
@@ -1347,6 +1501,10 @@
     r.dom.visning.parentNode.querySelectorAll('.slut-lag').forEach((l) => l.remove());
     if (placerMaal(opg)) placerFelt(opg);
     S.gentagTale = opg.tale;
+    // Piper: næste opgaves sætninger og svaret på denne hentes og afkodes nu, så talen starter uden ventetid
+    const naeste = r.opgaver[r.i + 1];
+    if (naeste) Piper.forhent(naeste.tale);
+    if (opg.svar != null && typeof opg.svar !== 'object') Piper.forhent('Ja, det er ' + opg.svar + '!');
     // Dansk: teksten, så de indtalte lyde (eller reserverne) — 🔊 gentager det hele
     S.gentagFn = r.trinvis ? r.trinvis.gentag : opg.lyd ? () => sigOpgave(opg) : null;
     if (opg.valgArt === 'skjult') {
@@ -5311,6 +5469,8 @@
 
     Tale.init();
     Lyd.indlaesKlip(); // indtalte klip (IndexedDB) og lyd/liste.json — spillet virker også uden
+    // Piper-stemmen: tale/liste.json — uden den taler enhedens stemme som før. Efter 20 s hentes resten i baggrunden.
+    Piper.indlaes().then(() => setTimeout(() => Piper.hentAlle(), 20000));
 
     if (T.side === 'barn') {
       const res = G.indlaesBarn(lager, T.noegle, T.navn);
@@ -5321,7 +5481,7 @@
       hentMission();
       visStart();
     } else if (T.side === 'voksen' && window.Voksen) {
-      window.Voksen.start({ h, G, O, D, lager, voksen, Lyd, Tale, Forloeb, KlipLager, skift, hop, vent, FIGURER, venTegning, VERDENER, DANSK_VERDENER, fyrtaarn, tegnVisning, valgIndhold, gemVoksen, lagerAdvarsel });
+      window.Voksen.start({ h, G, O, D, lager, voksen, Lyd, Tale, Piper, Forloeb, KlipLager, skift, hop, vent, FIGURER, venTegning, VERDENER, DANSK_VERDENER, fyrtaarn, tegnVisning, valgIndhold, gemVoksen, lagerAdvarsel });
     } else {
       visIndex();
     }
@@ -6009,6 +6169,7 @@
     DANSK_VERDENER,
     _visHistorie(nr) { visHistorieSide(nr, true); },
     _startVerden(id, frit) { startRunde(alleVerdener().find((v) => v.id === id), { frit: !!frit }); },
+    _piper: Piper, // test-e2e «piper»: listen er hentet
     _visLektion(verdenId) { const v = alleVerdener().find((x) => x.id === verdenId); visLektion(v, () => visKort(false), () => visKort(false)); },
     // ekstra (valgfri): fx { quiz: { nr: 1, frit: true } } — runden opfører sig som Historiebogens 🤔-runde (gemmer intet)
     _testRunde(verdenId, opgaver, ekstra) {

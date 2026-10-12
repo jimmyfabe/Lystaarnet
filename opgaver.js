@@ -2347,6 +2347,22 @@
     return G[type](niveau, rng, tingListe);
   }
 
+  // ---------- Fast pulje (Piper-stemmen, Jimmy 12-10-2026) ----------
+  // Hver opgave trækkes fra en fast pulje på PULJE stk. pr. type og trin (og tema, fordi tingene skifter). Så er alle
+  // sætninger kendte på forhånd og kan laves som lydfiler med Piper (vaerktoej/lav-tale.js). rng vælger nummeret i
+  // puljen; opgaven laves med sit eget frø, så samme nummer altid giver samme opgave. Hæves PULJE, skal lyden laves igen.
+  const PULJE = 100;
+  function puljeFroe(navn, niveau, k) {
+    let h = 2166136261; // FNV-1a
+    const s = navn + '|' + niveau + '|' + k;
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return (h >>> 0) || 1;
+  }
+  const puljeNr = (rng) => 1 + Math.floor(rng() * PULJE);
+  function puljeOpgave(type, niveau, rng, tingListe) {
+    return lavOpgave(type, niveau, lavRng(puljeFroe(type, niveau, puljeNr(rng))), tingListe);
+  }
+
   // En runde = 5 korte opgaver. Svære opgaver fra sidst (gentag) sættes ind på plads 3 og 4.
   // Opgaver, der kun kan løses ved at høre oplæsningen
   const LYT_TYPER = ['findTal', 'findTal50', 'findForm', 'klokkeFind', 'klokkeStil', 'urVaerksted']; // C: Urværkstedet høres
@@ -2371,7 +2387,7 @@
       const type = koe.shift();
       // samme type to gange i træk undgås, når der er flere at vælge imellem
       if (runde.length && typer.length > 1 && runde[runde.length - 1].type === type && forsoeg < 400) continue;
-      const o = lavOpgave(type, niveau, rng, opts.ting);
+      const o = puljeOpgave(type, niveau, rng, opts.ting);
       if (brugte[o.noegle] && forsoeg < 400) continue;
       brugte[o.noegle] = true;
       runde.push(o);
@@ -2400,7 +2416,7 @@
       // Lystårnets egne opgaver tæller i emnet, de hører til — så hvert emne stadig kun kommer med én gang pr. omgang
       const egne = LYSTAARN_TYPER.filter((l) => l.emne === e && n >= l.fra).map((l) => l.type);
       const typer = brugbareTyper(EMNER[e].niveauer[n].concat(egne), opts);
-      const o = lavOpgave(vaelg(rng, typer), n, rng, opts.ting);
+      const o = puljeOpgave(vaelg(rng, typer), n, rng, opts.ting);
       if (!runde.some((x) => x.noegle === o.noegle)) runde.push(o);
       i++;
       if (i > 60) break;
@@ -2621,6 +2637,7 @@
     TING, EMNER, MAERKER, FORMER, FORMER_PR_NIVEAU, MOENSTER_BRIKKER, G,
     antalOrd, antalValg, lavValg, lavValgTrin, lavValgTekst, talForvekslere, LYT_TYPER,
     lavOpgave, lavRunde, lavBlandetRunde, klemNiveau, opdaterNiveau, maerkeForRunde,
+    PULJE, puljeFroe, puljeNr, puljeOpgave,
     beskrivNoegle, HJEMME_IDEER, klokkeNavn,
     SOEMBRAET, MAALE_TING, vurderFigur, figurPasser, stregPasser, eksempelFigur,
     lavValgFejl, lavKort, LYSTAARN_TYPER, PUSLESPIL, RETNING, ruteFraOpskrift, rutePasser,
