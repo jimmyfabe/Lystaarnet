@@ -1,8 +1,8 @@
 /* sw.js — service worker, så spillet virker uden net.
    Ved hver ny udgave: tæl VERSION op. Filerne hentes med cache: 'reload',
    så GitHub Pages' HTTP-cache ikke giver en blanding af gamle og nye filer. */
-const VERSION = 'mat-2026-10-11-v112';
-// FILER-HASH: 6372ba21bd0e11e6 mat-2026-10-11-v112 — opdateres med: node test/test-sw.js --opdater
+const VERSION = 'mat-2026-10-11-v114';
+// FILER-HASH: bdd4b4483d303d67 mat-2026-10-11-v114 — opdateres med: node test/test-sw.js --opdater
 const FILER = [
   './',
   'index.html',
@@ -23,14 +23,7 @@ const FILER = [
   'feedback-forloeb.js',
   'dansk-opgaver.js',
   'grafik.js', // tegningerne (fase A): venner, verdener, tårnet, kortet og samledyrene
-  'lyd/liste.json', // listen over indtalte klip i lyd/ (læg også hver .wav-fil på FILER-listen)
-  // Jimmys indtalte bogstavlyde (10-10-2026), skåret til med vaerktoej/klip-lyde.js
-  'lyd/lyd-a.wav', 'lyd/lyd-a-kort.wav', 'lyd/lyd-aa.wav', 'lyd/lyd-ae.wav', 'lyd/lyd-b.wav', 'lyd/lyd-c.wav',
-  'lyd/lyd-c-s.wav', 'lyd/lyd-d.wav', 'lyd/lyd-d-bloed.wav', 'lyd/lyd-e.wav', 'lyd/lyd-e-tryksvag.wav', 'lyd/lyd-f.wav',
-  'lyd/lyd-g.wav', 'lyd/lyd-h.wav', 'lyd/lyd-i.wav', 'lyd/lyd-j.wav', 'lyd/lyd-k.wav', 'lyd/lyd-l.wav',
-  'lyd/lyd-m.wav', 'lyd/lyd-n.wav', 'lyd/lyd-o.wav', 'lyd/lyd-o-aaben.wav', 'lyd/lyd-oe.wav', 'lyd/lyd-p.wav',
-  'lyd/lyd-q.wav', 'lyd/lyd-r.wav', 'lyd/lyd-s.wav', 'lyd/lyd-t.wav', 'lyd/lyd-u.wav', 'lyd/lyd-v.wav',
-  'lyd/lyd-w.wav', 'lyd/lyd-x.wav', 'lyd/lyd-y.wav', 'lyd/lyd-z.wav',
+  'lyd/liste.json', // listen over indtalte klip i lyd/ (tom: Jimmys optagelser er fjernet 12-10; læg hver ny .wav på FILER-listen)
   'manifest.json',
   'manifest-dino.json',
   'manifest-enhjorning.json',

@@ -151,46 +151,91 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
 @keyframes puls { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.07); } }
 
 /* ---------- Startside (index) ---------- */
-.index { align-items: center; justify-content: center; gap: 4vmin; padding: 16px; }
+/* Fase A: flade kort med en fast bundkant (ingen gradient, ingen sløret skygge). Hvert barns kort har sit temas farver
+   (index.html sætter dem på .spiller-dino/.spiller-enhjorning): lys bund med vennen, navnet på en bjælke i temaets farve.
+   Voksen er mindre og rolig i de neutrale farver. */
+.index { align-items: center; justify-content: center; gap: 3vmin; padding: 16px; }
 .index-titel {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.15em;
+  margin: 0;
   font-size: clamp(34px, 7vmin, 64px);
+  line-height: 1.1;
   font-weight: 900;
   color: var(--farve-1-moerk);
   letter-spacing: 0.02em;
 }
+/* Ét stillestående tårn, fuldt tændt — to gange skriftens højde, så det er tårnet, man ser først */
+.index-titel .fyrtaarn.med-tegning { width: 2em; height: 2em; flex-shrink: 0; }
 .spiller-liste {
   display: flex;
   gap: 4vmin;
   flex-wrap: wrap;
   justify-content: center;
+  align-items: flex-end; /* ellers strækkes Voksen til børnenes højde */
 }
 .spiller-kort {
   width: clamp(200px, 30vmin, 300px);
   aspect-ratio: 3 / 4;
-  border-radius: 36px;
+  border: 4px solid var(--farve-1);
+  border-radius: 32px;
+  overflow: hidden;
+  background: var(--farve-1); /* bjælkens farve: så giver kortets runde hjørner ingen lys søm forneden */
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2vmin;
+  align-items: stretch;
   text-decoration: none;
   color: var(--hvid);
-  box-shadow: 0 9px 0 var(--skygge-stor), 0 16px 30px var(--skygge);
-  transition: transform 0.1s;
+  box-shadow: 0 8px 0 var(--farve-1-moerk);
+  transition: transform 0.1s, box-shadow 0.1s;
+  --navn: clamp(30px, 5vmin, 46px); /* navnets skrift — bjælken er lige høj på begge børns kort */
 }
-.spiller-kort:active { transform: translateY(6px) scale(0.98); }
-.spiller-dino { background: linear-gradient(160deg, var(--dino-1), var(--dino-2)); }
-.spiller-enhjorning { background: linear-gradient(160deg, var(--enhjorning-1), var(--enhjorning-2)); }
-.spiller-voksen { background: linear-gradient(160deg, var(--voksen-1), var(--voksen-2)); width: clamp(150px, 20vmin, 210px); }
-.spiller-figur { font-size: clamp(90px, 15vmin, 150px); filter: drop-shadow(0 6px 6px rgba(0, 0, 0, 0.2)); }
+.spiller-kort:active { transform: translateY(6px); box-shadow: 0 2px 0 var(--farve-1-moerk); }
+.spiller-voksen {
+  --farve-1: var(--voksen-1); --farve-1-moerk: var(--voksen-2); --baggrund-2: var(--papir);
+  width: clamp(150px, 20vmin, 210px);
+  --navn: clamp(22px, 3.6vmin, 34px);
+}
+.spiller-figur {
+  flex: 1 1 auto;
+  min-height: 0;
+  border-radius: 28px 28px 0 0; /* kortets indre hjørner (32 px − kanten) */
+  background: var(--baggrund-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(90px, 15vmin, 150px);
+  line-height: 1;
+}
 .spiller-voksen .spiller-figur { font-size: clamp(60px, 10vmin, 100px); }
-.spiller-navn { font-size: clamp(30px, 5vmin, 46px); font-weight: 900; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.18); }
-.spiller-voksen .spiller-navn { font-size: clamp(22px, 3.6vmin, 34px); }
+/* Tegningen fylder feltet over navnet (emojien bruger skriftstørrelsen ovenfor) */
+.spiller-figur.med-tegning { padding: 8% 6% 2%; }
+.spiller-figur.med-tegning svg { display: block; width: 100%; height: 100%; margin: 0; }
+.spiller-voksen .spiller-figur.med-tegning { padding: 14% 18% 6%; }
+.spiller-navn {
+  flex: 0 0 auto;
+  min-height: calc(var(--navn) * 1.45);
+  padding: 0 0.15em 0.06em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--navn);
+  line-height: 1.1;
+  font-weight: 900;
+}
 /* Lange navne («Enhjørning») må ikke stikke ud af kortet på en smal telefon */
 .spiller-navn.langt { font-size: clamp(22px, 3.8vmin, 38px); }
 @media (orientation: portrait) and (max-width: 600px) {
   .spiller-kort { width: 40vw; }
   .spiller-voksen { width: 30vw; }
+}
+/* Telefonen på langs (ca. 390 px høj): kortene følger højden, så tårn, titel og kort kan være der uden at skæres */
+@media (orientation: landscape) and (max-height: 500px) {
+  .index { gap: 2vh; }
+  .index-titel { font-size: 9vh; }
+  .spiller-kort { width: auto; height: 60vh; }
+  .spiller-voksen { width: auto; height: 44vh; }
 }
 
 /* ---------- Startskærm (barn) ---------- */
@@ -203,7 +248,6 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
 .fyrtaarn svg { width: 100%; height: 100%; display: block; }
 /* Lystårnet fra grafik.js er tegnet i et kvadrat (lysstrålerne går ud til siderne) */
 .fyrtaarn.med-tegning { width: 1.2em; }
-.index-titel .fyrtaarn { margin-right: 0.2em; }
 .start-taarn { font-size: clamp(50px, 9vmin, 90px); }
 .station-ikon.fyrtaarn { width: calc(var(--s) * 0.5); height: calc(var(--s) * 0.6); }
 .station.laast .station-ikon.fyrtaarn { filter: grayscale(1); opacity: 0.55; }

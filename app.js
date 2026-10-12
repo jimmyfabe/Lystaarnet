@@ -196,6 +196,12 @@
     '<rect x="38" y="26" width="24" height="14" rx="3" fill="#ffc83d" stroke="#4a2f1c" stroke-width="2"/>' +
     '<path d="M35 27 L50 12 L65 27 Z" fill="#e5484d" stroke="#4a2f1c" stroke-width="2"/>' +
     '<rect x="26" y="110" width="48" height="8" rx="4" fill="#4a2f1c" opacity=".5"/></svg>';
+  // Voksen-kortets lås på forsiden i samme tegnestil som grafik.js (96 × 96, kontur 3, flade farver fra kortets variabler)
+  const LAAS = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" fill="none" stroke="var(--kontur,#4a2f1c)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">' +
+    '<ellipse cx="48" cy="88" rx="30" ry="4" fill="var(--farve-1-moerk,#4f4338)" opacity=".15" stroke="none"/>' +
+    '<path d="M30 44V31a18 18 0 0 1 36 0v13" stroke-width="12"/><path d="M30 44V31a18 18 0 0 1 36 0v13" stroke="var(--papir,#fffaf0)" stroke-width="5"/>' +
+    '<rect x="18" y="42" width="60" height="42" rx="10" fill="var(--farve-1,#8a7a6b)"/>' +
+    '<path d="M48 55a6 6 0 0 0-3.5 10.9L42 75h12l-2.5-9.1A6 6 0 0 0 48 55Z" fill="var(--kontur,#4a2f1c)"/></svg>';
   // Lystårnet i fem lysstadier (grafik.taarn[0..4]) efter lysperlerne, der allerede gemmes (data.perler: én pr. mission i
   // eventyret). Lanternen tændes ved den første perle, de to nederste vinduer og strålerne ved 5 og 12, alt lys og to
   // stjerner ved 30 — samme sted, som tårnets glød er fuld (lysStyrke). Perlerne tælles kun op, så lys slukkes aldrig.
@@ -677,17 +683,22 @@
   //  STARTSIDEN (index.html) — vælg spiller
   // =====================================================================
   function visIndex() {
-    // Hvert barn har sit faste dyr (🦖 Dino, 🦄 Enhjørning) — det er det, barnet genkender uden at læse
-    const kort = (T.spillere || []).map((sp) => h('a', { class: 'spiller-kort spiller-' + sp.id, href: sp.side, 'aria-label': sp.navn },
-      h('span', { class: 'spiller-figur', 'aria-hidden': 'true' }, sp.e),
-      h('span', { class: 'spiller-navn' + (sp.navn.length > 6 ? ' langt' : '') }, sp.navn)));
+    // Hvert barn har sit faste dyr — det er det, barnet genkender uden at læse: Rex på Dinos kort, Måne på Enhjørningens,
+    // tegnet i barnets egne farver (index.html sætter temaets variabler på kortet). Uden grafik.js: emojien (🦖 🦄 🔐) som før.
+    const figur = (tegn, e) => h('span', { class: 'spiller-figur' + (tegn ? ' med-tegning' : ''), 'aria-hidden': 'true' }, tegn || e);
+    const kort = (T.spillere || []).map((sp) => {
+      const ven = sp.ven ? venTegning(sp.ven, 'vinker') : null;
+      return h('a', { class: 'spiller-kort spiller-' + sp.id, href: sp.side, 'aria-label': sp.navn },
+        figur(ven && ven.nodeType === 1 ? ven : null, sp.e),
+        h('span', { class: 'spiller-navn' + (sp.navn.length > 6 ? ' langt' : '') }, sp.navn));
+    });
     if (T.voksenSide) {
       kort.push(h('a', { class: 'spiller-kort spiller-voksen', href: T.voksenSide, 'aria-label': 'Voksen' },
-        h('span', { class: 'spiller-figur', 'aria-hidden': 'true' }, '🔐'),
+        figur(GR ? tegning(LAAS, 'laas-tegning') : null, '🔐'),
         h('span', { class: 'spiller-navn' }, 'Voksen')));
     }
     skift(h('div', { class: 'skaerm index' },
-      h('div', { class: 'index-titel' }, fyrtaarn('', 4), 'Lystårnet'),
+      h('h1', { class: 'index-titel' }, fyrtaarn('', 4), h('span', null, 'Lystårnet')),
       h('div', { class: 'spiller-liste' }, kort)));
   }
 

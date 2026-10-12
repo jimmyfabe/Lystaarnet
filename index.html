@@ -2,7 +2,7 @@
 <html lang="da">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-FNsCzaGJFfV4GfJjagHMYYsI2J2g+w8n8JUiT3gcGdY='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-wTBjTysY/FGr36O3JMPlb1A0vdXNqfFnyFv1hf72pr0='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -21,18 +21,25 @@
     --farve-2: #f2b33d; --farve-2-lys: #ffd98a; --farve-2-moerk: #c2830f;
     --baggrund-1: #fff4e3; --baggrund-2: #ffe1c2;
     --tekst: #4a2f1c; --sti: #c58a4a; --sti-kant: #f6dcb6;
-    --dino-1: #367047; --dino-2: #264f35;
-    --enhjorning-1: #765399; --enhjorning-2: #503565;
     --kontur: #4a2f1c;
     --voksen-1: #8a7a6b; --voksen-2: #4f4338;
+  }
+  /* Hvert barns kort får sit temas farver (som dino.html og enhjorning.html), så Rex og Måne tegnes rigtigt */
+  .spiller-dino {
+    --farve-1: #367047; --farve-1-lys: #c7ddb4; --farve-1-moerk: #264f35; --farve-2: #edb561;
+    --baggrund-2: #dfecd0; --kontur: #33493c;
+  }
+  .spiller-enhjorning {
+    --farve-1: #765399; --farve-1-lys: #decaed; --farve-1-moerk: #503565; --farve-2: #d6ab77;
+    --baggrund-2: #ede3f5; --kontur: #4c3c5e;
   }
 </style>
 <script>
   window.TEMA = {
     side: 'index',
     spillere: [
-      { id: 'dino', navn: 'Dino', e: '🦖', side: 'dino.html', noegle: 'mat_dino_v1' },
-      { id: 'enhjorning', navn: 'Enhjørning', e: '🦄', side: 'enhjorning.html', noegle: 'mat_enhjorning_v1' }
+      { id: 'dino', navn: 'Dino', e: '🦖', ven: 'rex', side: 'dino.html', noegle: 'mat_dino_v1' },
+      { id: 'enhjorning', navn: 'Enhjørning', e: '🦄', ven: 'luna', side: 'enhjorning.html', noegle: 'mat_enhjorning_v1' }
     ],
     voksenSide: 'voksen.html'
   };
