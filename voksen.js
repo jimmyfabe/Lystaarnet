@@ -1,4 +1,4 @@
-/* voksen.js — voksendelen: voksenlås, dagens dosis (gymnasiematematik uden hjælpemidler),
+/* voksen.js — voksendelen: voksenlås (hold 3 sekunder), dagens dosis (gymnasiematematik uden hjælpemidler),
    forældreoverblik (ét barn ad gangen — børnene sammenlignes aldrig), indstillinger og familieduel.
    Startes af app.js (window.Voksen.start) med fælles hjælpere. Opgaverne kommer fra voksen-opgaver.js. */
 (function () {
@@ -40,21 +40,18 @@
     }
 
     // =================================================================
-    //  Voksenlås: hold knappen inde i 3 sekunder + et regnestykke
+    //  Voksenlås: hold knappen inde i 3 sekunder (Jimmy 13-10-2026: intet regnestykke). Et kort tryk åbner ikke;
+    //  Enter/mellemrum holdt nede virker også (tastaturcoveret). Åben i 30 minutter i denne fane — 🏠 låser igen.
     // =================================================================
     function erAaben() {
       try { return Date.now() - Number(sessionStorage.getItem(LAAS_NOEGLE) || 0) < LAAS_MINUTTER * 60000; } catch (e) { return false; }
     }
     function laasOp() { try { sessionStorage.setItem(LAAS_NOEGLE, String(Date.now())); } catch (e) { /* kun i hukommelsen */ } }
-
-    // Efter et forkert svar skal man vente, før man kan prøve igen (så tilfældige tryk ikke åbner)
-    const VENT_NOEGLE = 'mat_voksen_vent';
-    const ventTil = () => { try { return Number(sessionStorage.getItem(VENT_NOEGLE) || 0); } catch (e) { return 0; } };
-    const saetVent = (ms) => { try { sessionStorage.setItem(VENT_NOEGLE, String(Date.now() + ms)); } catch (e) { /* kun denne gang */ } };
+    // Tilbage/swipe efter 🏠 viser siden fra browserens cache (bfcache) med menuen åben, selvom 🏠 slettede oplåsningen
+    // (eller de 30 minutter er gået): så låses igen, og en igangværende optagelse kasseres, så mikrofonen slukker.
+    window.addEventListener('pageshow', (e) => { if (e.persisted && !erAaben()) { stopOptagere(); visLaas(); } });
 
     function visLaas() {
-      const rest = ventTil() - Date.now();
-      if (rest > 0) { visLaasVent(); return; }
       let timer = null, startTid = 0;
       const ring = h('span', { class: 'laas-ring' });
       const knap = h('button', { class: 'laas-knap', type: 'button', 'aria-label': 'Hold inde i 3 sekunder' }, ring, h('span', { class: 'laas-ikon', 'aria-hidden': 'true' }, '🔐'));
@@ -65,9 +62,10 @@
         Lyd.init();
         startTid = Date.now();
         timer = setInterval(() => {
+          if (document.hidden) { stop(); return; } // skjult: aldrig et helt hold
           const p = Math.min(1, (Date.now() - startTid) / 3000);
           ring.style.setProperty('--p', p);
-          if (p >= 1) { stop(); Lyd.rigtig(); visLaasSpoergsmaal(); }
+          if (p >= 1) { stop(); Lyd.rigtig(); laasOp(); visMenu(); }
         }, 50);
       };
       knap.addEventListener('pointerdown', begynd);
@@ -77,58 +75,22 @@
         topbar('Voksendel'),
         h('div', { class: 'voksen-midte' }, knap, h('p', { class: 'voksen-hjaelp' }, 'Hold knappen inde i 3 sekunder.'))),
       (e) => { if (e.key === 'Enter' || e.key === ' ') { if (e.type === 'keydown' && !e.repeat) begynd(); } });
-      document.addEventListener('keyup', stop, { once: true });
-    }
-
-    function visLaasVent() {
-      const tekst = h('p', { class: 'voksen-hjaelp' }, '');
-      const opdater = () => {
-        const sek = Math.ceil((ventTil() - Date.now()) / 1000);
-        if (!document.body.contains(tekst)) { clearInterval(t); return; } // skærmen er skiftet
-        if (sek <= 0) { clearInterval(t); visLaas(); return; }
-        tekst.textContent = 'Prøv igen om ' + sek + (sek === 1 ? ' sekund.' : ' sekunder.');
-      };
-      skift(h('div', { class: 'skaerm voksen laas' },
-        topbar('Voksendel'),
-        h('div', { class: 'voksen-midte' }, h('span', { class: 'laas-ikon stor-laas', 'aria-hidden': 'true' }, '⏳'), tekst)));
-      const t = setInterval(opdater, 500);
-      opdater();
-    }
-
-    // Et tocifret produkt tastet på eget tastatur: et gæt rammer kun ca. 1 af 100
-    function visLaasSpoergsmaal() {
-      const r = rng();
-      const a = O.heltal(r, 6, 9), b = O.heltal(r, 6, 9);
-      const facit = a * b;
-      let buffer = '';
-      const display = h('div', { class: 'tast-display' }, '');
-      const tast = (t) => {
-        Lyd.init(); Lyd.tryk();
-        if (t === '⌫') buffer = buffer.slice(0, -1);
-        else if (t === '✔') {
-          if (!buffer) return;
-          if (Number(buffer) === facit) { Lyd.rigtig(); laasOp(); visMenu(); }
-          else { Lyd.blid(); saetVent(30000); visLaas(); }
+      // Hver tast, der slippes, stopper ringen — ikke kun den første (ellers åbnede to korte tryk efter 3 sekunder).
+      // Mister siden fokus eller skjules (app-skift), kommer keyup aldrig: så stopper ringen også — et helt hold kræves.
+      // Lytterne fjerner sig selv, når låsen ikke står på skærmen længere.
+      const slip = (e) => {
+        if (!document.body.contains(knap)) {
+          document.removeEventListener('keyup', slip);
+          document.removeEventListener('visibilitychange', slip);
+          window.removeEventListener('blur', slip);
           return;
-        } else if (buffer.length < 3) buffer += t;
-        display.textContent = buffer;
-        okKnap.disabled = !buffer;
+        }
+        if (e && e.type === 'visibilitychange' && !document.hidden) return; // synlig igen: intet at stoppe
+        stop();
       };
-      const knap = (t, kl, label) => h('button', { class: 'tast ' + (kl || ''), type: 'button', 'aria-label': label || t, onclick: () => tast(t) }, t);
-      const okKnap = knap('✔', 'tast-ok', 'OK');
-      okKnap.disabled = true;
-      skift(h('div', { class: 'skaerm voksen laas' },
-        topbar('Voksendel', visLaas),
-        h('div', { class: 'voksen-midte' },
-          h('p', { class: 'voksen-spoerg stor' }, 'Hvad er ' + a + ' · ' + b + '?'),
-          h('div', { class: 'taltastatur voksen-tast' }, display, h('div', { class: 'taster' },
-            ['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((t) => knap(t)), knap('⌫', 'tast-slet', 'Slet'), knap('0'), okKnap)))),
-      (e) => {
-        if (e.repeat) return;
-        if (/^[0-9]$/.test(e.key)) tast(e.key);
-        else if (e.key === 'Backspace') tast('⌫');
-        else if (e.key === 'Enter') { e.preventDefault(); tast('✔'); }
-      });
+      document.addEventListener('keyup', slip);
+      document.addEventListener('visibilitychange', slip);
+      window.addEventListener('blur', slip);
     }
 
     // =================================================================
@@ -613,11 +575,16 @@
     // Optagere i Indstillinger (barnets navn): stoppes, når skærmen forlades eller tegnes igen, så mikrofonen slukker
     let navneOptagere = [];
     const stopNavneOptagere = () => { navneOptagere.forEach((o) => o.stop()); navneOptagere = []; };
+    // Alle optagere (navnet i Indstillinger, Indtal): KASSERES, når låsen kommer frem igen (bfcache) — en halv optagelse
+    // må ikke gemmes som barnets navneklip. ⬅️ i Indstillinger gemmer derimod (stopNavneOptagere → stop).
+    let indtalOptager = null;
+    const stopOptagere = () => { navneOptagere.forEach((o) => o.afbryd()); navneOptagere = []; if (indtalOptager) indtalOptager.afbryd(); };
 
     // =================================================================
-    //  Barnets eget navn (12-10-2026): skrives af barnet første gang (app.js) og kan rettes her. Navnet findes kun på
-    //  denne enhed (og i «Gem en kopi»). Det skrives aldrig i en besked og siges aldrig af stemmen: talt navn er kun en
-    //  optagelse (navneklip i IndexedDB), som aldrig forlader enheden. Barnet kan ikke selv omdøbe sig (søskende).
+    //  Barnets eget navn (12-10-2026): skrives af barnet første gang (app.js) og kan rettes her («Mit navn»). Navnet findes
+    //  kun på denne enhed (og i «Gem en kopi»). Som tekst står det kun her — spillet viser Dino/Enhjørning (13-10-2026). Det
+    //  skrives aldrig i en besked og siges aldrig af stemmen: talt navn er kun en optagelse (navneklip i IndexedDB), som
+    //  aldrig forlader enheden. Barnet kan ikke selv omdøbe sig (søskende).
     // =================================================================
     function navnBlok(b) {
       const LK = window.Lydklip, KL = ctx.KlipLager;
@@ -632,7 +599,7 @@
       };
       // Kun egetNavn og navnSpurgt ændres i barnets gemte data (gem.js retEgetNavn). Barnets side læser dem igen (storage).
       // glem: navnet er ændret eller slettet (eller barnet skal skrive det igen) — så slettes optagelsen, ellers ville
-      // spillet vise det nye navn og sige det gamle
+      // spillet sige det gamle navn
       const ret = (fn, ok, glem) => {
         const r = G.retEgetNavn(lager, b.noegle, b.navn, fn);
         besked(r.ok ? ok : FEJL[r.fejl] || FEJL.ukendt);
@@ -656,7 +623,7 @@
         if (ret((d) => G.saetEgetNavn(d, felt.value), n ? 'Navnet er gemt.' : 'Navnet er slettet.', n !== foer)) felt.value = n || '';
       };
       const form = h('form', { class: 'navn-form', onsubmit: (e) => { e.preventDefault(); Lyd.init(); Lyd.tryk(); gemNavn(); } },
-        h('label', { class: 'navn-etiket', for: 'navn-' + b.id }, 'Barnets navn'),
+        h('label', { class: 'navn-etiket', for: 'navn-' + b.id }, 'Mit navn'),
         felt,
         h('button', { class: 'voksen-valg-knap navn-gem', type: 'submit' }, 'Gem navnet'),
         h('span', { class: 'navn-hint', id: 'navn-hint-' + b.id }, 'Højst 12 tegn.')); // = G.MAX_NAVN (test-navn)
@@ -704,7 +671,7 @@
       opdater();
       return h('div', { class: 'navn-blok' },
         h('h3', null, 'Navn'),
-        h('p', { class: 'navn-hjaelp' }, 'Barnet skriver selv sit navn, første gang det trykker ▶. Navnet vises i spillet og bliver på denne enhed (og i «Gem en kopi»).'),
+        h('p', { class: 'navn-hjaelp' }, 'Barnet skriver og indtaler selv sit navn, første gang det trykker ▶. Spillet viser stadig ' + b.navn + ' — navnet står kun her og siges kun fra optagelsen (barnets egen, eller din nedenfor). Det bliver på denne enhed (og i «Gem en kopi»).'),
         form,
         h('div', { class: 'voksen-knaprad navn-knaprad' }, sletNavn, igen),
         h('p', { class: 'navn-hjaelp' }, 'Optag navnet, så spillet kan sige det: «Hej!» ved start og «Du klarede det!» eller «Prøv igen» med navnet, højst én gang hver anden runde. Barnet kan selv sige det, eller du kan. Uden optagelse siges sætningerne uden navn.'),
@@ -1076,74 +1043,8 @@
       nyVoksenopgave();
     }
 
-    // Optag et kort lydklip her på enheden: MediaRecorder → WebAudio → lydklip.js (mono, beskåret, normaliseret WAV) →
-    // IndexedDB og Lyd. Bruges af 🎙️ Indtal og af barnets navn. Intet sendes nogen steder hen.
-    // valg: { status(tekst), startTekst(id), gemt(id, r), maxSek (stopper selv), stopTekst (knappens tekst under optagelsen) }
-    function lavOptager(valg) {
-      const LK = window.Lydklip, KL = ctx.KlipLager;
-      const kan = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
-      let optagelse = null; // { id, recorder, stream, chunks, knap, tekst, timer }
-      // Sættes FØR der ventes på mikrofonen (getUserMedia kan tage sekunder på iPad): et nyt tryk imens starter ikke en
-      // optagelse til, og stop() (Tilbage, skærmen forlades) annullerer den, så mikrofonen slukkes, når den svarer
-      let starter = null; // { id, annulleret }
-      const slukSpor = (stream) => { if (stream) stream.getTracks().forEach((t) => { try { t.stop(); } catch (e) { /* allerede slukket */ } }); };
-      async function stop() {
-        if (starter) { starter.annulleret = true; starter = null; }
-        const o = optagelse;
-        if (!o) return;
-        optagelse = null;
-        clearTimeout(o.timer);
-        o.knap.classList.remove('optager');
-        o.knap.textContent = o.tekst;
-        const faerdig = new Promise((res) => { o.recorder.onstop = res; });
-        try { o.recorder.stop(); } catch (e) { /* allerede stoppet */ }
-        await faerdig;
-        o.stream.getTracks().forEach((t) => t.stop());
-        try {
-          const blob = new Blob(o.chunks, { type: o.recorder.mimeType || 'audio/webm' });
-          const buf = await blob.arrayBuffer();
-          Lyd.init();
-          const ac = Lyd.ctx || new (window.AudioContext || window.webkitAudioContext)();
-          const lyd = await new Promise((res, rej) => { const p = ac.decodeAudioData(buf.slice(0), res, rej); if (p && p.then) p.then(res, rej); });
-          const kanaler = [];
-          for (let k = 0; k < lyd.numberOfChannels; k++) kanaler.push(lyd.getChannelData(k));
-          const r = LK.behandl(kanaler, lyd.sampleRate);
-          if (!r) { valg.status('Der var kun stilhed — prøv igen tættere på mikrofonen.'); return; }
-          await KL.gem('klip', o.id, r.wav);
-          ctx.Lyd.saetLokaltKlip(o.id, r.wav);
-          valg.gemt(o.id, r);
-        } catch (e) {
-          valg.status('Optagelsen kunne ikke gemmes (' + (e && e.message ? e.message : 'ukendt fejl') + ').');
-        }
-      }
-      async function optag(id, knap) {
-        if (starter) return; // mikrofonen er ved at starte: et tryk mere starter ikke en til
-        if (optagelse) { const forrige = optagelse.id; await stop(); if (forrige === id) return; }
-        if (!kan) { valg.status('Denne browser kan ikke optage lyd.'); return; }
-        const s = starter = { id, annulleret: false };
-        let stream = null;
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          if (s.annulleret) { slukSpor(stream); return; } // stoppet, mens mikrofonen startede
-          starter = null;
-          const recorder = new MediaRecorder(stream);
-          const chunks = [];
-          recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
-          recorder.start();
-          const o = optagelse = { id, recorder, stream, chunks, knap, tekst: knap.textContent, timer: null };
-          // Højst maxSek: så stopper optagelsen selv (men kun denne — ikke en ny, der er startet bagefter)
-          if (valg.maxSek) o.timer = setTimeout(() => { if (optagelse === o) stop(); }, valg.maxSek * 1000);
-          knap.classList.add('optager');
-          knap.textContent = valg.stopTekst || '⏹';
-          valg.status(valg.startTekst(id));
-        } catch (e) {
-          if (starter === s) starter = null;
-          slukSpor(stream); // fx kunne MediaRecorder ikke laves: mikrofonen må ikke blive ved med at være tændt
-          if (!s.annulleret) valg.status('Mikrofonen kunne ikke bruges. Giv spillet lov til mikrofonen i browserens indstillinger.');
-        }
-      }
-      return { kan, optag, stop, optager: () => !!optagelse };
-    }
+    // Optageren ligger i app.js (lavOptager) og kommer med ctx — barnets «Sig dit navn» bruger den også (13-10-2026)
+    const lavOptager = ctx.lavOptager;
 
     // =================================================================
     //  🎙️ Indtal — bogstavlyde og ord optages her på enheden (bag voksenlåsen). Intet sendes nogen steder hen.
@@ -1191,6 +1092,7 @@
           taelIndtalt();
         },
       });
+      indtalOptager = optager;
       const kanOptage = optager.kan;
       const stop = optager.stop;
       const rk = liste.map((l) => {

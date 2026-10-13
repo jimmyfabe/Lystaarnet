@@ -852,6 +852,7 @@
     runde: null,
     afbrudt: { pauset: null, pausetDansk: null }, // afbrudte runder pr. fag (▶ fortsætter dem) — se PAUSET_FELTER
     ur: null,          // Historiebogens og Bogstavjagtens fælles ur (se startUr)
+    forlad: null,      // ryddes op, når skærmen skiftes (fx «Sig dit navn»: mikrofonen slukkes)
   };
 
   let data = null;     // barnets data
@@ -891,11 +892,10 @@
   }
 
   // ---------- Barnets eget navn (12-10-2026) ----------
-  // Som tekst: forsiden, startskærmen og topbarerne viser det navn, barnet selv har skrevet (ellers Dino/Enhjørning).
+  // Som tekst: forsiden, startskærmen og topbarerne viser altid Dino/Enhjørning (Jimmy 13-10-2026) — barnets eget navn
+  // står kun på «Hvad hedder du?», mens barnet skriver det, og i voksendelen («Mit navn»).
   // Som tale KUN fra en optagelse på enheden (NAVNEKLIP): navnet sendes aldrig til Tale.sig, Forloeb.run({ tekst }),
   // 🔊 eller en log — en sætning uden lydfil læses af enhedens stemme, og repoet er offentligt.
-  const visNavn = () => (data && data.egetNavn) || (data && data.navn) || T.navn || '';
-  const navnKlasse = (grund, n) => [grund, n.length > 10 ? 'meget-langt' : n.length > 6 ? 'langt' : ''].filter(Boolean).join(' ');
   const navnKlipId = () => NAVNEKLIP + T.id;
   // Navnet kan siges: barnet har et navn, og det er optaget på denne enhed
   const harNavneklip = () => !!(data && data.egetNavn && T.id && Lyd.harLokaltKlip(navnKlipId()));
@@ -906,9 +906,10 @@
   const navnTur = () => (++navnRunder % NAVN_HVER === 0);
   const navnIRunden = (r) => !!(r && r.navnMaa && !r.navnSagt && harNavneklip());
   let navnHilst = false;
-  // Hilsenen til et barn med eget navn: «Hej!» + navnet (klippet) + skærmens spørgsmål
+  // Hilsenen: «Hej!» + navnet (klippet, hvis barnet har et navn og en optagelse) + skærmens spørgsmål.
+  // Talen siger aldrig «Hej Dino!» — Dino og Enhjørning er profilerne, ikke barnets navn (Jimmy 13-10-2026).
   const NAVN_HEJ = Object.freeze({ hej: 'Hej!' });
-  const hilsen = () => (data.egetNavn ? NAVN_HEJ : 'Hej ' + data.navn + '!');
+  const hilsen = () => NAVN_HEJ;
   // foer + navnet + efter gennem feedback-forløbet. Uden klip, eller når forløbet er optaget: foer + efter uden navn.
   // Giver true, hvis navnet bliver sagt.
   function sigMedNavn(foer, efter) {
@@ -926,7 +927,7 @@
     }
     Tale.sig([h0, resten].filter(Boolean).join(' '));
   }
-  // Et nyt eller slettet navn må ikke beholde den gamle optagelse: spillet ville vise det nye navn og sige det gamle
+  // Et nyt eller slettet navn må ikke beholde den gamle optagelse: spillet ville sige det gamle navn
   function glemNavneklip() {
     if (!T.id) return;
     const id = navnKlipId();
@@ -941,6 +942,7 @@
   }
 
   function skift(node, taster) {
+    if (S.forlad) { const f = S.forlad; S.forlad = null; f(); } // den gamle skærms oprydning (fx mikrofonen)
     Forloeb.stop(); // en igangværende feedback hører til den gamle skærm
     gemUr(); // Historiebogens/Bogstavjagtens tid gemmes ved hvert skærmskift
     S.token++;
@@ -988,10 +990,9 @@
     const figur = (tegn, e) => h('span', { class: 'spiller-figur' + (tegn ? ' med-tegning' : ''), 'aria-hidden': 'true' }, tegn || e);
     const kort = (T.spillere || []).map((sp) => {
       const ven = sp.ven ? venTegning(sp.ven, 'vinker') : null;
-      const navn = (sp.noegle && G.laesEgetNavn(lager, sp.noegle)) || sp.navn; // barnets eget navn, ellers Dino/Enhjørning
-      return h('a', { class: 'spiller-kort spiller-' + sp.id, href: sp.side, 'aria-label': navn },
+      return h('a', { class: 'spiller-kort spiller-' + sp.id, href: sp.side, 'aria-label': sp.navn },
         figur(ven && ven.nodeType === 1 ? ven : null, sp.e),
-        h('span', { class: navnKlasse('spiller-navn', navn) }, navn));
+        h('span', { class: 'spiller-navn' + (sp.navn.length > 6 ? ' langt' : '') }, sp.navn));
     });
     if (T.voksenSide) {
       kort.push(h('a', { class: 'spiller-kort spiller-voksen', href: T.voksenSide, 'aria-label': 'Voksen' },
@@ -1037,7 +1038,7 @@
       advarselKnap(),
       taarn,
       h('div', { class: 'start-figur', 'aria-hidden': 'true', 'data-ven': fig.id }, venTegning(fig.id, 'vinker')),
-      h('div', { class: navnKlasse('start-navn', visNavn()) }, visNavn()),
+      h('div', { class: 'start-navn' }, data.navn),
       h('button', { class: 'stor-knap spil-knap puls', type: 'button', 'aria-label': 'Start', onclick: start }, '▶')),
     (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); start(); } });
   }
@@ -1071,7 +1072,7 @@
       G.saetEgetNavn(data, navn); // normaliseres i gem.js (højst 12 tegn, kun bogstaver)
       gem();
       if ((data.egetNavn || null) !== foer) glemNavneklip(); // samme navn igen: optagelsen bliver
-      fortsaet();
+      sigNavnEllerVidere(fortsaet); // «Sig dit navn» (13-10-2026), hvis der ikke er en optagelse
     };
     // ⏭ og Esc: står der bogstaver, gemmes navnet som med ✔ (tastaturcoverets Esc må ikke smide det væk — review 12-10)
     const springOver = () => {
@@ -1156,6 +1157,277 @@
     });
     // Synkront efter skærmskiftet (stadig i tryk-handleren): iOS kræver en brugergestus til den første oplæsning
     if (hilsen) sigHilsen(hilsen, S.gentagTale);
+  }
+
+  // ---------- Optageren: et kort lydklip her på enheden ----------
+  // MediaRecorder → WebAudio → lydklip.js (mono, beskåret, normaliseret WAV) → IndexedDB og Lyd. Intet sendes nogen steder
+  // hen. Bruges af voksendelens 🎙️ Indtal og navneoptagelse (gennem ctx) og af barnets «Sig dit navn» (flyttet fra
+  // voksen.js 13-10-2026, så der kun er én optager).
+  // valg: { status(tekst, kode), startTekst(id), gemt(id, r), maxSek (stopper selv), stopTekst (knappens tekst under
+  //   optagelsen), foerStart() (mikrofonen har svaret — lige før optagelsen starter: fx stemmen stoppes), behold(id, r)
+  //   (valgfri: klippet gemmes IKKE — kalderen gemmer selv; barnets skærm først ved ✔) }
+  // kode (til barnets skærm, der ikke viser den voksnes tekst): kan-ikke · mikrofon (nej eller fejl) · stille · fejl
+  const kanOptage = () => !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
+  function lavOptager(valg) {
+    const LK = window.Lydklip;
+    const kan = kanOptage();
+    let optagelse = null; // { id, recorder, stream, chunks, knap, tekst, timer }
+    // Sættes FØR der ventes på mikrofonen (getUserMedia kan tage sekunder på iPad): et nyt tryk imens starter ikke en
+    // optagelse til, og stop()/afbryd() (Tilbage, skærmen forlades) annullerer den, så mikrofonen slukkes, når den svarer
+    let starter = null; // { id, annulleret }
+    const slukSpor = (stream) => { if (stream) stream.getTracks().forEach((t) => { try { t.stop(); } catch (e) { /* allerede slukket */ } }); };
+    const hvil = (o) => { clearTimeout(o.timer); o.knap.classList.remove('optager'); o.knap.textContent = o.tekst; };
+    async function stop() {
+      if (starter) { starter.annulleret = true; starter = null; }
+      const o = optagelse;
+      if (!o) return;
+      optagelse = null;
+      hvil(o);
+      const faerdig = new Promise((res) => { o.recorder.onstop = res; });
+      try { o.recorder.stop(); } catch (e) { /* allerede stoppet */ }
+      // Højst 2 s på optagerens stop: mikrofonen slukkes under alle omstændigheder
+      let frist = null;
+      await Promise.race([faerdig, new Promise((res) => { frist = setTimeout(res, 2000); })]);
+      clearTimeout(frist);
+      slukSpor(o.stream);
+      try {
+        const blob = new Blob(o.chunks, { type: o.recorder.mimeType || 'audio/webm' });
+        const buf = await blob.arrayBuffer();
+        Lyd.init();
+        const ac = Lyd.ctx || new (window.AudioContext || window.webkitAudioContext)();
+        const lyd = await new Promise((res, rej) => { const p = ac.decodeAudioData(buf.slice(0), res, rej); if (p && p.then) p.then(res, rej); });
+        const kanaler = [];
+        for (let k = 0; k < lyd.numberOfChannels; k++) kanaler.push(lyd.getChannelData(k));
+        const r = LK.behandl(kanaler, lyd.sampleRate);
+        if (!r) { valg.status('Der var kun stilhed — prøv igen tættere på mikrofonen.', 'stille'); return; }
+        if (valg.behold) { valg.behold(o.id, r); return; } // kalderen gemmer selv
+        await KlipLager.gem('klip', o.id, r.wav);
+        Lyd.saetLokaltKlip(o.id, r.wav);
+        valg.gemt(o.id, r);
+      } catch (e) {
+        valg.status('Optagelsen kunne ikke gemmes (' + (e && e.message ? e.message : 'ukendt fejl') + ').', 'fejl');
+      }
+    }
+    // Afbryd uden at gemme (skærmen forlades, appen går i baggrunden): mikrofonen slukkes med det samme
+    function afbryd() {
+      if (starter) { starter.annulleret = true; starter = null; }
+      const o = optagelse;
+      if (!o) return;
+      optagelse = null;
+      hvil(o);
+      o.recorder.ondataavailable = null;
+      o.recorder.onstop = null;
+      try { o.recorder.stop(); } catch (e) { /* allerede stoppet */ }
+      slukSpor(o.stream);
+    }
+    async function optag(id, knap) {
+      if (starter) return; // mikrofonen er ved at starte: et tryk mere starter ikke en til
+      if (optagelse) { const forrige = optagelse.id; await stop(); if (forrige === id) return; }
+      if (!kan) { valg.status('Denne browser kan ikke optage lyd.', 'kan-ikke'); return; }
+      const s = starter = { id, annulleret: false };
+      let stream = null;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        if (s.annulleret) { slukSpor(stream); return; } // stoppet, mens mikrofonen startede
+        starter = null;
+        if (valg.foerStart) valg.foerStart(id);
+        const recorder = new MediaRecorder(stream);
+        const chunks = [];
+        recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+        recorder.start();
+        const o = optagelse = { id, recorder, stream, chunks, knap, tekst: knap.textContent, timer: null };
+        // Højst maxSek: så stopper optagelsen selv (men kun denne — ikke en ny, der er startet bagefter)
+        if (valg.maxSek) o.timer = setTimeout(() => { if (optagelse === o) stop(); }, valg.maxSek * 1000);
+        knap.classList.add('optager');
+        knap.textContent = valg.stopTekst || '⏹';
+        valg.status(valg.startTekst(id));
+      } catch (e) {
+        if (starter === s) starter = null;
+        slukSpor(stream); // fx kunne MediaRecorder ikke laves: mikrofonen må ikke blive ved med at være tændt
+        if (!s.annulleret) valg.status('Mikrofonen kunne ikke bruges. Giv spillet lov til mikrofonen i browserens indstillinger.', 'mikrofon');
+      }
+    }
+    return { kan, optag, stop, afbryd, optager: () => !!optagelse };
+  }
+
+  // ---------- «Sig dit navn» — barnet indtaler selv sit navn (Jimmy 13-10-2026) ----------
+  // Lige efter navneskærmen, når et navn netop er gemt, oplæsningen er slået til, enheden kan optage, og der ikke er en
+  // optagelse i forvejen. Stemmen guider med sætninger UDEN navnet. 🔴 optager højst 3 s (ringen fyldes), ⏹ stopper før,
+  // og mikrofonen slukkes straks. Optagelsen spilles, og barnet vælger ✔ (gem), 🔁 (prøv igen) eller ⏭ (en voksen kan
+  // optage navnet senere under Indstillinger). Klippet gemmes FØRST ved ✔ — samme lager og id som voksendelens
+  // navneoptagelse, så hilsenen bagefter er «Hej!» + navnet. Stemmen taler aldrig, mens der optages (🔊 er slukket imens),
+  // og mikrofonen slukkes ved ⏭, skærmskift (S.forlad), pagehide/visibilitychange og fejl. Nej til mikrofonen, en fejl
+  // eller stilhed to gange i træk: «Det gør vi en anden gang.», og spillet går videre.
+  const kanSigeNavn = () => !!(data && data.egetNavn && T.id && voksen.tale && kanOptage() && window.Lydklip &&
+    (window.AudioContext || window.webkitAudioContext) && !harNavneklip());
+  function sigNavnEllerVidere(fortsaet) {
+    if (kanSigeNavn()) visSigNavn(fortsaet); else fortsaet();
+  }
+  const SIG_NAVN_TRYK = 'Tryk på den røde knap, og sig dit navn.';
+  const SIG_NAVN_HJAELP_MS = 900; // svarer mikrofonen ikke inden da, spørger iPad nok om lov (en boks, barnet ikke kan læse)
+  function visSigNavn(fortsaet) {
+    const id = navnKlipId();
+    const proeve = id + '-proeve'; // optagelsen, til barnet trykker ✔ — kun i hukommelsen (Lyd.lokale)
+    const navnNu = data.egetNavn;   // navnet, optagelsen hører til
+    let fase = 'klar'; // klar · starter (venter på mikrofonen) · optager · behandler · lyt · slut
+    let startTid = 0, ringTimer = null, hjaelpTimer = null, stille = 0, wav = null, videreKaldt = false;
+    const fig = minFigur();
+    const optagKnap = h('button', { class: 'sig-navn-optag', type: 'button', 'aria-label': 'Optag', onclick: () => roedKnap() }, '🔴');
+    const ring = h('span', { class: 'sig-navn-ring', 'aria-hidden': 'true' });
+    const optagFelt = h('div', { class: 'sig-navn-knap' }, optagKnap, ring);
+    const igenKnap = h('button', { class: 'sig-navn-igen', type: 'button', 'aria-label': 'Igen', onclick: () => igen() }, '🔁');
+    const okKnap = h('button', { class: 'sig-navn-ok', type: 'button', 'aria-label': 'Færdig', onclick: () => gemKlip() }, '✔');
+    const valgFelt = h('div', { class: 'sig-navn-valg' }, igenKnap, okKnap);
+    const hoejt = hoejttaler();
+    const optager = lavOptager({
+      maxSek: 3,
+      stopTekst: '⏹',
+      foerStart: () => { clearTimeout(hjaelpTimer); Forloeb.stop(); Tale.stop(); }, // stemmen må aldrig tale, mens der optages
+      startTekst: () => { visOptager(); return ''; },
+      status: (t, kode) => { if (kode) fejl(kode); },
+      behold: (_, r) => lyt(r.wav),
+    });
+
+    function visKlar() {
+      fase = 'klar';
+      clearInterval(ringTimer);
+      ring.style.setProperty('--p', 0);
+      valgFelt.classList.add('skjult');
+      okKnap.classList.remove('puls');
+      optagFelt.classList.remove('skjult');
+      optagKnap.classList.add('puls');
+      optagKnap.setAttribute('aria-label', 'Optag');
+      hoejt.disabled = false;
+    }
+    function visOptager() {
+      fase = 'optager';
+      startTid = performance.now();
+      optagKnap.classList.remove('puls');
+      optagKnap.setAttribute('aria-label', 'Stop');
+      ring.style.setProperty('--p', 0);
+      clearInterval(ringTimer);
+      // Ringen fyldes på 3 s; er optagelsen stoppet (⏹ eller af sig selv), behandles den
+      ringTimer = setInterval(() => {
+        if (!optager.optager()) { clearInterval(ringTimer); if (fase === 'optager') fase = 'behandler'; return; }
+        ring.style.setProperty('--p', Math.min(1, (performance.now() - startTid) / 3000));
+      }, 50);
+    }
+    // 🔴 (og ⏹ under optagelsen). Et dobbelttryk starter ikke to optagelser og stopper ikke den første med det samme.
+    function roedKnap() {
+      if (fase === 'optager') {
+        if (performance.now() - startTid < 700) return;
+        fase = 'behandler';
+        Lyd.init();
+        optager.stop();
+        return;
+      }
+      if (fase !== 'klar') return; // mikrofonen er ved at starte, eller optagelsen behandles
+      fase = 'starter';
+      Lyd.init();
+      Forloeb.stop(); Tale.stop();
+      optagKnap.classList.remove('puls');
+      hoejt.disabled = true;
+      // Første gang kan iPad spørge om lov til mikrofonen: svarer den ikke straks, skal barnet hente en voksen
+      hjaelpTimer = setTimeout(() => { if (fase === 'starter') Tale.sig('Hent en voksen, hvis der kommer en besked.'); }, SIG_NAVN_HJAELP_MS);
+      optager.optag(proeve, optagKnap);
+    }
+    function lyt(w) {
+      if (fase === 'slut') return; // skærmen er forladt, mens optagelsen blev behandlet
+      clearInterval(ringTimer);
+      fase = 'lyt';
+      wav = w;
+      Lyd.saetLokaltKlip(proeve, w);
+      ring.style.setProperty('--p', 0);
+      const fokus = optagFelt.contains(document.activeElement);
+      optagFelt.classList.add('skjult');
+      valgFelt.classList.remove('skjult');
+      okKnap.classList.add('puls');
+      hoejt.disabled = false;
+      if (fokus) okKnap.focus();
+      Lyd.aabn(); // iOS: lydkanalen kan være afbrudt af mikrofonen
+      afspil();
+    }
+    const afspil = () => { Forloeb.stop(); Forloeb.run({ tekst: 'Hør her.', navnKlip: proeve, efter: 'Var det godt? Så tryk på det grønne flueben.' }); };
+    function igen() {
+      if (fase !== 'lyt') return;
+      Lyd.init(); Lyd.tryk();
+      Forloeb.stop();
+      Lyd.fjernLokaltKlip(proeve);
+      wav = null;
+      const fokus = valgFelt.contains(document.activeElement);
+      visKlar();
+      if (fokus) optagKnap.focus();
+      Tale.sig(SIG_NAVN_TRYK);
+    }
+    // ✔: gemmes på enheden som voksendelens navneoptagelse og bruges med det samme (synkront i trykket — iOS).
+    // Kan IndexedDB ikke gemme (fx privat browsing), bruges klippet heller ikke nu.
+    function gemKlip() {
+      if (fase !== 'lyt' || !wav) return;
+      Lyd.init(); Lyd.tryk();
+      const w = wav;
+      if (!data || data.egetNavn !== navnNu) { videre(); return; } // navnet er ændret i en anden fane imens
+      Lyd.saetLokaltKlip(id, w);
+      KlipLager.gem('klip', id, w).catch(() => Lyd.fjernLokaltKlip(id));
+      videre();
+    }
+    function fejl(kode) {
+      if (fase === 'slut') return;
+      clearTimeout(hjaelpTimer);
+      if (kode === 'stille' && ++stille < 2) { visKlar(); Tale.sig('Jeg kunne ikke høre dig. Prøv igen.'); return; }
+      ryd();
+      Tale.sig('Det gør vi en anden gang.', videre); // spillet går videre, når sætningen er sagt (⏭ imens går straks)
+    }
+    function ryd() {
+      fase = 'slut';
+      clearTimeout(hjaelpTimer);
+      clearInterval(ringTimer);
+      optager.afbryd(); // mikrofonen slukkes med det samme — også hvis den stadig er ved at starte
+      Lyd.fjernLokaltKlip(proeve);
+      wav = null;
+      document.removeEventListener('visibilitychange', vagt);
+      window.removeEventListener('pagehide', vagt);
+      if (S.forlad === ryd) S.forlad = null;
+    }
+    function videre() {
+      if (videreKaldt) return;
+      videreKaldt = true;
+      ryd();
+      if (tok === S.token) fortsaet();
+    }
+    // Appen i baggrunden eller siden lukkes: mikrofonen slukkes, og barnet kan trykke 🔴 igen bagefter
+    function vagt(e) {
+      if (e.type !== 'pagehide' && !document.hidden) return;
+      if (fase !== 'starter' && fase !== 'optager') return;
+      clearTimeout(hjaelpTimer);
+      optager.afbryd();
+      visKlar();
+    }
+    const springOver = () => { Lyd.init(); videre(); }; // ⏭ og Esc: optagelsen kasseres
+
+    const tok = skift(h('div', { class: ['skaerm', 'sig-navn'].join(' ') },
+      h('div', { class: 'topbar' },
+        ikonKnap('⏭', 'Spring over', springOver, 'sig-navn-spring'),
+        h('div', { class: 'topbar-titel', 'aria-hidden': 'true' }, '🎙️'),
+        hoejt),
+      h('div', { class: 'sig-navn-midte' },
+        h('div', { class: 'sig-navn-ven', 'aria-hidden': 'true', 'data-ven': fig.id }, venTegning(fig.id, 'vinker')),
+        optagFelt,
+        valgFelt)),
+    (e) => {
+      if (performance.now() < (S.spaertTil || 0)) return; // 2. Enter/Esc fra «Hvad hedder du?» (dobbelttryk) rammer ikke her
+      if (e.key === 'Escape') { e.preventDefault(); springOver(); return; }
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      if (document.activeElement && document.activeElement.tagName === 'BUTTON') return; // en fokuseret knap (Tab) beholder sin tast
+      e.preventDefault();
+      if (fase === 'lyt') gemKlip(); else roedKnap();
+    });
+    S.forlad = ryd;
+    S.gentagTale = 'Nu skal du sige dit navn. ' + SIG_NAVN_TRYK;
+    S.gentagFn = () => { if (fase === 'lyt') afspil(); else if (fase === 'klar') Tale.sig(S.gentagTale); }; // aldrig under optagelsen
+    document.addEventListener('visibilitychange', vagt);
+    window.addEventListener('pagehide', vagt);
+    visKlar();
+    Tale.sig(S.gentagTale); // synkront i trykket på ✔ (iOS)
   }
 
   // ---------- Verdenskort ----------
@@ -1252,7 +1524,7 @@
     skift(h('div', { class: 'skaerm fagvalg' },
       h('div', { class: 'topbar' },
         h('a', { class: 'ikon-knap', href: 'index.html', 'aria-label': 'Skift spiller', title: 'Skift spiller' }, '🏠'),
-        h('div', { class: navnKlasse('topbar-titel', visNavn()) }, visNavn()),
+        h('div', { class: 'topbar-titel' }, data.navn),
         h('div', { class: 'topbar-hoejre' }, advarselKnap(), hoejttaler())), // ⚠️ hvis spillet ikke kan gemme
       h('div', { class: 'fagvalg-liste' },
         kort('matematik', '🔢', 'Matematik', 'Matematik — tal'),
@@ -1282,7 +1554,7 @@
       h('div', { class: 'topbar' },
         h('a', { class: 'ikon-knap', href: 'index.html', 'aria-label': 'Skift spiller', title: 'Skift spiller' }, '🏠'),
         fagKnap,
-        h('div', { class: navnKlasse('topbar-titel', visNavn()) }, visNavn()),
+        h('div', { class: 'topbar-titel' }, data.navn),
         h('div', { class: 'topbar-hoejre' }, advarselKnap(), hoejttaler())),
       h('div', { class: 'fagvalg-liste' },
         kort('eventyr', '🗺️', 'Eventyr', 'Eventyr — verdenerne i rækkefølge'),
@@ -1369,7 +1641,7 @@
       h('div', { class: 'topbar' },
         h('a', { class: 'ikon-knap', href: 'index.html', 'aria-label': 'Skift spiller', title: 'Skift spiller' }, '🏠'),
         fagKnap || advarsel || topbarPlads(), // to knapper til højre — så titlen står i midten
-        h('div', { class: 'topbar-titel' }, h('span', { class: navnKlasse('kort-navn', visNavn()) }, visNavn()), data.perler && !advarsel ? h('span', { class: 'perle-tal lille' }, ' ✨ ' + data.perler) : null),
+        h('div', { class: 'topbar-titel' }, h('span', { class: 'kort-navn' }, data.navn), data.perler && !advarsel ? h('span', { class: 'perle-tal lille' }, ' ✨ ' + data.perler) : null),
         h('div', { class: 'topbar-hoejre' },
           fagKnap ? advarsel : null,
           ikonKnap('📖', 'Samlebog', () => visSamlebog()),
@@ -5775,7 +6047,7 @@
       hentMission();
       visStart();
     } else if (T.side === 'voksen' && window.Voksen) {
-      window.Voksen.start({ h, G, O, D, lager, voksen, Lyd, Tale, Piper, Forloeb, KlipLager, skift, hop, vent, FIGURER, venTegning, VERDENER, DANSK_VERDENER, fyrtaarn, tegnVisning, valgIndhold, gemVoksen, lagerAdvarsel });
+      window.Voksen.start({ h, G, O, D, lager, voksen, Lyd, Tale, Piper, Forloeb, KlipLager, lavOptager, skift, hop, vent, FIGURER, venTegning, VERDENER, DANSK_VERDENER, fyrtaarn, tegnVisning, valgIndhold, gemVoksen, lagerAdvarsel });
     } else {
       visIndex();
     }

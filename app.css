@@ -109,7 +109,6 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
 /* Tom plads i stedet for en knap, så titlen står i midten. Den giver sig først, hvis titlen ellers ikke kan være der. */
 .topbar-plads { flex: 0 1 var(--ikon); min-width: 0; }
 .kort .topbar-titel { flex: 1 0 auto; } /* barnets navn og perlerne skæres aldrig af — pladsen giver sig i stedet */
-.topbar-titel.meget-langt, .topbar-titel .meget-langt { font-size: clamp(18px, 3vmin, 26px); } /* barnets eget navn, 11–12 tegn */
 
 .ikon-knap {
   width: var(--ikon);
@@ -227,8 +226,6 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
 }
 /* Lange navne («Enhjørning») må ikke stikke ud af kortet på en smal telefon */
 .spiller-navn.langt { font-size: clamp(22px, 3.8vmin, 38px); }
-/* Barnets eget navn (højst 12 tegn): 11–12 tegn får en mindre skrift — og brydes hellere end at stikke ud */
-.spiller-navn.meget-langt { font-size: clamp(18px, 3vmin, 30px); overflow-wrap: anywhere; text-align: center; }
 @media (orientation: portrait) and (max-width: 600px) {
   .spiller-kort { width: 40vw; }
   .spiller-voksen { width: 30vw; }
@@ -267,7 +264,6 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
   color: var(--farve-1-moerk);
   margin-bottom: 2vmin;
 }
-.start-navn.meget-langt { font-size: clamp(30px, 6vmin, 56px); max-width: calc(100vw - 32px); overflow-wrap: anywhere; text-align: center; }
 .spil-knap { width: clamp(130px, 22vmin, 190px); height: clamp(130px, 22vmin, 190px); font-size: clamp(64px, 11vmin, 96px); }
 /* Telefonen på langs (ca. 390 px høj): mindsteværdierne ovenfor (130 px figur + 130 px ▶) fylder mere end skærmen —
    ▶ blev skåret af forneden, og tårnet ramte toppen (ui-review 11-10). Her følger alt højden, i alt ca. 82 % af den */
@@ -316,6 +312,60 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
   .bogstav-tastatur { --b: 52px; gap: 6px; }
   .navn-ven { display: none; }
   .navn-vis, .navn-raekke .navn-ok { height: 56px; }
+}
+
+/* ---------- «Sig dit navn» (13-10-2026): barnet indtaler selv sit navn — 🔴 i en ring, der fyldes på 3 sekunder ---------- */
+.sig-navn .topbar-titel { font-size: calc(var(--ikon) * 0.5); }
+.sig-navn .hoejttaler:disabled { opacity: 0.4; cursor: default; } /* stemmen taler aldrig under optagelsen */
+/* Knapfeltet (🔴 med ringen · 🔁 ✔) fylder det samme i alle faser, så vennen står stille, når knapperne skifter (review
+   13-10-2026): --sn-roed = 🔴, --sn-valg = 🔁/✔, --sn-mellem = afstanden mellem dem; feltet er det største af de to */
+.sig-navn-midte {
+  --sn-roed: clamp(120px, 24vmin, 190px); --sn-valg: clamp(104px, 19vmin, 150px); --sn-mellem: clamp(16px, 5vmin, 48px);
+  --sn-bredde: max(calc(var(--sn-roed) + 28px), calc(2 * var(--sn-valg) + var(--sn-mellem)));
+  --sn-hoejde: max(calc(var(--sn-roed) + 28px), var(--sn-valg));
+  flex: 1; min-height: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: clamp(16px, 5vmin, 56px); padding: 8px 16px 20px;
+}
+.sig-navn-ven { flex: 0 0 auto; font-size: clamp(96px, 24vmin, 220px); line-height: 1; filter: drop-shadow(0 10px 8px var(--skygge)); }
+.sig-navn-ven svg { display: block; width: 1em; height: 1em; }
+.sig-navn-knap {
+  --s: var(--sn-roed); position: relative; flex: 0 0 auto; width: var(--s); height: var(--s);
+  margin: calc((var(--sn-hoejde) - var(--s)) / 2) calc((var(--sn-bredde) - var(--s)) / 2); /* mindst 14 px til ringen */
+}
+.sig-navn-optag {
+  width: 100%; height: 100%; padding: 0; border: none; border-radius: 50%;
+  background: var(--hvid); box-shadow: 0 7px 0 var(--skygge-stor), 0 12px 24px var(--skygge);
+  font-size: calc(var(--s) * 0.5); line-height: 1; display: flex; align-items: center; justify-content: center;
+  transition: transform 0.08s;
+}
+.sig-navn-optag:active { transform: translateY(4px) scale(0.97); box-shadow: 0 2px 0 var(--skygge-stor); }
+.sig-navn-optag.optager { background: #ffe1e1; }
+/* Ringen ligger uden om knappen (som voksenlåsens .laas-ring): den ses kun under optagelsen og fyldes med --p */
+.sig-navn-ring {
+  --p: 0; position: absolute; inset: -14px; border-radius: 50%; pointer-events: none; opacity: 0;
+  background: conic-gradient(var(--rod-brik) calc(var(--p) * 360deg), rgba(229, 72, 77, 0.2) 0);
+  -webkit-mask: radial-gradient(circle closest-side, transparent calc(100% - 9px), #000 calc(100% - 8px));
+  mask: radial-gradient(circle closest-side, transparent calc(100% - 9px), #000 calc(100% - 8px));
+}
+.sig-navn-optag.optager + .sig-navn-ring { opacity: 1; }
+.sig-navn-valg { flex: 0 0 auto; width: var(--sn-bredde); height: var(--sn-hoejde); display: flex; align-items: center; justify-content: center; gap: var(--sn-mellem); }
+.sig-navn-valg button {
+  flex: 0 0 auto; width: var(--sn-valg); height: var(--sn-valg); padding: 0; border: none; border-radius: 50%;
+  font-size: clamp(48px, 9vmin, 72px); line-height: 1; display: inline-flex; align-items: center; justify-content: center;
+  transition: transform 0.08s;
+}
+.sig-navn-valg button:active { transform: translateY(4px) scale(0.97); }
+.sig-navn-igen { background: var(--hvid); box-shadow: 0 7px 0 var(--skygge-stor), 0 12px 24px var(--skygge); }
+.sig-navn-ok { color: var(--hvid); background: radial-gradient(circle at 35% 30%, #4fbf7c, var(--rigtig) 55%, var(--rigtig-moerk)); box-shadow: 0 7px 0 var(--rigtig-moerk), 0 12px 24px var(--skygge-stor); }
+/* Højkant: vennen over knappen, og begge følger bredden (telefonen har god plads i højden) */
+@media (orientation: portrait) {
+  .sig-navn-midte { flex-direction: column; --sn-roed: clamp(120px, 40vw, 190px); }
+  .sig-navn-ven { font-size: clamp(96px, 34vw, 220px); }
+}
+/* Telefonen på langs (ca. 390 px høj): alt følger højden */
+@media (orientation: landscape) and (max-height: 500px) {
+  .sig-navn-midte { --sn-roed: 34vh; --sn-valg: 32vh; }
+  .sig-navn-ven { font-size: 30vh; }
+  .sig-navn-valg button { font-size: 15vh; }
 }
 
 /* ---------- Vælg ven ---------- */
@@ -1223,14 +1273,7 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
 .brik:disabled { opacity: 0.3; box-shadow: none; }
 .brik-felt .brik:disabled { opacity: 1; }
 .brik-ok { max-width: 260px; }
-/* Låsens regnestykke: hele tastaturet skal kunne ses uden at rulle — også på iPad på langs, når
-   Safaris værktøjslinjer tager plads. svh = den synlige højde med værktøjslinjerne fremme. */
-.laas .voksen-spoerg.stor { margin: 0; }
-.laas .voksen-tast { --tast: clamp(56px, 10.5vh, 96px); }
-@supports (height: 1svh) { .laas .voksen-tast { --tast: clamp(56px, 10.5svh, 96px); } }
-.stor-laas { font-size: 72px; line-height: 1; }
 .voksen-spoerg { font-size: clamp(20px, 3vmin, 28px); line-height: 1.5; font-weight: 700; text-align: center; max-width: 820px; }
-.voksen-spoerg.stor { font-size: clamp(30px, 6vmin, 52px); }
 .voksen math { font-size: 1.15em; math-style: normal; } /* brøker i fuld størrelse, også inline */
 .voksen-valg-knap math { font-size: 1.3em; }
 .voksen-valg { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; width: 100%; max-width: 760px; }
