@@ -1156,7 +1156,24 @@
       const taelIndtalt = () => {
         const n = liste.filter((l) => ctx.Lyd.harLokaltKlip(l.id)).length;
         taeller.textContent = n + ' af ' + liste.length + ' indtalt';
+        sletAlle.hidden = n === 0; // kun, når der findes en bogstavoptagelse på enheden
       };
+      // Bogstavoptagelserne på denne enhed (IndexedDB) går forud for spillets egne lyde — her kan de slettes (13-10-2026).
+      // Kun id'er fra LYDLISTE: barnets navn (egetnavn-*) og tegningerne røres aldrig.
+      const sletAlle = h('button', { class: 'voksen-valg-knap indtal-slet-alle', type: 'button', onclick: () => sletOptagelser() }, '🗑️ Slet optagelserne på denne enhed');
+      async function sletOptagelser() {
+        const ids = liste.map((l) => l.id).filter((id) => !LK.erNavnKlip(id) && ctx.Lyd.harLokaltKlip(id));
+        if (!ids.length) return;
+        if (!confirm('Slette alle bogstavoptagelser på denne enhed? Spillet bruger så sine egne lyde. Barnets navn og tegningerne bliver.')) return;
+        stop();
+        let fejl = 0;
+        for (const id of ids) {
+          try { await ctx.KlipLager.slet('klip', id); ctx.Lyd.fjernLokaltKlip(id); } catch (e) { fejl++; }
+        }
+        liste.forEach(opdaterRaekke);
+        taelIndtalt();
+        status.textContent = fejl ? 'Nogle optagelser kunne ikke slettes. Prøv igen.' : 'Optagelserne er slettet.';
+      }
       const taeller = h('b', { class: 'indtal-taeller' }, '');
       const opdaterRaekke = (l) => {
         const r = raekker[l.id];
@@ -1194,7 +1211,8 @@
             h('p', null, 'Sid et stille sted 10–15 cm fra mikrofonen. Tryk 🔴, sig lyden, og tryk ⏹. Holdelyde (m, s, l …) i ca. 1 sekund; stoplyde (p, t, k …) helt korte uden «ø» bagefter. Tryk ▶ for at lytte, og optag igen, hvis det ikke lød rigtigt.'),
             h('p', null, 'Klippene gemmes kun på denne enhed og virker med det samme her. «Eksportér» laver én fil, som kan lægges i spillet, så alle enheder får dem.'),
             h('div', { class: 'voksen-knaprad' }, taeller,
-              h('button', { class: 'voksen-valg-knap', type: 'button', onclick: eksporter }, '💾 Eksportér')),
+              h('button', { class: 'voksen-valg-knap', type: 'button', onclick: eksporter }, '💾 Eksportér'),
+              sletAlle),
             status),
           h('section', { class: 'indtal-liste' }, rk))));
       liste.forEach(opdaterRaekke);
