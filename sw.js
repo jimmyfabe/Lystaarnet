@@ -1,8 +1,8 @@
 /* sw.js — service worker, så spillet virker uden net.
    Ved hver ny udgave: tæl VERSION op. Filerne hentes med cache: 'reload',
    så GitHub Pages' HTTP-cache ikke giver en blanding af gamle og nye filer. */
-const VERSION = 'mat-2026-10-13-v133';
-// FILER-HASH: a06ecc550f63f627 mat-2026-10-13-v133 — opdateres med: node test/test-sw.js --opdater
+const VERSION = 'mat-2026-10-13-v134';
+// FILER-HASH: 6a2c6cd90330ddb8 mat-2026-10-13-v134 — opdateres med: node test/test-sw.js --opdater
 const FILER = [
   './',
   'index.html',

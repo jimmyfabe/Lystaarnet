@@ -649,6 +649,9 @@
             try {
               const svar = await fetch(window.Talefiler.sti(n));
               if (!svar || !svar.ok) continue;
+              // Uden sw gemmer siden selv: kun et lydsvar (som sw.js' heltLydsvar) — ellers kunne fx en captive portals
+              // HTML blive gemt som stemmefil og aldrig blive hentet igen
+              if (!swGemmer && !/^audio\//i.test((svar.headers && svar.headers.get('Content-Type')) || '')) continue;
               ab = await svar.arrayBuffer();
             } catch (e) { continue; } // netfejl: filen springes over
             if (!swGemmer) {
