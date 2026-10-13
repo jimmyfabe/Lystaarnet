@@ -1328,6 +1328,25 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
 .overblik-indhold ul { margin: 6px 0; padding-left: 22px; }
 .overblik-tabel { width: 100%; border-collapse: collapse; font-size: 17px; }
 .overblik-tabel td { padding: 6px 8px; border-top: 1px solid #e6e1d6; vertical-align: top; }
+/* Opstart (Indstillinger): højst de 10 seneste starter. Tallene står under hinanden; på en smal telefon ruller tabellen
+   vandret (feltet kan få fokus, så piletasterne ruller). «Skærm» — tiden med sort skærm — er det tal, man kigger efter.
+   En blød skygge i kanten viser, at der er mere at rulle til, og forsvinder ved enden: skyggerne sidder fast i feltets
+   kanter (scroll), og to dæk i baggrundens farve ruller med indholdet (local) og dækker dem, når enden er nået. */
+.opstart-rulle {
+  overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 4px -8px;
+  background:
+    linear-gradient(to right, var(--hvid) 50%, rgba(255, 253, 248, 0)) left / 32px 100% no-repeat local,
+    linear-gradient(to left, var(--hvid) 50%, rgba(255, 253, 248, 0)) right / 32px 100% no-repeat local,
+    linear-gradient(to right, var(--skygge-stor), rgba(70, 45, 20, 0)) left / 16px 100% no-repeat scroll,
+    linear-gradient(to left, var(--skygge-stor), rgba(70, 45, 20, 0)) right / 16px 100% no-repeat scroll;
+}
+.opstart-rulle:focus-visible { outline: 4px solid var(--tekst); outline-offset: 2px; border-radius: 8px; }
+.opstart-rulle table { width: auto; min-width: 100%; }
+.opstart-rulle th { padding: 6px 8px; font-weight: 700; text-align: right; white-space: nowrap; }
+.opstart-rulle td { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.opstart-rulle .opstart-tekst { text-align: left; }
+.opstart-rulle .opstart-skaerm { font-weight: 700; }
+.opstart-hjaelp { font-size: 17px; max-width: 640px; }
 .tid-soejler { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; height: 150px; align-items: end; margin-top: 8px; }
 .tid-soejle { height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; }
 .tid-soejle i { display: block; width: 70%; min-height: 3px; border-radius: 8px 8px 2px 2px; background: var(--farve-1); }

@@ -765,7 +765,39 @@
             h('div', { class: 'voksen-knaprad' },
               h('button', { class: 'voksen-valg-knap', type: 'button', onclick: gemKopi }, '💾 Gem en kopi'),
               h('button', { class: 'voksen-valg-knap', type: 'button', onclick: indlaesKopi }, '📂 Indlæs en kopi'),
-              kanFortryde ? h('button', { class: 'voksen-valg-knap', type: 'button', onclick: fortrydIndlaesning }, '↩️ Fortryd seneste indlæsning') : null)))));
+              kanFortryde ? h('button', { class: 'voksen-valg-knap', type: 'button', onclick: fortrydIndlaesning }, '↩️ Fortryd seneste indlæsning') : null)),
+          opstartSektion())));
+    }
+
+    // Opstart (13-10-2026): højst de 10 seneste starter af spillet på denne enhed (app.js maalOpstart → G.noterOpstart),
+    // nyeste øverst — så en langsom start (sort skærm) kan måles på iPhone uden en Mac. Kun tal; et ukendt tal er «–».
+    function opstartSektion() {
+      const liste = G.laesOpstart(lager).slice().reverse();
+      const SIDER = ['Forside', 'Dino', 'Enhjørning', 'Voksen']; // samme rækkefølge som G.OPSTART_SIDER
+      const ms = (v) => (v === null ? '–' : String(v).replace(/\B(?=(\d{3})+(?!\d))/g, '.'));
+      const p2 = (n) => String(n).padStart(2, '0');
+      const tid = (t) => { const d = new Date(t); return p2(d.getDate()) + '-' + p2(d.getMonth() + 1) + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes()); };
+      // De vigtigste kolonner først — de står helt fremme ned til 360 px bredde; resten ruller vandret ind (app.css)
+      const KOLONNER = ['Tidspunkt', 'Skærm', 'Svar', 'SW', 'Side', 'FCP', 'SW-tid'];
+      const TEKST = ['Tidspunkt', 'SW', 'Side']; // venstrestillet (opstart-tekst); tallene står til højre
+      const tabel = h('div', { class: 'opstart-rulle', role: 'region', 'aria-labelledby': 'opstart-titel', tabindex: '0' },
+        h('table', { class: 'overblik-tabel' },
+          h('thead', null, h('tr', null, KOLONNER.map((k) => h('th', { scope: 'col', class: TEKST.includes(k) ? 'opstart-tekst' : null }, k)))),
+          h('tbody', null, liste.map((m) => h('tr', null,
+            h('td', { class: 'opstart-tekst' }, tid(m.t)),
+            h('td', { class: 'opstart-skaerm' }, ms(m.skaerm)),
+            h('td', null, ms(m.rs)),
+            h('td', { class: 'opstart-tekst' }, m.st === null ? '–' : m.st ? 'ja' : 'nej'),
+            h('td', { class: 'opstart-tekst' }, m.s === null ? '–' : SIDER[m.s]),
+            h('td', null, ms(m.fcp)),
+            h('td', null, ms(m.sw)))))));
+      return h('section', { class: 'opstart' }, h('h2', { id: 'opstart-titel' }, 'Opstart'),
+        h('p', null, 'De seneste starter af spillet (højst 10) på denne enhed, i millisekunder fra siden blev åbnet.'),
+        liste.length ? tabel : h('p', { class: 'opstart-tom' }, 'Ingen målinger endnu.'),
+        liste.length ? h('p', { class: 'opstart-hjaelp' },
+          '«Skærm» er, når den første skærm var tegnet — før det er skærmen sort. ' +
+          '«FCP» er det første, browseren tegnede, og «Svar» er, når siden kom frem. ' +
+          '«SW» er ja, når service workeren styrede siden, og «SW-tid» er den del af svaret, den brugte.') : null);
     }
 
     // Stemme: Lystårnets stemme (Piper-filerne i tale/, når de findes) øverst, derunder de danske stemmer på enheden

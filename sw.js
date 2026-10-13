@@ -1,8 +1,8 @@
 /* sw.js — service worker, så spillet virker uden net.
    Ved hver ny udgave: tæl VERSION op. Filerne hentes med cache: 'reload',
    så GitHub Pages' HTTP-cache ikke giver en blanding af gamle og nye filer. */
-const VERSION = 'mat-2026-10-13-v126';
-// FILER-HASH: caa02f17d2d0b155 mat-2026-10-13-v126 — opdateres med: node test/test-sw.js --opdater
+const VERSION = 'mat-2026-10-13-v133';
+// FILER-HASH: a06ecc550f63f627 mat-2026-10-13-v133 — opdateres med: node test/test-sw.js --opdater
 const FILER = [
   './',
   'index.html',
@@ -40,10 +40,69 @@ const FILER = [
   'ikoner/enhjorning-512.png',
 ];
 
-// Piper-stemmen (tale/<ab>/<nøgle>.mp3): filnavnene er indholds-hashes, så en fil ændrer sig aldrig. De ligger i en
-// egen cache, som overlever nye udgaver — ellers skulle iPad'en hente hele stemmen igen ved hver opdatering.
-const TALE_CACHE = 'mat-tale';
+// Piper-stemmen (tale/<ab>/<nøgle>.mp3): filnavnene er indholds-hashes, så en fil ændrer sig aldrig. De ligger i
+// IndexedDB (TALE_DB, nøgle = filens 14 hex-tegn, værdi = ArrayBuffer), som overlever nye udgaver.
+// IKKE i Cache Storage (13-10-2026, v126): WebKit indlæser oplysningerne om ALLE caches ved det første Cache API-kald —
+// med 12.500 stemmefiler tog det første caches.open(VERSION) over 1,3 s ved hver start (sort skærm på iPhone).
+// Den gamle cache «mat-tale» slettes ved activate; app.js (Piper.hentAlle/TaleLager) henter stemmen igen i baggrunden.
+// Databasen deles med app.js (TaleLager): samme navn, version og store — test/test-sw-tale.js vogter det.
+const TALE_DB = 'lystaarn-tale';
+const TALE_STORE = 'filer';
 const erTale = (url) => /\/tale\/[0-9a-f]{2}\/[0-9a-f]{14}\.mp3$/.test(new URL(url).pathname);
+const taleNoegle = (url) => new URL(url).pathname.slice(-18, -4);
+
+// Én forbindelse pr. service worker. Lukker browseren den (versionchange, lager ryddet), åbnes den igen næste gang.
+let taleDb = null;
+function aabenTale() {
+  if (taleDb) return taleDb;
+  if (typeof indexedDB === 'undefined' || !indexedDB) return Promise.reject(new Error('ingen IndexedDB'));
+  const p = new Promise((res, rej) => {
+    let r;
+    try { r = indexedDB.open(TALE_DB, 1); } catch (e) { rej(e); return; }
+    r.onupgradeneeded = () => { if (!r.result.objectStoreNames.contains(TALE_STORE)) r.result.createObjectStore(TALE_STORE); };
+    r.onsuccess = () => {
+      const db = r.result;
+      db.onversionchange = () => { db.close(); if (taleDb === p) taleDb = null; };
+      db.onclose = () => { if (taleDb === p) taleDb = null; };
+      res(db);
+    };
+    r.onerror = () => rej(r.error);
+    r.onblocked = () => rej(new Error('IndexedDB blokeret'));
+  });
+  taleDb = p;
+  p.catch(() => { if (taleDb === p) taleDb = null; });
+  return p;
+}
+function taleKald(mode, fn) {
+  return aabenTale().then((db) => new Promise((res, rej) => {
+    let tx;
+    // En lukket forbindelse (InvalidStateError): glem den, så næste kald åbner en ny — ellers var stemmen væk offline
+    try { tx = db.transaction(TALE_STORE, mode); } catch (err) { taleDb = null; rej(err); return; }
+    const req = fn(tx.objectStore(TALE_STORE));
+    tx.oncomplete = () => res(req.result);
+    tx.onerror = () => rej(tx.error);
+    tx.onabort = () => rej(tx.error);
+  }));
+}
+// En brugbar fil: ArrayBuffer (eller Blob) med indhold — alt andet er et miss
+const harIndhold = (v) => !!v && ((typeof v.byteLength === 'number' && v.byteLength > 0) || (typeof v.size === 'number' && v.size > 0));
+
+// Kun et helt lydsvar gemmes: 200 (ikke 206 Partial Content) og audio/* (ikke en fejlside i HTML med status 200)
+const heltLydsvar = (svar) => svar.status === 200 && svar.type === 'basic' && /^audio\//i.test(svar.headers.get('Content-Type') || '');
+
+// Stemmefilen fra IndexedDB; ellers fra nettet, og et helt lydsvar gemmes bagefter (svaret venter ikke på gemningen)
+async function taleSvar(e, req) {
+  const n = taleNoegle(req.url);
+  let gemt = null;
+  try { gemt = await taleKald('readonly', (s) => s.get(n)); } catch (err) { /* uden IndexedDB: nettet */ }
+  if (harIndhold(gemt)) return new Response(gemt, { headers: { 'Content-Type': 'audio/mpeg' } });
+  const svar = await fetch(req);
+  if (heltLydsvar(svar)) {
+    const gem = svar.clone().arrayBuffer().then((ab) => (ab.byteLength ? taleKald('readwrite', (s) => s.put(ab, n)) : null)).catch(() => {});
+    try { e.waitUntil(gem); } catch (err) { /* hændelsen er slut — gemningen kører alligevel videre */ }
+  }
+  return svar;
+}
 
 self.addEventListener('install', (e) => {
   e.waitUntil((async () => {
@@ -60,8 +119,9 @@ self.addEventListener('install', (e) => {
 
 self.addEventListener('activate', (e) => {
   e.waitUntil((async () => {
+    // Gamle udgaver — og «mat-tale» (stemmen i Cache Storage før v126), som gjorde hver start langsom
     const navne = await caches.keys();
-    await Promise.all(navne.filter((n) => n.startsWith('mat-') && n !== VERSION && n !== TALE_CACHE).map((n) => caches.delete(n)));
+    await Promise.all(navne.filter((n) => n.startsWith('mat-') && n !== VERSION).map((n) => caches.delete(n)));
     await self.clients.claim();
   })());
 });
@@ -70,8 +130,9 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
+  if (erTale(req.url)) { e.respondWith(taleSvar(e, req)); return; } // stemmen: IndexedDB, aldrig Cache API
   e.respondWith((async () => {
-    const cache = await caches.open(erTale(req.url) ? TALE_CACHE : VERSION);
+    const cache = await caches.open(VERSION);
     const fundet = await cache.match(req, { ignoreSearch: true });
     if (fundet) return fundet;
     try {

@@ -723,6 +723,42 @@
     return skriv(lager, noegle || 'mat_voksen_v1', JSON.stringify(data));
   }
 
+  // ---------- Opstartsmåling (13-10-2026: sort skærm i flere sekunder ved start på iPhone) ----------
+  // De sidste OPSTART_MAX starter på enheden ligger i «mat_opstart_v1» — KUN tal: tidspunkt (t, ms siden 1970),
+  // sidens nummer i OPSTART_SIDER (s), ms fra Navigation Timing (rs = responseStart, sw = responseStart − workerStart,
+  // fcp = first-contentful-paint), skaerm = ms til den første skærm var tegnet, st = 1, hvis en service worker styrede
+  // siden. Et tal, browseren ikke kender, er null. Vises under Voksen → Indstillinger → Opstart.
+  const OPSTART_NOEGLE = 'mat_opstart_v1';
+  const OPSTART_MAX = 10;
+  const OPSTART_SIDER = ['index', 'dino', 'enhjorning', 'voksen'];
+  const OPSTART_MS = ['rs', 'sw', 'fcp', 'skaerm'];
+  const msEllerNull = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 && v < 600000 ? Math.round(v) : null);
+  // Én måling, som den gemmes — alt andet end de kendte tal falder fra; null, hvis tidspunktet ikke giver mening
+  function rensOpstart(m) {
+    if (!erObjekt(m) || typeof m.t !== 'number' || !(m.t > 1e12 && m.t < 1e13)) return null;
+    const ud = { t: Math.round(m.t), s: Number.isInteger(m.s) && m.s >= 0 && m.s < OPSTART_SIDER.length ? m.s : null };
+    for (const f of OPSTART_MS) ud[f] = msEllerNull(m[f]);
+    ud.st = m.st === 1 ? 1 : m.st === 0 ? 0 : null;
+    return ud;
+  }
+  function laesOpstart(lager) {
+    let l;
+    try { l = JSON.parse(laes(lager, OPSTART_NOEGLE)); } catch (e) { return []; }
+    return Array.isArray(l) ? l.map(rensOpstart).filter(Boolean).slice(-OPSTART_MAX) : [];
+  }
+  // maaling = { t, side: 'index' | 'dino' | 'enhjorning', rs, sw, fcp, skaerm, styret } → true, hvis gemt.
+  // Voksen-siden måles ikke (den viser listen og ville selv skubbe spillets starter ud); 'voksen' står stadig i
+  // OPSTART_SIDER, så en ældre måling med s = 3 kan læses.
+  function noterOpstart(lager, maaling) {
+    if (erObjekt(maaling) && maaling.side === 'voksen') return false;
+    const m = rensOpstart(erObjekt(maaling) ? {
+      t: maaling.t, s: OPSTART_SIDER.indexOf(maaling.side),
+      rs: maaling.rs, sw: maaling.sw, fcp: maaling.fcp, skaerm: maaling.skaerm, st: maaling.styret ? 1 : 0,
+    } : null);
+    if (!m) return false;
+    return skriv(lager, OPSTART_NOEGLE, JSON.stringify(laesOpstart(lager).concat([m]).slice(-OPSTART_MAX)));
+  }
+
   // Lager i hukommelsen, hvis localStorage ikke findes (fx privat browsing)
   function hukommelsesLager() {
     const m = {};
@@ -743,6 +779,7 @@
     indlaesBarn, gemBarn, indlaesVoksen, gemVoksen, findBackups, findUlaeselige, importer, lavKopi, rydGamleKopier, fortrydImport, kanFortryde, importKopier,
     dag, tilfoejGentag, fjernGentag, hukommelsesLager,
     MAX_NAVN, normaliserEgetNavn, laesEgetNavn, saetEgetNavn, retEgetNavn,
+    OPSTART_NOEGLE, OPSTART_MAX, OPSTART_SIDER, laesOpstart, noterOpstart,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Gem;

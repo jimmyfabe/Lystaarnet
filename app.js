@@ -607,38 +607,63 @@
     // Højst ms på en fil — ellers null (så taler enhedens stemme). Fejl giver også null.
     medFrist(p, ms) { return Promise.race([p.then((b) => b, () => null), new Promise((r) => setTimeout(() => r(null), ms))]); },
     // Hent hele stemmen i baggrunden til brug uden net — roligt (to ad gangen) og kun, mens siden er synlig og online.
-    // Filerne lægges i service workerens tale-cache (sw.js: mat-tale). status = { hentet, i_alt } til voksendelen.
+    // Filerne ligger i IndexedDB (TaleLager nedenfor; sw.js slår dem op dér). status = { hentet, iAlt } til voksendelen
+    // (hentet = gemt i IndexedDB).
+    // Aldrig Cache API her: et kald dertil får WebKit til at indlæse alle caches (13-10-2026, sw v126).
     status: null,
     async hentAlle() {
       // Kun når stemmen bruges (ikke med en valgt enhedsstemme eller uden oplæsning) — review 12-10, fund 4
-      if (!this.liste || typeof caches === 'undefined' || this.henterAlle || !this.slaaetTil() || !voksen.tale) return;
+      if (!this.liste || !TaleLager.findes() || this.henterAlle || !this.slaaetTil() || !voksen.tale) return;
       this.henterAlle = true;
       try {
-        const c = await caches.open('mat-tale');
-        const gemte = await c.keys();
-        const har = new Set(gemte.map((r) => r.url.slice(r.url.lastIndexOf('/') + 1, -4)));
-        // Filer, der ikke står i listen (en gammel stemme eller fart), fjernes fra cachen (review 12-10, fund 5)
-        for (const r of gemte) { const n = r.url.slice(r.url.lastIndexOf('/') + 1, -4); if (!Object.prototype.hasOwnProperty.call(this.liste, n)) await c.delete(r); }
+        const gemte = await TaleLager.noegler();
+        const har = new Set(gemte);
+        // Filer, der ikke står i listen (en gammel stemme eller fart), fjernes (review 12-10, fund 5)
+        const loese = gemte.filter((n) => !Object.prototype.hasOwnProperty.call(this.liste, n));
+        if (loese.length) await TaleLager.slet(loese);
         const mangler = Object.keys(this.liste).filter((n) => !har.has(n));
         const iAlt = Object.keys(this.liste).length;
         this.status = { hentet: iAlt - mangler.length, iAlt: iAlt };
-        // Styrer service workeren siden, gemmer den selv filen (sw.js) — ellers gør siden det. Første fejl ved gemning
-        // (fx fuld kvote) stopper det hele, så der ikke hentes 66 MB, der ikke kan gemmes.
+        // Styrer service workeren siden, gemmer den selv filen (sw.js) — ellers gør siden det. En fejl ved gemning
+        // (fx fuld kvote) stopper det hele, så der ikke hentes 80 MB, der ikke kan gemmes. En netfejl (fetch eller
+        // indholdet) springer kun filen over; den prøves igen ved næste start.
+        // Service workeren sluger sine egne fejl ved gemning, så siden tæller selv efter i IndexedDB for hver
+        // TJEK_HVER hentede filer: er antallet ikke vokset, stoppes der, og status viser det, der faktisk ligger dér.
         const swGemmer = !!(navigator.serviceWorker && navigator.serviceWorker.controller);
-        let stop = false;
+        const TJEK_HVER = 200;
+        let stop = false, sidenTjek = 0, sidstTalt = this.status.hentet;
+        let taeller = null; // løftet, mens lageret tælles — den anden arbejder venter på det, før den henter mere
+        const taelGemte = async () => {
+          try {
+            const nu = (await TaleLager.noegler()).filter((n) => Object.prototype.hasOwnProperty.call(this.liste, n)).length;
+            this.status.hentet = nu;
+            return nu;
+          } catch (e) { return -1; } // kan lageret ikke læses, kan det heller ikke gemme
+        };
         const arbejder = async () => {
           while (mangler.length && !stop) {
+            if (taeller) { await taeller; continue; }
             if (document.hidden || navigator.onLine === false) { await new Promise((r) => setTimeout(r, 5000)); continue; }
             const n = mangler.shift();
-            let svar = null;
-            try { svar = await fetch(window.Talefiler.sti(n)); } catch (e) { continue; } // prøves næste gang
-            if (!svar || !svar.ok) continue;
-            if (!swGemmer) { try { await c.put(window.Talefiler.sti(n), svar); } catch (e) { stop = true; break; } }
-            this.status.hentet++;
+            let ab = null;
+            try {
+              const svar = await fetch(window.Talefiler.sti(n));
+              if (!svar || !svar.ok) continue;
+              ab = await svar.arrayBuffer();
+            } catch (e) { continue; } // netfejl: filen springes over
+            if (!swGemmer) {
+              try { await TaleLager.gem(n, ab); } catch (e) { stop = true; break; }
+              this.status.hentet++;
+            } else if (++sidenTjek >= TJEK_HVER) {
+              sidenTjek = 0;
+              taeller = taelGemte().then((nu) => { if (nu <= sidstTalt) stop = true; sidstTalt = nu; taeller = null; });
+              await taeller;
+            }
           }
         };
         await Promise.all([arbejder(), arbejder()]);
-      } catch (e) { /* uden Cache API: filerne hentes, når de bruges */ }
+        if (swGemmer) await taelGemte();
+      } catch (e) { /* uden IndexedDB: filerne hentes, når de bruges */ }
       this.henterAlle = false;
     },
     // Hent og afkod på forhånd (næste opgave), så talen starter uden ventetid
@@ -646,6 +671,47 @@
       if (!tekst || !this.slaaetTil() || !Lyd.ctx) return;
       for (const e of window.Talefiler.enheder(tekst)) { const n = this.noegle(e); if (n) this.buffer(n); }
     },
+  };
+
+  // Stemmefilerne på enheden: en EGEN IndexedDB (sw.js TALE_DB/TALE_STORE — samme navn, version og store), nøgle =
+  // filens 14 hex-tegn, værdi = ArrayBuffer (Blob har været ustabil i iOS' IndexedDB). Adskilt fra KlipLager
+  // («lystaarn»), som rummer børnenes optagelser — stemmen kan slettes og hentes igen, optagelserne kan ikke.
+  const TaleLager = {
+    db: null,
+    findes() { return typeof indexedDB !== 'undefined' && !!indexedDB; },
+    aaben() {
+      if (this.db) return this.db;
+      const p = new Promise((res, rej) => {
+        let r;
+        try { r = indexedDB.open('lystaarn-tale', 1); } catch (e) { rej(e); return; }
+        r.onupgradeneeded = () => { if (!r.result.objectStoreNames.contains('filer')) r.result.createObjectStore('filer'); };
+        r.onsuccess = () => {
+          const db = r.result;
+          db.onversionchange = () => { db.close(); if (this.db === p) this.db = null; };
+          db.onclose = () => { if (this.db === p) this.db = null; };
+          res(db);
+        };
+        r.onerror = () => rej(r.error);
+      });
+      this.db = p;
+      p.catch(() => { if (this.db === p) this.db = null; });
+      return p;
+    },
+    kald(mode, fn) {
+      return this.aaben().then((db) => new Promise((res, rej) => {
+        let tx;
+        // En lukket forbindelse (InvalidStateError): glem den, så næste kald åbner en ny (som sw.js taleKald)
+        try { tx = db.transaction('filer', mode); } catch (err) { this.db = null; rej(err); return; }
+        const req = fn(tx.objectStore('filer'));
+        tx.oncomplete = () => res(req ? req.result : undefined);
+        tx.onerror = () => rej(tx.error);
+        tx.onabort = () => rej(tx.error);
+      }));
+    },
+    noegler() { return this.kald('readonly', (s) => s.getAllKeys()); },
+    gem(n, ab) { return this.kald('readwrite', (s) => s.put(ab, n)); },
+    // Flere nøgler i én transaktion
+    slet(liste) { return this.kald('readwrite', (s) => { for (const n of liste) s.delete(n); return null; }); },
   };
 
   // ---------- Oplæsning (Piper-filer, ellers speechSynthesis, dansk) ----------
@@ -6056,6 +6122,35 @@
     if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
       navigator.serviceWorker.register('sw.js').catch(() => { /* offline er en bonus */ });
     }
+    maalOpstart();
+  }
+
+  // Opstartsmåling (13-10-2026: sort skærm ved start på iPhone) — så rettelsen kan ses på enheden uden en Mac.
+  // Hvornår den første skærm var tegnet (næste billede efter boot), og efter load + 1 s tallene fra Navigation Timing
+  // (iOS 15.1+) → G.noterOpstart (kun tal, de sidste 10). Samles efter tegningen, så målingen ikke forsinker starten.
+  // Kun spillets sider (forsiden og børnenes): voksen-siden, der viser listen, ville ellers selv skubbe en start ud.
+  function maalOpstart() {
+    const p = window.performance;
+    if (!p || typeof p.now !== 'function' || (T.side !== 'barn' && T.side !== 'index')) return;
+    const side = T.side === 'barn' ? T.id : T.side;
+    const billede = window.requestAnimationFrame ? (f) => window.requestAnimationFrame(f) : (f) => setTimeout(f, 16);
+    billede(() => setTimeout(() => {
+      const skaerm = p.now(); // lige efter det første billede med skærmen
+      const saml = () => setTimeout(() => {
+        try {
+          const nav = p.getEntriesByType ? p.getEntriesByType('navigation')[0] : null;
+          const fcp = p.getEntriesByType ? p.getEntriesByType('paint').find((x) => x.name === 'first-contentful-paint') : null;
+          G.noterOpstart(lager, {
+            t: Date.now(), side: side, skaerm: skaerm,
+            rs: nav ? nav.responseStart : null,
+            sw: nav && nav.workerStart > 0 ? nav.responseStart - nav.workerStart : null,
+            fcp: fcp ? fcp.startTime : null,
+            styret: !!(navigator.serviceWorker && navigator.serviceWorker.controller),
+          });
+        } catch (e) { /* målingen må aldrig stoppe spillet */ }
+      }, 1000);
+      if (document.readyState === 'complete') saml(); else window.addEventListener('load', saml, { once: true });
+    }, 0));
   }
 
 
