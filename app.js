@@ -286,8 +286,29 @@
   function miniTegning(id, klasse) { return id && MINI[id] ? tegning(MINI[id], klasse || 'mini-tegning') : null; }
   function miniBillede(id, e, klasse) {
     const svg = miniTegning(id, 'mini-tegning');
-    return h('span', { class: 'mini-billede' + (klasse ? ' ' + klasse : '') + (svg ? ' med-tegning' : ''), 'aria-hidden': 'true' }, svg || e || '');
+    return h('span', { class: 'mini-billede' + (klasse ? ' ' + klasse : '') + (svg ? ' med-tegning' : ''), 'aria-hidden': 'true' }, svg || ordTegn(e) || '');
   }
+  // Talordenes emoji er tastetegn (🔟, 2️⃣ …): et barn på seks skal se ti ting, ikke en tast. Billedet bliver i stedet
+  // terningbilleder (skolens repræsentation, som terning() i matematik): 1–6 på én terning, 7–10 som fem og resten på
+  // to terninger. Ordet og oplæsningen er de samme — kun billedet skifter. Andre emoji kommer tilbage uændret.
+  const TERNING_PLADS = { 1: [5], 2: [1, 9], 3: [1, 5, 9], 4: [1, 3, 7, 9], 5: [1, 3, 5, 7, 9], 6: [1, 3, 4, 6, 7, 9] };
+  function tastetegnTal(e) {
+    if (e === '\u{1F51F}') return 10;
+    const m = /^([1-9])\uFE0F?\u20E3$/.exec(e || '');
+    return m ? Number(m[1]) : 0;
+  }
+  function talBillede(n) {
+    const svg = svgEl('svg', { class: 'tal-billede', viewBox: '0 0 100 100', 'aria-hidden': 'true', focusable: 'false', 'data-tal': n });
+    // En terning med sit antal øjne: x, y = øverste venstre hjørne, s = sidelængden
+    const terning = (x, y, s, antal) => {
+      svgEl('rect', { x: x, y: y, width: s, height: s, rx: s * 0.22, class: 'tal-terning' }, svg);
+      TERNING_PLADS[antal].forEach((p) => svgEl('circle', { cx: x + s * (0.27 + 0.23 * ((p - 1) % 3)), cy: y + s * (0.27 + 0.23 * Math.floor((p - 1) / 3)), r: s * 0.095, class: 'tal-oeje' }, svg));
+    };
+    if (n <= 6) terning(7, 7, 86, n);
+    else { terning(2, 2, 54, 5); terning(44, 44, 54, n - 5); } // to terninger på skrå: den anden ligger på hjørnet (dækker intet øje)
+    return svg;
+  }
+  const ordTegn = (e) => { const n = tastetegnTal(e); return n ? talBillede(n) : e; };
 
   // ---------- Små hjælpere ----------
   function h(tag, props) {
@@ -386,6 +407,10 @@
     },
   };
 
+  // Barnets navn som lydklip: «egetnavn-<barn>» (lydklip.js navnKlipId) — optaget på enheden, aldrig i repoet
+  const NAVNEKLIP = 'egetnavn-';
+  const erNavneklip = (id) => typeof id === 'string' && id.indexOf(NAVNEKLIP) === 0;
+
   // ---------- Lyd (WebAudio) — effekter og indtalte klip ----------
   // Effekterne spilles af lydpalet.js (fase B) på spillets egen AudioContext — Lyd er en tynd facade, så de mange
   // Lyd.tryk()/Lyd.rigtig() i spillet ikke skal ændres. Feedback med tale går gennem Forloeb (docs/LYD-INTEGRATION.md).
@@ -403,7 +428,9 @@
           const s = this.ctx.createBufferSource();
           s.buffer = b; s.connect(this.ctx.destination); s.start(0);
         }
-        if (this.ctx.state === 'suspended') this.ctx.resume();
+        // iOS: 'suspended' — og 'interrupted' efter baggrund, opkald eller lydløs — vækkes i selve trykket
+        const st = this.ctx.state;
+        if (st && st !== 'running' && st !== 'closed') { const p = this.ctx.resume(); if (p && p.catch) p.catch(() => {}); }
       } catch (e) { this.ctx = null; }
       return this.ctx;
     },
@@ -427,7 +454,9 @@
     harLokaltKlip(id) { return !!this.lokale[id]; },
     lokaltKlip(id) { return this.lokale[id] || null; },
     saetLokaltKlip(id, bytes) { this.lokale[id] = bytes; delete this.bufre[id]; },
-    harKlip(id) { return !!this.lokale[id] || !!(this.liste && this.liste.has(id)); },
+    fjernLokaltKlip(id) { delete this.lokale[id]; delete this.bufre[id]; },
+    // Barnets navn (NAVNEKLIP) findes kun på enheden: aldrig fra lyd/liste.json
+    harKlip(id) { return !!this.lokale[id] || (!erNavneklip(id) && !!(this.liste && this.liste.has(id))); },
     indlaesKlip() {
       const lokale = KlipLager.alle('klip').then((alle) => { for (const id in alle) if (alle[id]) this.lokale[id] = new Uint8Array(alle[id]); }).catch(() => {});
       const liste = (/^https?:$/.test(location.protocol) ? fetch('lyd/liste.json').then((r) => (r.ok ? r.json() : [])) : Promise.resolve([]))
@@ -438,7 +467,7 @@
     async afkod(id) {
       if (this.bufre[id]) return this.bufre[id];
       let bytes = this.lokale[id];
-      if (!bytes && this.liste && this.liste.has(id)) {
+      if (!bytes && !erNavneklip(id) && this.liste && this.liste.has(id)) {
         const r = await fetch('lyd/' + encodeURIComponent(id) + '.wav');
         if (r.ok) bytes = new Uint8Array(await r.arrayBuffer());
       }
@@ -451,17 +480,22 @@
     // Afspil et klip (eller sig reserven). Løftet holder, til lyden er færdig.
     async klip(id, reserve) {
       if (!voksen.tale) return;
-      const gen = this.klipGen;
+      // Barnets navn: kun et klip optaget på enheden — ingen hentning og ingen reserve (navnet må aldrig til talen)
+      const navn = erNavneklip(id);
+      if (navn) { if (!this.lokale[id]) return; reserve = ''; }
+      const gen = this.klipGen, ng = this.navnGen;
       let buf = null;
       try { if (this.harKlip(id)) buf = await this.afkod(id); } catch (e) { buf = null; }
       if (gen !== this.klipGen) return; // stoppet, mens klippet blev hentet/afkodet: hverken klip eller reserve
+      if (navn && ng !== this.navnGen) return; // ny tale eller stop imens: navnet siges ikke bagefter
       if (buf && this.ctx) {
         return new Promise((res) => {
           try {
             const s = this.ctx.createBufferSource();
             s.buffer = buf; s.connect(this.ctx.destination);
-            const k = this.kilde = { s: s, res: res };
-            s.onended = () => { if (this.kilde === k) this.kilde = null; res(); };
+            const k = { s: s, res: res };
+            if (navn) this.navnKilde = k; else this.kilde = k;
+            s.onended = () => { if (this.kilde === k) this.kilde = null; if (this.navnKilde === k) this.navnKilde = null; res(); };
             s.start(0);
             setTimeout(res, (buf.duration * 1000 + 400) * TEMPO + 200); // hvis onended aldrig kommer
           } catch (e) { res(); }
@@ -475,9 +509,22 @@
     // så sætningen ikke starter oven i klippet). Klippets løfte afsluttes.
     stopKlip() {
       this.klipGen++;
+      this.stopNavn();
       const k = this.kilde;
       if (!k) return;
       this.kilde = null;
+      try { k.s.onended = null; k.s.stop(); } catch (e) { /* allerede stoppet */ }
+      k.res();
+    },
+    // Barnets navn har sin egen plads og tæller: Tale.sig og Tale.stop stopper KUN navnet — Lydtogets og Bogstavjagtens
+    // bogstavklip spiller videre som før
+    navnKilde: null,
+    navnGen: 0,
+    stopNavn() {
+      this.navnGen++;
+      const k = this.navnKilde;
+      if (!k) return;
+      this.navnKilde = null;
       try { k.s.onended = null; k.s.stop(); } catch (e) { /* allerede stoppet */ }
       k.res();
     },
@@ -510,7 +557,34 @@
     // Mindst én sætning har en fil, og lyden er låst op (efter første tryk) — ellers talesyntesen som før
     // Lydkanalen skal køre: på iOS kan den være 'suspended'/'interrupted' (opkald, lydløs) — så taler enhedens stemme
     // (review 12-10, fund 7)
-    kan(tekst) { return this.slaaetTil() && !!Lyd.ctx && (!Lyd.ctx.state || Lyd.ctx.state === 'running') && window.Talefiler.enheder(tekst).some((e) => this.noegle(e)); },
+    kan(tekst) { return this.vilTale(tekst) && this.kanalKoerer(); },
+    // Piper ville tale sætningen (mindst én fil, og lyden er låst op) — uanset om kanalen kører lige nu
+    vilTale(tekst) { return this.slaaetTil() && !!Lyd.ctx && window.Talefiler.enheder(tekst).some((e) => this.noegle(e)); },
+    kanalKoerer() { return !!Lyd.ctx && (!Lyd.ctx.state || Lyd.ctx.state === 'running'); },
+    // Væk lydkanalen og vent højst ms på 'running' (statechange eller resume()'s løfte). Giver true, hvis den kører.
+    // iOS lægger kanalen i 'suspended'/'interrupted' (baggrund, opkald, lydløs); resume() er asynkron — uden ventetiden
+    // talte første sætning efter et tryk med enhedens stemme og den næste med Piper (Jimmy 12-10: stemmen skiftede).
+    VAEK_MS: 500,
+    vaekKanal(ms) {
+      const c = Lyd.ctx;
+      if (!c) return Promise.resolve(false);
+      if (this.kanalKoerer()) return Promise.resolve(true);
+      if (c.state === 'closed') return Promise.resolve(false);
+      return new Promise((res) => {
+        let faerdig = false, frist = null;
+        const slut = (v) => {
+          if (faerdig) return;
+          faerdig = true;
+          clearTimeout(frist);
+          try { if (c.removeEventListener) c.removeEventListener('statechange', tjek); } catch (e) { /* ingenting */ }
+          res(v);
+        };
+        const tjek = () => { if (this.kanalKoerer()) slut(true); };
+        try { if (c.addEventListener) c.addEventListener('statechange', tjek); } catch (e) { /* ingenting */ }
+        frist = setTimeout(() => slut(this.kanalKoerer()), ms);
+        try { const p = c.resume && c.resume(); if (p && p.then) p.then(tjek, () => {}); } catch (e) { /* kan ikke vækkes */ }
+      });
+    },
     // Piper er i brug, og listen er hentet. Alle puljens sætninger har en fil (test-tale), så «hør og find» kan bruges
     // uden en dansk stemme på enheden. (Gamle «gentag»-opgaver fra før puljen kan mangle filer — de siges med enhedens stemme.)
     klar() { return this.slaaetTil() && Object.keys(this.liste).length > 0; },
@@ -613,8 +687,25 @@
       const slut = () => { if (!faerdig) { faerdig = true; if (efter) efter(); } };
       if (!voksen.tale || !tekst) { if (efter) setTimeout(slut, 0); return; }
       this.stopPiper(); // et nyt sig afbryder det forrige — også en Piper-sætning
+      Lyd.stopNavn();   // og barnets navn (men ikke et bogstavklip)
       Piper.noter(tekst);
       if (Piper.kan(tekst)) { this.stopSyntese(); this.spilPiper(tekst, slut, !!efter); return; }
+      // Piper ville tale, men lydkanalen sover (iOS): væk den og vent højst Piper.VAEK_MS, så stemmen ikke skifter mellem
+      // Piper og enhedens stemme. Kører den ikke da, taler enhedens stemme (review 12-10, fund 7: hellere end ingenting).
+      // Et nyt sig eller stop() imens afbryder (piperNr/venter) — efter kaldes præcis én gang, aldrig synkront.
+      if (Piper.vilTale(tekst)) {
+        this.stopSyntese(); // den forrige sætning stopper nu — ikke først, når kanalen er vågen
+        const mit = this.piperNr;
+        this.venter = () => setTimeout(slut, 0);
+        Piper.vaekKanal(Piper.VAEK_MS).then(() => {
+          if (mit !== this.piperNr) return; // afbrudt imens: venter har kaldt efter
+          this.venter = null;
+          if (Piper.kan(tekst)) { this.stopSyntese(); this.spilPiper(tekst, slut, !!efter); return; }
+          if (!this.findes) { if (efter) setTimeout(slut, 0); return; }
+          this.sigSyntese(tekst, efter ? slut : null);
+        });
+        return;
+      }
       if (!this.findes) { if (efter) setTimeout(slut, 0); return; }
       this.sigSyntese(tekst, efter ? slut : null);
     },
@@ -674,8 +765,12 @@
     // (piperNr), og efter kaldes præcis én gang — også hvis noget går galt (loftet: summen af varighederne + 1,2 s).
     piperNr: 0,
     kilde: null,
+    venter: null, // en sætning, der venter på, at lydkanalen vågner — et nyt sig eller stop afbryder den
     stopPiper() {
       this.piperNr++;
+      const v = this.venter;
+      this.venter = null;
+      if (v) v();
       const k = this.kilde;
       this.kilde = null;
       if (k) { try { k.s.onended = null; k.s.stop(); } catch (e) { /* allerede stoppet */ } k.res(); }
@@ -717,6 +812,7 @@
       this.gen++;
       this.foerst = null;
       this.stopPiper();
+      Lyd.stopNavn();
       if (!this.findes) return;
       this.aktuel = null; // så en sætning, der venter på at blive startet (60 ms efter cancel), ikke starter alligevel
       try { window.speechSynthesis.cancel(); } catch (e) { /* ingenting */ }
@@ -737,7 +833,8 @@
       run: (o) => {
         o = o || {};
         if (o.lyd) Palet.play(o.lyd);
-        const p = o.klip ? Lyd.klip(o.klip, o.reserve) : (o.tekst || o.reserve) ? Tale.sigVent(o.tekst || o.reserve) : null;
+        const t = [o.tekst || o.reserve, o.efter].filter(Boolean).join(' '); // navnKlip bruges ikke her (navnet er aldrig tekst)
+        const p = o.klip ? Lyd.klip(o.klip, o.reserve) : t ? Tale.sigVent(t) : null;
         return Promise.resolve(p).then(() => ({ status: 'completed', reason: 'reserve', effekt: '', tale: '', animation: '' }));
       },
       stop() {},
@@ -793,6 +890,56 @@
     }, 'advarsel-knap');
   }
 
+  // ---------- Barnets eget navn (12-10-2026) ----------
+  // Som tekst: forsiden, startskærmen og topbarerne viser det navn, barnet selv har skrevet (ellers Dino/Enhjørning).
+  // Som tale KUN fra en optagelse på enheden (NAVNEKLIP): navnet sendes aldrig til Tale.sig, Forloeb.run({ tekst }),
+  // 🔊 eller en log — en sætning uden lydfil læses af enhedens stemme, og repoet er offentligt.
+  const visNavn = () => (data && data.egetNavn) || (data && data.navn) || T.navn || '';
+  const navnKlasse = (grund, n) => [grund, n.length > 10 ? 'meget-langt' : n.length > 6 ? 'langt' : ''].filter(Boolean).join(' ');
+  const navnKlipId = () => NAVNEKLIP + T.id;
+  // Navnet kan siges: barnet har et navn, og det er optaget på denne enhed
+  const harNavneklip = () => !!(data && data.egetNavn && T.id && Lyd.harLokaltKlip(navnKlipId()));
+  // «Bare det ikke bliver for meget» (Jimmy 12-10-2026): hilsenen én gang pr. besøg, og i runderne højst én gang pr.
+  // runde i hver NAVN_HVER. runde — fejringen, eller «Prøv igen» efter hjælpen, hvis det kom først
+  const NAVN_HVER = 2;
+  let navnRunder = 0;
+  const navnTur = () => (++navnRunder % NAVN_HVER === 0);
+  const navnIRunden = (r) => !!(r && r.navnMaa && !r.navnSagt && harNavneklip());
+  let navnHilst = false;
+  // Hilsenen til et barn med eget navn: «Hej!» + navnet (klippet) + skærmens spørgsmål
+  const NAVN_HEJ = Object.freeze({ hej: 'Hej!' });
+  const hilsen = () => (data.egetNavn ? NAVN_HEJ : 'Hej ' + data.navn + '!');
+  // foer + navnet + efter gennem feedback-forløbet. Uden klip, eller når forløbet er optaget: foer + efter uden navn.
+  // Giver true, hvis navnet bliver sagt.
+  function sigMedNavn(foer, efter) {
+    if (!harNavneklip() || Forloeb.optaget()) { Tale.sig([foer, efter].filter(Boolean).join(' ')); return false; }
+    Forloeb.run({ tekst: foer, navnKlip: navnKlipId(), efter: efter || '' });
+    return true;
+  }
+  // En skærms hilsen + spørgsmål (visFigurValg, visFagValg, visTilstandValg)
+  function sigHilsen(h0, resten) {
+    if (h0 === NAVN_HEJ) {
+      if (navnHilst) { Tale.sig([h0.hej, resten].filter(Boolean).join(' ')); return; }
+      navnHilst = true;
+      sigMedNavn(h0.hej, resten);
+      return;
+    }
+    Tale.sig([h0, resten].filter(Boolean).join(' '));
+  }
+  // Et nyt eller slettet navn må ikke beholde den gamle optagelse: spillet ville vise det nye navn og sige det gamle
+  function glemNavneklip() {
+    if (!T.id) return;
+    const id = navnKlipId();
+    Lyd.fjernLokaltKlip(id);
+    KlipLager.slet('klip', id).catch(() => {});
+  }
+  // En voksen kan have optaget eller slettet navnet i en anden fane: klippet læses igen fra enheden (ved ▶)
+  function opdaterNavneklip() {
+    if (!T.id || !data || !data.egetNavn) return;
+    const id = navnKlipId();
+    KlipLager.hent('klip', id).then((v) => { if (v) Lyd.saetLokaltKlip(id, new Uint8Array(v)); else Lyd.fjernLokaltKlip(id); }).catch(() => {});
+  }
+
   function skift(node, taster) {
     Forloeb.stop(); // en igangværende feedback hører til den gamle skærm
     gemUr(); // Historiebogens/Bogstavjagtens tid gemmes ved hvert skærmskift
@@ -841,9 +988,10 @@
     const figur = (tegn, e) => h('span', { class: 'spiller-figur' + (tegn ? ' med-tegning' : ''), 'aria-hidden': 'true' }, tegn || e);
     const kort = (T.spillere || []).map((sp) => {
       const ven = sp.ven ? venTegning(sp.ven, 'vinker') : null;
-      return h('a', { class: 'spiller-kort spiller-' + sp.id, href: sp.side, 'aria-label': sp.navn },
+      const navn = (sp.noegle && G.laesEgetNavn(lager, sp.noegle)) || sp.navn; // barnets eget navn, ellers Dino/Enhjørning
+      return h('a', { class: 'spiller-kort spiller-' + sp.id, href: sp.side, 'aria-label': navn },
         figur(ven && ven.nodeType === 1 ? ven : null, sp.e),
-        h('span', { class: 'spiller-navn' + (sp.navn.length > 6 ? ' langt' : '') }, sp.navn));
+        h('span', { class: navnKlasse('spiller-navn', navn) }, navn));
     });
     if (T.voksenSide) {
       kort.push(h('a', { class: 'spiller-kort spiller-voksen', href: T.voksenSide, 'aria-label': 'Voksen' },
@@ -862,16 +1010,22 @@
   // ---------- Startskærm (låser også lyd og oplæsning op på iPad) ----------
   function visStart() {
     const fig = minFigur();
+    opdaterNavneklip();
+    const videre = () => {
+      if (!data.figur) {
+        visFigurValg(true, hilsen());
+      } else if (D && !data.fag) {
+        visFagValg(hilsen());
+      } else {
+        visTilstandValg(hilsen());
+      }
+    };
     const start = () => {
       Lyd.init();
       Lyd.rigtig();
-      if (!data.figur) {
-        visFigurValg(true, 'Hej ' + data.navn + '! Hvem skal med dig på rejsen? Tryk på en.');
-      } else if (D && !data.fag) {
-        visFagValg('Hej ' + data.navn + '!');
-      } else {
-        visTilstandValg('Hej ' + data.navn + '!');
-      }
+      // Første gang (også for et barn, der allerede spiller): «Hvad hedder du?» — kun én gang (data.navnSpurgt)
+      if (!data.navnSpurgt && !window.__udenNavn) visNavnSkaerm(videre);
+      else videre();
     };
     const taarn = h('button', {
       class: 'start-taarn-knap', type: 'button', 'aria-label': 'Hør historien om Lystårnet',
@@ -883,10 +1037,75 @@
       advarselKnap(),
       taarn,
       h('div', { class: 'start-figur', 'aria-hidden': 'true', 'data-ven': fig.id }, venTegning(fig.id, 'vinker')),
-      h('div', { class: 'start-navn' }, data.navn),
+      h('div', { class: navnKlasse('start-navn', visNavn()) }, visNavn()),
       h('button', { class: 'stor-knap spil-knap puls', type: 'button', 'aria-label': 'Start', onclick: start }, '▶')),
     (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); start(); } });
   }
+
+  // ---------- «Hvad hedder du?» — barnet skriver sit eget navn (12-10-2026) ----------
+  // Store bogstavtaster i ABC-rækkefølge, ⌫, ✔ (fra ét bogstav) og ⏭ (spring over). Tastaturcoveret virker også
+  // (Enter = ✔, Esc = ⏭). Bogstaverne siger intet (navnet må aldrig til talen), og navnet står ikke i et aria-live-felt.
+  // Spørges kun én gang (navnSpurgt). Undtagelse fra «3–5 valg pr. skærm»: se docs/DESIGN-NOTER.md.
+  function visNavnSkaerm(fortsaet) {
+    let navn = '';
+    const vis = h('div', { class: 'navn-vis tom' }, '');
+    const okKnap = h('button', { class: 'tast tast-ok navn-ok', type: 'button', 'aria-label': 'Færdig', disabled: true, onclick: () => faerdig() }, '✔');
+    const tastatur = bogstavTastatur({
+      max: G.MAX_NAVN,
+      naar: (t) => {
+        navn = t;
+        vis.textContent = stortNavn(t);
+        vis.classList.toggle('tom', !t);
+        vis.classList.toggle('lang', t.length > 8);
+        // Et bredt navn på en smal skærm: skriften bliver mindre (ned til 18 px), til navnet kan være i feltet
+        vis.style.fontSize = '';
+        for (let px = parseFloat(getComputedStyle(vis).fontSize); px > 18 && vis.scrollWidth > vis.clientWidth + 1; px -= 2) vis.style.fontSize = Math.max(18, px - 2) + 'px';
+        okKnap.disabled = !/[^ -]/.test(t);
+        okKnap.classList.toggle('puls', !okKnap.disabled);
+      },
+    });
+    const faerdig = () => {
+      if (okKnap.disabled) return;
+      Lyd.init(); Lyd.tryk();
+      const foer = data.egetNavn || null;
+      G.saetEgetNavn(data, navn); // normaliseres i gem.js (højst 12 tegn, kun bogstaver)
+      gem();
+      if ((data.egetNavn || null) !== foer) glemNavneklip(); // samme navn igen: optagelsen bliver
+      fortsaet();
+    };
+    // ⏭ og Esc: står der bogstaver, gemmes navnet som med ✔ (tastaturcoverets Esc må ikke smide det væk — review 12-10)
+    const springOver = () => {
+      if (!okKnap.disabled) { faerdig(); return; }
+      Lyd.init(); Lyd.tryk();
+      data.navnSpurgt = true; // spørges ikke igen; en voksen kan skrive navnet under Indstillinger
+      gem();
+      fortsaet();
+    };
+    const fig = minFigur();
+    S.gentagTale = 'Hvad hedder du? Skriv dit navn. Du må gerne få hjælp af en voksen.';
+    skift(h('div', { class: 'skaerm navneskaerm' },
+      h('div', { class: 'topbar' },
+        ikonKnap('⏭', 'Spring over', springOver, 'navn-spring'),
+        h('div', { class: 'topbar-titel', 'aria-hidden': 'true' }, '✏️'),
+        hoejttaler()),
+      h('div', { class: 'navn-midte' },
+        h('div', { class: 'navn-raekke' },
+          h('div', { class: 'navn-ven', 'aria-hidden': 'true', 'data-ven': fig.id }, venTegning(fig.id, 'vinker')),
+          vis,
+          okKnap),
+        tastatur.el)),
+    (e) => {
+      // En fokuseret knap (Tab) beholder sin Enter og sit mellemrum
+      const knapFokus = document.activeElement && document.activeElement.tagName === 'BUTTON';
+      if (e.key === 'Enter') { if (!knapFokus) { e.preventDefault(); faerdig(); } return; }
+      if (e.key === 'Escape') { e.preventDefault(); springOver(); return; }
+      if (e.key === ' ' && knapFokus) return;
+      if (tastatur.tast(e.key)) e.preventDefault();
+    });
+    Tale.sig(S.gentagTale); // synkront i trykket på ▶ (iOS)
+  }
+  // «anne-sofie» → «Anne-Sofie» (som gem.js gemmer det) — mens barnet skriver
+  const stortNavn = (t) => t.replace(/[^ -]+/g, (o) => o.charAt(0).toUpperCase() + o.slice(1));
 
   // ---------- Vælg rejseven ----------
   function visFigurValg(foersteGang, hilsen) {
@@ -936,7 +1155,7 @@
       else if (e.key === 'Enter') okKnap.click();
     });
     // Synkront efter skærmskiftet (stadig i tryk-handleren): iOS kræver en brugergestus til den første oplæsning
-    if (hilsen) Tale.sig(hilsen);
+    if (hilsen) sigHilsen(hilsen, S.gentagTale);
   }
 
   // ---------- Verdenskort ----------
@@ -1033,13 +1252,13 @@
     skift(h('div', { class: 'skaerm fagvalg' },
       h('div', { class: 'topbar' },
         h('a', { class: 'ikon-knap', href: 'index.html', 'aria-label': 'Skift spiller', title: 'Skift spiller' }, '🏠'),
-        h('div', { class: 'topbar-titel' }, data.navn),
+        h('div', { class: navnKlasse('topbar-titel', visNavn()) }, visNavn()),
         h('div', { class: 'topbar-hoejre' }, advarselKnap(), hoejttaler())), // ⚠️ hvis spillet ikke kan gemme
       h('div', { class: 'fagvalg-liste' },
         kort('matematik', '🔢', 'Matematik', 'Matematik — tal'),
         kort('dansk', '🔤', 'Dansk', 'Dansk — bogstaver'))),
     (e) => { if (e.key === '1') vaelg('matematik'); else if (e.key === '2') vaelg('dansk'); });
-    Tale.sig((hilsen ? hilsen + ' ' : '') + S.gentagTale);
+    sigHilsen(hilsen, S.gentagTale);
   }
 
   // B10: Eventyr eller Vælg selv? To store kort efter fagvalget — vises hver gang (ét tryk); det sidste valg lyser
@@ -1063,7 +1282,7 @@
       h('div', { class: 'topbar' },
         h('a', { class: 'ikon-knap', href: 'index.html', 'aria-label': 'Skift spiller', title: 'Skift spiller' }, '🏠'),
         fagKnap,
-        h('div', { class: 'topbar-titel' }, data.navn),
+        h('div', { class: navnKlasse('topbar-titel', visNavn()) }, visNavn()),
         h('div', { class: 'topbar-hoejre' }, advarselKnap(), hoejttaler())),
       h('div', { class: 'fagvalg-liste' },
         kort('eventyr', '🗺️', 'Eventyr', 'Eventyr — verdenerne i rækkefølge'),
@@ -1073,7 +1292,7 @@
       else if (e.key === '2') vaelg('frit');
       else if (e.key === 'Enter') { e.preventDefault(); vaelg(data.tilstand || 'eventyr'); }
     });
-    Tale.sig((hilsen ? hilsen + ' ' : '') + S.gentagTale);
+    sigHilsen(hilsen, S.gentagTale);
   }
 
   // Lystårnets lys: én lysperle pr. runde i eventyret (forudsigeligt), fuldt lys ved 30.
@@ -1150,7 +1369,7 @@
       h('div', { class: 'topbar' },
         h('a', { class: 'ikon-knap', href: 'index.html', 'aria-label': 'Skift spiller', title: 'Skift spiller' }, '🏠'),
         fagKnap || advarsel || topbarPlads(), // to knapper til højre — så titlen står i midten
-        h('div', { class: 'topbar-titel' }, h('span', { class: 'kort-navn' }, data.navn), data.perler && !advarsel ? h('span', { class: 'perle-tal lille' }, ' ✨ ' + data.perler) : null),
+        h('div', { class: 'topbar-titel' }, h('span', { class: navnKlasse('kort-navn', visNavn()) }, visNavn()), data.perler && !advarsel ? h('span', { class: 'perle-tal lille' }, ' ✨ ' + data.perler) : null),
         h('div', { class: 'topbar-hoejre' },
           fagKnap ? advarsel : null,
           ikonKnap('📖', 'Samlebog', () => visSamlebog()),
@@ -1172,16 +1391,18 @@
       // 🎒 står i øverste venstre hjørne: ingen station (med navn og stjerner) må ligge inde over den
       const frit = fritKnap.offsetWidth || 80;
       const ssMax = Math.max(...stationer.map((s) => s.offsetWidth || 100));
-      let x0 = Math.min(90, w * 0.08), y0 = Math.min(80, hh * 0.08);
+      const x0Start = Math.min(90, w * 0.08), y0Start = Math.min(80, hh * 0.08);
+      let x0 = x0Start, y0 = y0Start;
       const halv = Math.max(ssMax, 150) / 2; // navneskiltet kan være bredere end stationen
       // Halvdelen af stationens bredde med navneskilt (navnene på låste verdener er skjult på små skærme)
       const halvNavn = (i) => { const st = stationer[i], nv = st && st.querySelector('.station-navn'); return Math.max((st && st.offsetWidth || 80) / 2, nv ? nv.offsetWidth / 2 : 0); };
-      const beregn = () => {
+      // trang: højkant uden navneskilte (.trangt) — så skal der ikke være plads til navnet under den næstsidste station
+      const beregn = (trang) => {
         // Den sidste station står altid i øverste række (liggende) / til venstre (højkant), så ▶ nederst til højre ikke dækker den.
         // ▶ har sin egen plads nederst til højre: kun rækken/søjlen med ▶ skal stoppe før den — den anden må gå
         // næsten helt ud til kanten. Så får stationerne mere plads (B6: 11 verdener).
         const fri = liggende ? w - halvNavn(n - 1) - 8 : hh - ssMax / 2 - 40;                      // den sidste station (uden ▶)
-        const vedKnap = liggende ? w - knap - 24 - Math.max(16, halvNavn(n - 2)) : hh - knap - ssMax / 2 - 75;  // den næstsidste (rækken med ▶) — navnet under den og ▶'s lille ikon må ikke røre ▶
+        const vedKnap = liggende ? w - knap - 24 - Math.max(16, halvNavn(n - 2)) : hh - knap - ssMax / 2 - (trang ? 40 : 75);  // den næstsidste (rækken med ▶) — navnet under den og ▶'s lille ikon må ikke røre ▶
         const start = liggende ? x0 : y0;
         const trin = n > 2 ? Math.min((fri - start) / (n - 1), (vedKnap - start) / (n - 2)) : (vedKnap - start);
         return liste.map((_, i) => {
@@ -1190,13 +1411,30 @@
           return liggende ? { x: pos, y: hh * (top ? 0.3 : 0.7) } : { x: w * (top ? 0.3 : 0.7), y: pos };
         });
       };
-      let punkter = beregn();
-      const iHjoernet = (p) => p.x - halv < frit + 10 && p.y - ssMax / 2 - 30 < frit + 10;
-      for (let k = 0; k < 12 && punkter.some(iHjoernet); k++) {
-        if (liggende) x0 += 12; else y0 += 12;
-        punkter = beregn();
-      }
+      // Uden navneskilte (trang) er stationen kun sin cirkel og stjernerne over den (målt) — ellers navnets bredde og 30 px
+      const stj = stationer.map((st) => st.querySelector('.station-stjerner')).find(Boolean);
+      const stjOver = stj ? Math.max(0, stj.closest('.station').getBoundingClientRect().top - stj.getBoundingClientRect().top) + 2 : 30;
+      const iHjoernet = (p, trang) => p.x - (trang ? ssMax / 2 : halv) < frit + 10 && p.y - ssMax / 2 - (trang ? stjOver : 30) < frit + 10;
+      const stil = (trang) => {
+        x0 = x0Start; y0 = y0Start;
+        let pk = beregn(trang);
+        const steg = trang ? 4 : 12; // uden navne tæller hver pixel: finere skridt forbi 🎒
+        for (let k = 0; k < 144 / steg && pk.some((q) => iHjoernet(q, trang)); k++) {
+          if (liggende) x0 += steg; else y0 += steg;
+          pk = beregn(trang);
+        }
+        return pk;
+      };
+      let punkter = stil(false);
+      // Højkant med mange verdener (iPhone): er der ikke plads til navneskiltet mellem to stationer i samme søjle,
+      // skjules navnene (de lå under den næste stations stjerner — testlisten v112). Ikonerne, stjernerne og oplæsningen
+      // bærer betydningen; de låste verdeners navne er allerede skjult på små skærme. Uden navne bruges luften over
+      // den første station og over ▶ til mere afstand i søjlen, så stjernerne ikke ligger ind over stationen ovenover
+      // (review 12-10: et tryk dér åbnede den forkerte verden)
+      const trangt = !liggende && n > 2 && Math.abs(punkter[2].y - punkter[0].y) < ssMax + 44;
+      if (trangt) punkter = stil(true);
       punkter.forEach((p, i) => { stationer[i].style.left = p.x + 'px'; stationer[i].style.top = p.y + 'px'; });
+      flade.classList.toggle('trangt', trangt);
       // glat kurve gennem punkterne
       let d = 'M' + punkter[0].x + ',' + punkter[0].y;
       for (let i = 1; i < punkter.length; i++) {
@@ -1352,6 +1590,7 @@
       verden: verden, emne: emne, opgaver: opgaver, i: 0, forsoeg: 0, frit: !!opts.frit,
       sidstAktiv: Date.now(), aktivMs: 0, niveauOp: false, registreret: -1,
       maerke: O.maerkeForRunde(T.samling, data.runderIalt, minFigur().e, data.maerker), // dyret, vi hjælper — kendt fra start
+      navnMaa: navnTur(), // barnets navn må siges én gang i denne runde (hver anden runde)
     };
     visRundeSkaerm(false, opts.frit ? verden.navn + '.' : '');
   }
@@ -1943,6 +2182,8 @@
     if (d.taelbar === false) ting.forEach((t) => t.classList.remove('taelbar'));
     // C · ting.billede: GRAFIK-C's tegning i stedet for emojien (Fortællebroen) — emojien, hvis tegningen mangler
     if (d.billede && MINI[d.billede]) ting.forEach((t) => { t.textContent = ''; t.classList.add('med-tegning'); t.append(miniTegning(d.billede, 'ting-tegning')); });
+    // Et talord (ti, to …) som terningbillede i stedet for tastetegnet (rimPar, findPar, ordStrimmel)
+    else if (tastetegnTal(d.e)) ting.forEach((t) => { t.textContent = ''; t.classList.add('med-tegning'); t.append(talBillede(tastetegnTal(d.e))); });
     // D2: maerk = synlig ring (dem, der flytter) · vaek = taget væk (stiplet + kryds, som i minus; tælles ikke)
     (d.under || []).forEach((u) => ting.slice(u.fra, u.til).forEach((t) => {
       t.setAttribute('data-del', u.id);
@@ -2594,7 +2835,8 @@
     const krop = valg.closest('.runde-krop');
     const saet = (o) => {
       valg.classList.toggle('kort-stak', o === 'stak' || o === 'store-stak' || o === 'halv-stak');
-      if (krop) krop.classList.toggle('kort-store', o === 'store' || o === 'store-stak' || o === 'halv-stak');
+      valg.classList.toggle('kort-gitter', o === 'gitter');
+      if (krop) krop.classList.toggle('kort-store', o === 'store' || o === 'store-stak' || o === 'halv-stak' || o === 'gitter');
       if (krop) krop.classList.toggle('kort-halv', o === 'halv-stak');
     };
     const muligheder = ['side', 'stak'];
@@ -2603,6 +2845,10 @@
     // Højkant: «store-stak» er kortene under hinanden, men højere — til små tegninger, der ellers står småt i lave kort
     // (ui-review #3: bamsen i laesPlacering var ca. 20 px på en iPhone)
     else if (krop && window.innerHeight > window.innerWidth) muligheder.push('store-stak');
+    // Højkant med tierstænger på alle tre kort (byt10): to kort øverst og ét under, så hvert kort bliver dobbelt så bredt.
+    // Tre smalle kort side om side gav stænger på ca. 10 px på en iPhone (D1-tjekket); kun når det giver mest plads
+    // iPad på langs: de store kort i den brede kolonne stod tre side om side med meget luft over og under (D1-tjekket)
+    if (krop && (window.innerHeight > window.innerWidth || window.innerHeight > 500) && kort.length === 3 && kort.every((s) => s.querySelector('.staenger'))) muligheder.push('gitter');
     let valgt = null, bedst = 0;
     // Mønter i en bunke (tæt) er en nødløsning: en opstilling uden bunke vælges, hvis den er næsten lige så god —
     // og en lodret bunke kun, når den vandrette ikke kan være der
@@ -2622,7 +2868,7 @@
     return h('button', {
       class: 'ord-emoji ' + (klasse || ''), type: 'button', 'aria-label': ord,
       onclick: () => { Lyd.init(); Tale.sig(ord); },
-    }, billede && MINI[billede] ? miniBillede(billede, e, 'ord-tegning') : h('span', { 'aria-hidden': 'true' }, e));
+    }, billede && MINI[billede] ? miniBillede(billede, e, 'ord-tegning') : h('span', { 'aria-hidden': 'true' }, ordTegn(e)));
   }
   function lytKnap(opg) {
     return h('button', {
@@ -2708,12 +2954,12 @@
       const o = D.ORD[x];
       // C · Rimhaven: GRAFIK-C's tegninger af billedordene, hvor de findes (ellers emojien)
       if (erMinispil(opg) && MINI[D.BILLEDE[x]]) return miniBillede(D.BILLEDE[x], o.e, 'valg-emoji valg-tegning');
-      return h('span', { class: 'valg-emoji', 'aria-hidden': 'true' }, o ? o.e : x);
+      return h('span', { class: 'valg-emoji', 'aria-hidden': 'true' }, o ? ordTegn(o.e) : x);
     }
     // Huskekort: forsiden (billedet) og bagsiden — kortet vendes af visSkjulteKort
     if (opg.valgArt === 'skjult') {
       const o = D.ORD[x];
-      return h('span', { class: 'vende-kort', 'aria-hidden': 'true' }, h('span', { class: 'vende-for valg-emoji' }, o ? o.e : x), h('span', { class: 'vende-bag' }, '?'));
+      return h('span', { class: 'vende-kort', 'aria-hidden': 'true' }, h('span', { class: 'vende-for valg-emoji' }, o ? ordTegn(o.e) : x), h('span', { class: 'vende-bag' }, '?'));
     }
     if (opg.valgArt === 'haandskrift') return haandskriftSvg(x);
     if (opg.valgArt === 'scene') return tegnScene(opg.kort[x].dele, { kort: true });
@@ -2869,6 +3115,49 @@
     const ud = h('div', { class: 'taltastatur' }, display, taster);
     setTimeout(opdater, 0);
     return ud;
+  }
+
+  // ---------- Bogstavtastatur (intet <input>): A–Å i ABC-rækkefølge + ⌫ ----------
+  // valg: { max, naar(tekst) }. Teksten er med små bogstaver (stort begyndelsesbogstav sættes ved visning/gem).
+  // tast(key) bruges af skærmens fysiske tastatur: bogstaver (også med accent), mellemrum/bindestreg mellem bogstaver
+  // og Backspace. Giver true, hvis tasten blev brugt. Bogstavtasterne siger intet — kun klikket.
+  const NAVNE_BOGSTAV = /^[a-zæøåäöüéèêëáàíóúñç]$/;
+  function bogstavTastatur(valg) {
+    const max = valg.max || 12;
+    let tekst = '';
+    const taster = [];
+    const opdater = () => {
+      const fuld = tekst.length >= max;
+      for (const k of taster) if (k.dataset.b) k.disabled = fuld;
+      slet.disabled = !tekst;
+      valg.naar(tekst);
+    };
+    const tilfoej = (b) => {
+      if (tekst.length >= max) return false;
+      if ((b === ' ' || b === '-') && (!tekst || /[ -]$/.test(tekst))) return false; // kun mellem bogstaver
+      tekst += b;
+      opdater();
+      return true;
+    };
+    const fjern = () => { if (!tekst) return false; tekst = tekst.slice(0, -1); opdater(); return true; };
+    const knap = (b) => {
+      const k = h('button', { class: 'bogstav-tast', type: 'button', 'data-b': b, 'aria-label': b.toUpperCase(), onclick: () => { Lyd.init(); Lyd.tryk(); tilfoej(b); } }, b.toUpperCase());
+      taster.push(k);
+      return k;
+    };
+    const slet = h('button', { class: 'bogstav-tast bogstav-slet', type: 'button', 'aria-label': 'Slet', onclick: () => { Lyd.init(); Lyd.tryk(); fjern(); } }, '⌫');
+    const el = h('div', { class: 'bogstav-tastatur' }, 'abcdefghijklmnopqrstuvwxyzæøå'.split('').map(knap), slet);
+    taster.push(slet);
+    setTimeout(opdater, 0);
+    return {
+      el: el,
+      tast: (key) => {
+        if (key === 'Backspace') return fjern();
+        const b = typeof key === 'string' ? key.toLowerCase() : '';
+        if (NAVNE_BOGSTAV.test(b) || b === ' ' || b === '-') { Lyd.init(); Lyd.tryk(); tilfoej(b); return true; }
+        return false;
+      },
+    };
   }
 
   function rundeTaster(e) {
@@ -3112,7 +3401,8 @@
     r.laast = false;
     if (visSvarBagefter) { saetUdtryk(r.dom.ven, 'taenker'); visSvaret(opg); return; }
     saetUdtryk(r.dom.ven, grundUdtryk(opg)); // hjælpen er færdig — nu prøver barnet igen
-    Tale.sig('Prøv igen.');
+    // «Prøv igen.» + barnets navn (klippet), hvis det er rundens tur — ellers som før. Et svar stopper forløbet (svar()).
+    if (navnIRunden(r)) { if (sigMedNavn('Prøv igen.', '')) r.navnSagt = true; } else Tale.sig('Prøv igen.');
     S.gentagTale = 'Prøv igen. ' + opg.tale;
   }
 
@@ -3724,7 +4014,7 @@
       return;
     }
     if (art === 'visBogstav') {
-      hjaelpeFelt(h('div', { class: 'vis-bogstav' }, bogstavKort(trin.bogstav), trin.e ? h('span', { class: 'vis-bogstav-e', 'aria-hidden': 'true' }, trin.e) : null,
+      hjaelpeFelt(h('div', { class: 'vis-bogstav' }, bogstavKort(trin.bogstav), trin.e ? h('span', { class: 'vis-bogstav-e', 'aria-hidden': 'true' }, ordTegn(trin.e)) : null,
         trin.ord ? h('span', { class: 'vis-bogstav-ord' }, trin.ord) : null));
       await vent(200);
       if (!levende()) return;
@@ -5162,7 +5452,11 @@
     });
     token = S.token;
     // Fejringen og så introen (ca. 1,7 s) — ring og hånd kommer med stemmen (app.css). Åbnes dyret før, stoppes introen.
-    Forloeb.run({ lyd: 'fejring', tekst: intro });
+    // Er det rundens tur: «Du klarede det!» + barnets navn (klippet) + resten af introen
+    if (navnIRunden(r)) {
+      r.navnSagt = true;
+      Forloeb.run({ lyd: 'fejring', tekst: 'Du klarede det!', navnKlip: navnKlipId(), efter: intro.slice('Du klarede det! '.length) });
+    } else Forloeb.run({ lyd: 'fejring', tekst: intro });
   }
 
   // ---------- Historien om Lystårnet (tynd ramme, læses højt — én gang, og når man trykker på tårnet) ----------
@@ -5665,7 +5959,7 @@
     const r = S.runde = {
       verden: verden, emne: 'historie', opgaver: [{ svar: 'læst' }, { svar: 'tegnet' }, { svar: 'skrevet' }], i: 3, forsoeg: 0, frit: !!frit,
       sidstAktiv: Date.now(), aktivMs: 0, niveauOp: false, registreret: -1, historie: nr,
-      maerke: O.maerkeForRunde(T.samling, data.runderIalt, minFigur().e, data.maerker),
+      maerke: O.maerkeForRunde(T.samling, data.runderIalt, minFigur().e, data.maerker), navnMaa: navnTur(),
     };
     setTimeout(() => {
       if (S.runde !== r) return; // barnet gik videre (fx 🤔): uret kører videre, og historien er ikke belønnet endnu
@@ -6116,7 +6410,7 @@
       S.runde = {
         verden: verden, emne: 'jagt', opgaver: runde.map((x) => ({ svar: x.bogstav })), i: runde.length, forsoeg: 0, frit: !!frit,
         sidstAktiv: Date.now(), aktivMs: 0, niveauOp: false, registreret: -1,
-        maerke: O.maerkeForRunde(T.samling, data.runderIalt, minFigur().e, data.maerker),
+        maerke: O.maerkeForRunde(T.samling, data.runderIalt, minFigur().e, data.maerker), navnMaa: navnTur(),
       };
       afslutRunde();
     }

@@ -60,6 +60,8 @@
       dage: {},             // 'ÅÅÅÅ-MM-DD' → { sek, runder, opgaver, rigtige }
       pauset: null,         // afbrudt mission { verden, i, opgaver, niveauOp, registreret } — fortsætter næste gang
       // pausetDansk (valgfrit, fund 5, Jimmy 11-10-2026): dansk's afbrudte mission, samme form; mangler = ingen
+      // egetNavn (valgfrit, 12-10-2026): det navn, barnet selv har skrevet — findes kun på enheden; mangler = Dino/Enhjørning
+      // navnSpurgt (valgfrit): true, når barnet har set «Hvad hedder du?» (skrevet eller sprunget over); mangler = spørg
       lektioner: {},        // verdensId → true, når verdenens lektion er vist (B2)
       dansk: {},            // dansk-emneId → standardEmne() — samme form som emner (B4)
       fag: null,            // 'matematik' | 'dansk' — det sidste valg (null: barnet har ikke valgt endnu)
@@ -195,7 +197,80 @@
       const p = normaliserPauset(d.pausetDansk);
       if (p) ud.pausetDansk = p; else delete ud.pausetDansk;
     }
+    // Barnets eget navn: to valgfrie felter (ingen migrering). Ugyldigt → slettes. d.navn bruges aldrig som eget navn.
+    if (Object.prototype.hasOwnProperty.call(d, 'egetNavn')) {
+      const n = normaliserEgetNavn(d.egetNavn);
+      if (n) ud.egetNavn = n; else delete ud.egetNavn;
+    }
+    if (Object.prototype.hasOwnProperty.call(d, 'navnSpurgt')) {
+      if (d.navnSpurgt === true) ud.navnSpurgt = true; else delete ud.navnSpurgt;
+    }
     return ud;
+  }
+
+  // ---------- Barnets eget navn (12-10-2026) ----------
+  // Kun bogstaver (a–z, æøå og nogle få med accent), mellemrum og bindestreg kun mellem bogstaver, «Anne-Sofie»-stort,
+  // højst MAX_NAVN tegn. Alt andet (tal, emoji, tegn, kontrol- og retningstegn) fjernes. Intet tilbage → null.
+  const MAX_NAVN = 12;
+  const IKKE_NAVNETEGN = /[^a-zA-ZæøåÆØÅäöüÄÖÜéèêëÉÈÊËáàÁÀíÍóÓúÚñÑçÇ -]/g;
+  function normaliserEgetNavn(v) {
+    if (typeof v !== 'string') return null;
+    let t = v.slice(0, 400).normalize('NFC')
+      .replace(/[\u2010\u2011]/g, '-')
+      .replace(/[\s\u00A0]+/g, ' ')
+      .replace(IKKE_NAVNETEGN, '')
+      .replace(/ *-[ -]*/g, '-')       // en bindestreg med mellemrum omkring bliver én bindestreg
+      .replace(/ {2,}/g, ' ')
+      .replace(/^[ -]+|[ -]+$/g, '');
+    t = t.slice(0, MAX_NAVN).replace(/[ -]+$/, '');
+    if (!t) return null;
+    return t.replace(/[^ -]+/g, (ord) => ord.charAt(0).toUpperCase() + ord.slice(1).toLowerCase());
+  }
+
+  // Til forsiden: barnets eget navn fra en NY nøgle — skriver aldrig, og læser aldrig de gamle nøgler (med navne)
+  function laesEgetNavn(lager, noegle) {
+    if (!/^mat_(dino|enhjorning)_v1$/.test(noegle)) return null;
+    const raa = laes(lager, noegle);
+    if (!raa) return null;
+    try {
+      const obj = JSON.parse(raa);
+      return erObjekt(obj) ? normaliserEgetNavn(obj.egetNavn) : null;
+    } catch (e) { return null; }
+  }
+
+  // Sæt (eller slet, når teksten er tom/ugyldig) barnets eget navn. Barnet spørges så ikke igen. Giver det gemte navn.
+  function saetEgetNavn(data, tekst) {
+    const n = normaliserEgetNavn(tekst);
+    if (n) data.egetNavn = n; else delete data.egetNavn;
+    data.navnSpurgt = true;
+    return n;
+  }
+
+  // Voksendelen retter navnet i de gemte data: KUN egetNavn og navnSpurgt ændres — alt andet skrives, som det lå (rå
+  // JSON uden __proto__-nøgler, ingen normalisering). fn(d) ændrer de to felter. Ulæselige data og et barn, hvis data stadig kun ligger under
+  // den gamle nøgle (fuldt lager), røres aldrig. Giver { ok, fejl: null | 'ulaeselig' | 'gammel' | 'fuldt' | 'ukendt' }.
+  function retEgetNavn(lager, noegle, navn, fn) {
+    if (!/^mat_(dino|enhjorning)_v1$/.test(noegle)) return { ok: false, fejl: 'ukendt' };
+    const raa = laes(lager, noegle);
+    let d;
+    if (raa === null || raa === undefined || raa === '') {
+      const gl = laes(lager, GAMLE_NOEGLER[noegle]);
+      if (gl !== null && gl !== undefined && gl !== '') return { ok: false, fejl: 'gammel' };
+      d = standardBarn(navn); // barnet har ikke spillet endnu
+    } else {
+      try { d = JSON.parse(raa); } catch (e) { d = undefined; }
+      if (!erObjekt(d)) return { ok: false, fejl: 'ulaeselig' };
+      d = rens(d);
+    }
+    const foer = Object.assign({}, d);
+    fn(d);
+    // Kun de to felter må være ændret (et værn mod en fejl i fn)
+    for (const k of Object.keys(foer)) if (k !== 'egetNavn' && k !== 'navnSpurgt' && d[k] !== foer[k]) d[k] = foer[k];
+    for (const k of Object.keys(d)) if (!(k in foer) && k !== 'egetNavn' && k !== 'navnSpurgt') delete d[k];
+    if ('egetNavn' in d) { const n = normaliserEgetNavn(d.egetNavn); if (n) d.egetNavn = n; else delete d.egetNavn; }
+    if ('navnSpurgt' in d && d.navnSpurgt !== true) delete d.navnSpurgt;
+    const ny = JSON.stringify(d);
+    return skriv(lager, noegle, ny) && laes(lager, noegle) === ny ? { ok: true, fejl: null } : { ok: false, fejl: 'fuldt' };
   }
 
   // Afbrudt mission: kun hvis alle opgaver er hele, og der er en opgave tilbage at lave
@@ -667,6 +742,7 @@
     migrer, normaliserBarn, normaliserEmne, normaliserVoksen, normaliserPauset, voksenGentag, rens,
     indlaesBarn, gemBarn, indlaesVoksen, gemVoksen, findBackups, findUlaeselige, importer, lavKopi, rydGamleKopier, fortrydImport, kanFortryde, importKopier,
     dag, tilfoejGentag, fjernGentag, hukommelsesLager,
+    MAX_NAVN, normaliserEgetNavn, laesEgetNavn, saetEgetNavn, retEgetNavn,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Gem;

@@ -135,18 +135,24 @@
     return { wav: lavWav(s, RATE), sek: s.length / RATE };
   }
 
-  // Eksportfilen fra 🎙️ Indtal: { version: 1, klip: { id: base64WAV } }. Kun gyldige id'er og WAV'er.
+  // Barnets navn, sagt af barnet selv eller en voksen (12-10-2026): klippet ligger KUN på enheden (IndexedDB). Det
+  // kommer aldrig i lyd/, på sw.js' liste eller i eksportfilen — repoet er offentligt. «navn-» er bogstavernes navne.
+  const NAVNEKLIP = 'egetnavn-';
+  const navnKlipId = (barnId) => NAVNEKLIP + String(barnId);
+  const erNavnKlip = (id) => typeof id === 'string' && id.indexOf(NAVNEKLIP) === 0;
+
+  // Eksportfilen fra 🎙️ Indtal: { version: 1, klip: { id: base64WAV } }. Kun gyldige id'er og WAV'er — aldrig navneklip.
   const GYLDIGT_ID = /^[a-z][a-z0-9-]{0,40}$/;
   function lavEksport(klip) {
     const ud = { version: 1, klip: {} };
-    for (const id of Object.keys(klip || {}).sort()) if (GYLDIGT_ID.test(id) && klip[id] && klip[id].length) ud.klip[id] = tilBase64(klip[id]);
+    for (const id of Object.keys(klip || {}).sort()) if (GYLDIGT_ID.test(id) && !erNavnKlip(id) && klip[id] && klip[id].length) ud.klip[id] = tilBase64(klip[id]);
     return ud;
   }
   function laesEksport(obj) {
     const ud = {};
     if (!obj || typeof obj !== 'object' || obj.version !== 1 || !obj.klip || typeof obj.klip !== 'object') return ud;
     for (const id of Object.keys(obj.klip)) {
-      if (!GYLDIGT_ID.test(id) || typeof obj.klip[id] !== 'string') continue;
+      if (!GYLDIGT_ID.test(id) || erNavnKlip(id) || typeof obj.klip[id] !== 'string') continue;
       const b = fraBase64(obj.klip[id]);
       if (laesWav(b)) ud[id] = b;
     }
@@ -169,7 +175,7 @@
       da.find((v) => v.localService) || da[0];
   }
 
-  const Lydklip = { RATE, danskeStemmer, vaelgStemme, tilMono, nySamplerate, beskaerStilhed, normaliser, lavWav, laesWav, tilBase64, fraBase64, behandl, lavEksport, laesEksport, GYLDIGT_ID };
+  const Lydklip = { RATE, danskeStemmer, vaelgStemme, tilMono, nySamplerate, beskaerStilhed, normaliser, lavWav, laesWav, tilBase64, fraBase64, behandl, lavEksport, laesEksport, GYLDIGT_ID, navnKlipId, erNavnKlip };
   if (typeof module !== 'undefined' && module.exports) module.exports = Lydklip;
   else root.Lydklip = Lydklip;
 })(typeof self !== 'undefined' ? self : this);

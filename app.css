@@ -109,6 +109,7 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
 /* Tom plads i stedet for en knap, så titlen står i midten. Den giver sig først, hvis titlen ellers ikke kan være der. */
 .topbar-plads { flex: 0 1 var(--ikon); min-width: 0; }
 .kort .topbar-titel { flex: 1 0 auto; } /* barnets navn og perlerne skæres aldrig af — pladsen giver sig i stedet */
+.topbar-titel.meget-langt, .topbar-titel .meget-langt { font-size: clamp(18px, 3vmin, 26px); } /* barnets eget navn, 11–12 tegn */
 
 .ikon-knap {
   width: var(--ikon);
@@ -226,6 +227,8 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
 }
 /* Lange navne («Enhjørning») må ikke stikke ud af kortet på en smal telefon */
 .spiller-navn.langt { font-size: clamp(22px, 3.8vmin, 38px); }
+/* Barnets eget navn (højst 12 tegn): 11–12 tegn får en mindre skrift — og brydes hellere end at stikke ud */
+.spiller-navn.meget-langt { font-size: clamp(18px, 3vmin, 30px); overflow-wrap: anywhere; text-align: center; }
 @media (orientation: portrait) and (max-width: 600px) {
   .spiller-kort { width: 40vw; }
   .spiller-voksen { width: 30vw; }
@@ -264,6 +267,7 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
   color: var(--farve-1-moerk);
   margin-bottom: 2vmin;
 }
+.start-navn.meget-langt { font-size: clamp(30px, 6vmin, 56px); max-width: calc(100vw - 32px); overflow-wrap: anywhere; text-align: center; }
 .spil-knap { width: clamp(130px, 22vmin, 190px); height: clamp(130px, 22vmin, 190px); font-size: clamp(64px, 11vmin, 96px); }
 /* Telefonen på langs (ca. 390 px høj): mindsteværdierne ovenfor (130 px figur + 130 px ▶) fylder mere end skærmen —
    ▶ blev skåret af forneden, og tårnet ramte toppen (ui-review 11-10). Her følger alt højden, i alt ca. 82 % af den */
@@ -273,6 +277,45 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
   .start-figur { font-size: 25vh; }
   .start-navn { font-size: 9vh; margin-bottom: 0; }
   .start .spil-knap, .historie .spil-knap { width: max(88px, 24vh); height: max(88px, 24vh); font-size: max(44px, 12vh); }
+}
+
+/* ---------- «Hvad hedder du?» (navneskærmen) og bogstavtastaturet — intet <input> ---------- */
+.navneskaerm .topbar-titel { font-size: calc(var(--ikon) * 0.5); }
+.navn-midte { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(8px, 2vmin, 20px); padding: 4px 12px 12px; }
+.navn-raekke { display: flex; align-items: center; justify-content: center; gap: clamp(8px, 1.6vmin, 16px); width: min(100%, 820px); }
+.navn-ven { flex: 0 0 auto; font-size: clamp(56px, 11vmin, 104px); line-height: 1; }
+.navn-ven svg { display: block; width: 1em; height: 1em; }
+.navn-vis {
+  flex: 1 1 auto; min-width: 0; height: clamp(60px, 12vmin, 104px); padding: 0 14px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 20px; background: var(--hvid); box-shadow: inset 0 3px 8px var(--skygge);
+  font-size: clamp(30px, 7vmin, 64px); font-weight: 900; color: var(--farve-1-moerk);
+  white-space: nowrap; overflow: hidden;
+}
+.navn-vis.lang { font-size: clamp(24px, 5.4vmin, 50px); }
+.navn-vis.tom::before { content: "✏️"; opacity: 0.45; }
+.navn-raekke .navn-ok { flex: 0 0 auto; width: clamp(64px, 12vmin, 104px); height: clamp(60px, 12vmin, 104px); font-size: clamp(30px, 6vmin, 52px); }
+.navn-raekke .navn-ok:disabled { animation: none; }
+.bogstav-tastatur { --b: clamp(52px, 8.4vmin, 80px); display: grid; grid-template-columns: repeat(10, minmax(52px, 1fr)); grid-auto-rows: var(--b); gap: clamp(6px, 1vmin, 10px); width: min(100%, 920px); }
+.bogstav-tast {
+  min-width: 52px; min-height: 52px; padding: 0; border: none; border-radius: 14px;
+  background: var(--hvid); color: var(--tekst); font-family: inherit; font-size: calc(var(--b) * 0.5); font-weight: 900;
+  box-shadow: 0 4px 0 var(--farve-1-lys), 0 6px 12px var(--skygge); transition: transform 0.06s;
+}
+.bogstav-tast:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--farve-1-lys); }
+.bogstav-tast:disabled { opacity: 0.4; box-shadow: none; cursor: default; }
+.bogstav-slet { background: var(--papir); }
+/* Telefonen og iPad på højkant: seks kolonner (fem rækker) med tasterne lige så brede som høje */
+@media (max-width: 699px) {
+  .bogstav-tastatur { grid-template-columns: repeat(6, minmax(52px, 1fr)); --b: clamp(52px, 13vw, 76px); }
+}
+/* Telefonen på højkant: navnet får hele bredden ved siden af ✔ (vennen står på startskærmen) */
+@media (max-width: 499px) { .navn-ven { display: none; } }
+/* Telefonen på langs (ca. 390 px høj): ti kolonner, og vennen får ikke plads */
+@media (orientation: landscape) and (max-height: 500px) {
+  .bogstav-tastatur { --b: 52px; gap: 6px; }
+  .navn-ven { display: none; }
+  .navn-vis, .navn-raekke .navn-ok { height: 56px; }
 }
 
 /* ---------- Vælg ven ---------- */
@@ -1582,6 +1625,24 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
 .stemme-raekke { display: flex; align-items: center; gap: 10px; }
 .stemme-valg { flex: 1; min-width: 0; text-align: left; }
 .stemme-valg.valgt { box-shadow: inset 0 0 0 4px var(--farve-1); font-weight: 900; }
+/* Barnets eget navn i Indstillinger (voksen.js navnBlok): et almindeligt tekstfelt — det er den voksnes skærm */
+.navn-blok { border-top: 1px solid #e6e1d6; margin-top: 6px; padding: 6px 0 10px; }
+.navn-hjaelp { margin: 6px 0; font-size: 17px; line-height: 1.4; }
+.navn-form { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; margin: 8px 0; }
+.navn-etiket { flex: 0 0 auto; font-weight: 700; }
+.navn-felt {
+  flex: 1 1 11em; min-width: 0; min-height: 56px; padding: 8px 14px;
+  font-family: inherit; font-size: 22px; font-weight: 700; color: var(--tekst);
+  background: var(--hvid); border: 2px solid var(--farve-1); border-radius: 14px;
+  -webkit-user-select: text; user-select: text;
+}
+.navn-felt:focus-visible { outline: 4px solid var(--tekst); outline-offset: 2px; }
+.navn-hint { flex: 1 0 100%; font-size: 17px; }
+.navn-blok .voksen-valg-knap { min-height: 56px; padding: 8px 16px; font-size: 18px; }
+.navn-blok .voksen-valg-knap:disabled { opacity: 0.4; box-shadow: none; cursor: default; }
+.navn-knaprad { justify-content: flex-start; gap: 10px; margin: 8px 0; }
+.navn-optag.optager { background: #ffd9d9; animation: puls 1s ease-in-out infinite; }
+.navn-status { min-height: 1.4em; margin: 6px 0 0; font-size: 17px; font-weight: 700; }
 @media (max-width: 600px) {
   .indtal-raekke { flex-wrap: wrap; }
   .indtal-tekst { flex-basis: calc(100% - 80px); }
@@ -1842,6 +1903,13 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
 
 /* Små skærme (B6: 11 verdener): navnene på låste verdener skjules — et tryk siger navnet, og ikonet viser verdenen */
 @media (max-height: 500px), (max-width: 600px) { .kort .station.laast .station-navn { display: none; } .kort .station-navn { padding: 2px 5px; } }
+/* Kortet på højkant, når navnene ikke kan være der (app.js sætter .trangt): navnene skjules, så de ikke ligger under stjernerne */
+.kort-flade.trangt .station-navn { display: none; }
+/* Stjernerne er kun at se på: et tryk på dem rammer stationen under dem (de kan ligge ind over stationen ovenover) */
+.kort-flade .station-stjerner { pointer-events: none; }
+/* Telefon på højkant uden navne: de åbne stationer er 70 px (før 78) — så når stjernerne ikke ned over stationen
+   ovenover i søjlen, og ikonerne ses helt (trykfladen er stadig over 52 px) */
+@media (orientation: portrait) and (max-width: 600px) { .kort-flade.trangt .station.aaben { --s: 70px; } }
 
 /* ---------- B7: 📘 Lær (voksendelen) ---------- */
 .laer-liste { display: flex; flex-direction: column; gap: 10px; padding: 8px 16px 24px; overflow-y: auto; max-width: 760px; width: 100%; margin: 0 auto; }
@@ -1952,8 +2020,10 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
 /* Mønsterrækken: brikkerne i én række (en lang frise evt. i to), pilen viser, hvor mønstret begynder */
 .sd-raekke { display: flex; align-items: center; justify-content: center; gap: calc(var(--u) * 0.6); }
 .sd-raekke.to-rader { flex-wrap: wrap; row-gap: calc(var(--u) * 1); }
-.sd-raekke.frise.to-rader { width: calc(var(--u) * (6.6 * var(--halv, 2) + 4.8)); justify-content: flex-start; padding-left: calc(var(--u) * 4.4); }
-.sd-raekke.frise.to-rader .sd-pil { margin-left: calc(var(--u) * -4.4); }
+/* To rækker: pilen står til venstre for den første række (4u + 0,2u + mellemrummet 0,6u = 4,8u), og den anden række
+   begynder lige under den første brik — ikke 0,4u længere til venstre (testlisten v112: «starter under pilen») */
+.sd-raekke.frise.to-rader { width: calc(var(--u) * (6.6 * var(--halv, 2) + 4.8)); justify-content: flex-start; padding-left: calc(var(--u) * 4.8); }
+.sd-raekke.frise.to-rader .sd-pil { margin-left: calc(var(--u) * -4.8); }
 /* Stak vendt til søjler (to lange rækker på en smal skærm): tingene står parvis ud for hinanden, fra toppen */
 .scene.lodret .scene-rad { align-items: flex-start; }
 .scene.lodret .ting-gruppe.linje .ting-raekke { flex-direction: column; }
@@ -2032,9 +2102,18 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
   .runde-krop.kort-store .valg-scene.kort-stak .valg-knap.svar-ramme { padding: 12px 18px; }
   /* «halv-stak»: opgaven og kortene deler bredden lige (køen i opgaven i samme målestok som på kortene) */
   .runde-krop.scene-opgave.kort-store.kort-halv { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  /* «gitter» (tre kort med tierstænger): to kort øverst og ét under i den brede kolonne — kortene bliver halvt så
+     høje og næsten dobbelt så brede, så stængerne bliver større og luften over og under dem mindre */
+  .runde-krop.kort-store .valg.valg-scene.kort-gitter { flex-flow: row wrap; justify-content: center; align-content: center; }
+  .runde-krop.kort-store .valg-scene.kort-gitter .valg-knap { flex: 0 0 calc(50% - 11px); height: calc(50% - 11px); max-height: none; }
 }
 @media (orientation: portrait) {
   .runde-krop.kort-store .valg-scene .valg-knap { height: clamp(150px, 40vh, 480px); }
+}
+/* «gitter» (højkant, tre kort med tierstænger): to kort øverst og ét under, hvert lige så bredt som halvdelen */
+@media (orientation: portrait) {
+  .runde .valg.valg-scene.kort-gitter { flex-flow: row wrap; justify-content: center; align-content: center; }
+  .runde .valg-scene.kort-gitter .valg-knap { flex: 0 0 calc(50% - 11px); height: clamp(150px, 26vh, 300px); }
 }
 /* Brede kort (fx en mønsterrække) stables under hinanden — også på højkant og på telefonen på langs */
 .runde .valg.valg-scene.kort-stak { flex-direction: column; }
@@ -2064,6 +2143,8 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
 .sd-placering { position: relative; display: block; width: calc(var(--u) * 23.04); height: calc(var(--u) * 19.8); transition: filter 0.2s; }
 .sd-placering svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 .plac-ting { position: absolute; left: 50%; transform: translateX(-50%); font-size: calc(var(--u) * 7.5); line-height: 1; }
+/* «Bag»: kun tingens højre halvdel ses — dyrene (🐈, 🐟) vender mod venstre, så de spejles og kigger frem med hovedet */
+.sd-placering.bag .plac-ting { transform: translateX(-50%) scaleX(-1); }
 .plac-krop { fill: var(--sti-kant); stroke: var(--sti); stroke-width: 3; stroke-linejoin: round; }
 .plac-inde { fill: var(--sti); }
 .plac-laag { fill: var(--sti); stroke: var(--sti); stroke-width: 2; }
@@ -2268,6 +2349,11 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
    ===================================================================== */
 .mini-tegning { display: block; width: 100%; height: 100%; overflow: visible; }
 .mini-billede { display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
+/* Talordene (to, ti, ni …): terningbilleder i stedet for tastetegnet (🔟) — samme plads som emojien i linjen */
+.tal-billede { display: inline-block; flex: 0 0 auto; width: 1.15em; height: 1.15em; vertical-align: middle; }
+.tal-terning { fill: var(--hvid); stroke: var(--kontur); stroke-width: 3; }
+.tal-oeje { fill: var(--tekst); }
+.ting.med-tegning > .tal-billede { display: block; width: 100%; height: 100%; }
 
 /* Frøposten: bestillingen (dyret, tallet og lige så mange prikker) ved siden af kurven — over den i et smalt felt */
 .froe-post { display: flex; align-items: center; justify-content: center; gap: clamp(12px, 3vmin, 40px); max-width: 100%; }
@@ -2283,19 +2369,25 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
 @container (max-aspect-ratio: 1/1) {
   .froe-post { flex-direction: column; }
   .froe-bestilling { flex-direction: row; }
-  .froe-kurv { width: min(560px, 96cqw, calc((100cqh - 130px) * 1.43)); }
+  .froe-kurv { width: min(560px, 100cqw, calc((100cqh - 130px) * 1.43)); }
 }
 .kurv-tegning { position: absolute; inset: 0; width: 100%; height: 100%; }
 .kurv-reserve { position: absolute; inset: 30% 8% 4%; border-radius: 0 0 40% 40% / 0 0 30% 30%; background: var(--farve-2); border: 3px solid var(--kontur); }
 /* Den lyse flade i kurven (frøene er i samme farve som kurven): fem på række, cellen er en brøkdel af kurvens bredde.
-   Fladen må aldrig nå op over kurvens forkant (y 49 af 112 — ca. 34 cqw over fladens bund; 31 cqw giver luft): ved tre og fire rækker
-   (trin 3, 11–20 frø) bliver cellerne mindre, så højden 2·padding + rk·c + (rk−1)·gap holder sig under 31 cqw (ui-review 11-10) */
-.kurv-indhold { --c: min(calc(56cqw / var(--kol, 5)), calc((31cqw - 4.8cqw - (var(--rk, 2) - 1) * 1.4cqw) / var(--rk, 2))); position: absolute; left: 50%; bottom: 8%; transform: translateX(-50%); display: grid; padding: 2.4cqw; border-radius: 3cqw; background: rgba(255, 253, 248, 0.82); box-shadow: 0 0.5cqw 0 rgba(70, 45, 20, 0.18); }
-.kurv-indhold.mange { --c: min(calc(56cqw / var(--kol, 5)), calc((31cqw - 6.4cqw - (var(--rk, 2) - 1) * 1.4cqw) / var(--rk, 2))); padding-bottom: 4cqw; }
+   Fladen ligger helt inde i kurven (review 12-10: med bunden 8 % over kurvens kant — viewBox-y 103 — stak den 1–8 px ud
+   under bunden, som slutter ved 102,5, og ved fem og seks på række også ud til siderne). Kurvens indre omrids (streg 1,5
+   indad): siderne (17,37)→(30,96), bunden en bue ned til y 101, forkanten y 49. Fladens bund står ved y 95 (15,2 %),
+   og den er højst 61 cqw bred og 28,2 cqw høj (toppen ved y 49,9 — aldrig over forkanten, ui-review 11-10) */
+.kurv-indhold { --c: min(calc((61cqw - 4.8cqw - (var(--kol, 5) - 1) * 1.4cqw) / var(--kol, 5)), calc((28.2cqw - 4.8cqw - (var(--rk, 2) - 1) * 1.4cqw) / var(--rk, 2))); position: absolute; left: 50%; bottom: 15.2%; transform: translateX(-50%); display: grid; padding: 2.4cqw; border-radius: 3cqw; background: rgba(255, 253, 248, 0.82); box-shadow: 0 0.5cqw 0 rgba(70, 45, 20, 0.18); }
+/* Mange frø (tre og fire rækker, 11–20): mindre luft om og mellem frøene, så de bliver større inden for den samme flade
+   (testlisten v112: selve frøet var ca. 9 px på en iPhone ved 20) — 1,6 + 3,2 cqw luft og 1 cqw mellem rækkerne. Den smalle
+   flade (fem på række) kan stå lavere, hvor buen i bunden er dybest: bunden ved y 97,5 (12,95 %), højst 44 cqw bred og 29,8 høj */
+.kurv-indhold.mange { --c: min(calc((44cqw - 3.2cqw - (var(--kol, 5) - 1) * 1cqw) / var(--kol, 5)), calc((29.8cqw - 4.8cqw - (var(--rk, 2) - 1) * 1cqw) / var(--rk, 2))); bottom: 12.95%; padding: 1.6cqw 1.6cqw 3.2cqw; }
+.kurv-indhold.mange .froe-lag { gap: 1cqw; }
 .froe-lag { grid-area: 1 / 1; display: grid; grid-template-columns: repeat(var(--kol, 5), var(--c)); grid-template-rows: repeat(var(--rk, 2), var(--c)); gap: 1.4cqw; align-content: start; border-radius: 2cqw; transition: box-shadow 0.2s, background 0.2s; }
 .kurv-indhold.mange .froe-lag > :nth-child(n+11) { top: 1.6cqw; } /* luft efter hver ti */
 .froe, .froe-plads { position: relative; display: flex; align-items: center; justify-content: center; aspect-ratio: 1; line-height: 1; transition: transform 0.2s, filter 0.2s; }
-.froe svg, .froe-plads svg { width: 100%; height: 100%; }
+.froe svg, .froe-plads svg { flex: 0 0 auto; width: 130%; height: 130%; } /* tegningerne har luft om sig — frøet fylder nu cellen (rører ikke naboen) */
 .froe.land { animation: land 0.25s ease-out; }
 @keyframes land { from { transform: translateY(-45%) scale(0.85); opacity: 0.2; } to { transform: none; opacity: 1; } }
 .froe-lag.lyser { background: rgba(255, 200, 61, 0.28); box-shadow: 0 0 0 4px var(--guld), 0 0 14px var(--guld); }
@@ -2382,19 +2474,31 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
 .lydtog-tog { --v: clamp(60px, 12.5vmin, 130px); display: flex; align-items: flex-end; max-width: 100%; transition: transform 1.2s ease-in; }
 @supports (width: 1cqw) {
   .lydtog-billede { width: min(150px, 30cqh, 30cqw); height: min(150px, 30cqh, 30cqw); font-size: min(100px, 20cqh, 20cqw); }
-  .lydtog-tog { --v: max(52px, min(170px, calc(94cqw / (var(--vogne) + 1)), 44cqh)); }
+  .lydtog-tog { --v: max(52px, min(170px, calc(94cqw / (var(--vogne) * 0.92 + 1)), 44cqh)); }
 }
 .lydtog-tog.koerer { transform: translateX(110vw); }
 .lydtog-lok, .lydtog-vogn { position: relative; flex: 0 0 auto; width: var(--v); height: var(--v); transition: transform 0.25s; }
+/* Toget hænger sammen på alle skærme: hver vogn ligger 8 % ind over den forrige, så koblingerne mødes (vognens x 4–14
+   og 82–92, lokomotivets krog 84–92 — alle i y 66 af 96). Lokomotivet er lige så stort som vognene (samme højde) */
+.lydtog-vogn { margin-left: calc(var(--v) * -0.08); }
 .vogn-tegning { position: absolute; inset: 0; width: 100%; height: 100%; }
 .vogn-reserve { position: absolute; inset: 22% 13% 28%; display: flex; align-items: center; justify-content: center; border: 3px solid var(--kontur); border-radius: 10%; background: var(--farve-2); }
 .vogn-reserve.lok { border: none; background: none; font-size: calc(var(--v) * 0.6); }
 .vogn-bogstav { position: absolute; left: 20.8%; width: 58.3%; top: 30.2%; height: 33.3%; display: flex; align-items: center; justify-content: center; font-family: var(--skrift); font-size: max(17px, calc(var(--v) * 0.34)); font-weight: 900; line-height: 1; color: var(--tekst); }
 .vogn-bogstav.gammel { opacity: 0.55; }
-/* Den aktive vogn: stiplet ramme og løftet (ikke kun farve) */
-.lydtog-vogn.aktiv { transform: translateY(calc(var(--v) * -0.1)); }
-.lydtog-vogn.aktiv::after { content: ''; position: absolute; inset: 15% 3% 13%; border: 4px dashed var(--farve-2-moerk); border-radius: 14px; }
+/* Den aktive vogn: en stiplet ramme om vinduet (x 17–79, y 26–64 af 96 — over hjulene, som starter ved y 67) og et
+   lys om vognen. Vognen bliver i toget: løftet knækkede koblingerne, og den gamle ramme skar gennem hjulene */
+.lydtog-vogn.aktiv .vogn-tegning { filter: drop-shadow(0 0 calc(var(--v) * 0.05) var(--guld)) drop-shadow(0 0 2px var(--guld-moerk)); }
+.lydtog-vogn.aktiv::after { content: ''; position: absolute; inset: 27.1% 17.7% 33.3%; border: 4px dashed var(--farve-2-moerk); border-radius: 10px; }
 .lydtog-vogn.fyldt .vogn-bogstav { color: var(--farve-1-moerk); }
+/* Højkant (fx iPhone): bredden bestemmer togets størrelse — toget bruger (næsten) hele bredden, og billedet over toget
+   bliver større (der er plads i højden). Testlisten v112: lydtoget var for lille på iPhone højkant */
+@supports (width: 1cqw) {
+  @container (max-aspect-ratio: 1/1) {
+    .lydtog-tog { --v: max(52px, min(170px, calc(98cqw / (var(--vogne) * 0.92 + 1)), 44cqh)); }
+    .lydtog-billede { width: min(170px, 40cqw, 30cqh); height: min(170px, 40cqw, 30cqh); font-size: min(110px, 26cqw, 20cqh); }
+  }
+}
 /* Kortene til den aktive vogn/plads — store (mindst 64 px) */
 .byg-panel.trinvis.tog .trinvis-kort { min-width: clamp(72px, 13vmin, 120px); height: clamp(72px, 13vmin, 120px); font-size: clamp(44px, 8vmin, 72px); }
 .trinvis-kort.vis-svar { background: var(--guld); box-shadow: 0 6px 0 var(--guld-moerk), 0 0 0 8px rgba(255, 200, 61, 0.4); animation: puls 1.2s ease-in-out infinite; }

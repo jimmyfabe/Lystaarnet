@@ -610,7 +610,112 @@
     // =================================================================
     //  Indstillinger
     // =================================================================
+    // Optagere i Indstillinger (barnets navn): stoppes, når skærmen forlades eller tegnes igen, så mikrofonen slukker
+    let navneOptagere = [];
+    const stopNavneOptagere = () => { navneOptagere.forEach((o) => o.stop()); navneOptagere = []; };
+
+    // =================================================================
+    //  Barnets eget navn (12-10-2026): skrives af barnet første gang (app.js) og kan rettes her. Navnet findes kun på
+    //  denne enhed (og i «Gem en kopi»). Det skrives aldrig i en besked og siges aldrig af stemmen: talt navn er kun en
+    //  optagelse (navneklip i IndexedDB), som aldrig forlader enheden. Barnet kan ikke selv omdøbe sig (søskende).
+    // =================================================================
+    function navnBlok(b) {
+      const LK = window.Lydklip, KL = ctx.KlipLager;
+      const klipId = LK.navnKlipId(b.id);
+      const status = h('p', { class: 'navn-status', role: 'status' }, '');
+      const besked = (t) => { status.textContent = t; };
+      const FEJL = {
+        ulaeselig: 'Barnets gemte data kunne ikke læses, så navnet kan ikke gemmes. Se «Sikkerhedskopi» nedenfor.',
+        gammel: 'Navnet kan ikke gemmes, fordi lageret er fuldt. Tag en kopi under «Sikkerhedskopi», og prøv igen.',
+        fuldt: 'Navnet kunne ikke gemmes, fordi lageret er fuldt. Tag en kopi under «Sikkerhedskopi», og prøv igen.',
+        ukendt: 'Navnet kunne ikke gemmes.',
+      };
+      // Kun egetNavn og navnSpurgt ændres i barnets gemte data (gem.js retEgetNavn). Barnets side læser dem igen (storage).
+      // glem: navnet er ændret eller slettet (eller barnet skal skrive det igen) — så slettes optagelsen, ellers ville
+      // spillet vise det nye navn og sige det gamle
+      const ret = (fn, ok, glem) => {
+        const r = G.retEgetNavn(lager, b.noegle, b.navn, fn);
+        besked(r.ok ? ok : FEJL[r.fejl] || FEJL.ukendt);
+        opdater();
+        if (r.ok && glem && ctx.Lyd.harLokaltKlip(klipId)) {
+          KL.slet('klip', klipId).then(() => { ctx.Lyd.fjernLokaltKlip(klipId); besked(ok + ' Optagelsen er slettet.'); opdater(); },
+            () => besked(ok + ' Optagelsen kunne ikke slettes her på enheden.'));
+        }
+        return r.ok;
+      };
+      // Enter gemmer (også dér, hvor formularens egen Enter ikke sender — fx WebKit på Windows)
+      const felt = h('input', {
+        class: 'navn-felt', type: 'text', id: 'navn-' + b.id, maxlength: String(G.MAX_NAVN), autocomplete: 'off',
+        autocapitalize: 'words', autocorrect: 'off', spellcheck: 'false', enterkeyhint: 'done', 'aria-describedby': 'navn-hint-' + b.id,
+        onkeydown: (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); Lyd.init(); Lyd.tryk(); gemNavn(); } },
+      });
+      felt.value = G.laesEgetNavn(lager, b.noegle) || '';
+      const gemNavn = () => {
+        const foer = G.laesEgetNavn(lager, b.noegle);
+        const n = G.normaliserEgetNavn(felt.value);
+        if (ret((d) => G.saetEgetNavn(d, felt.value), n ? 'Navnet er gemt.' : 'Navnet er slettet.', n !== foer)) felt.value = n || '';
+      };
+      const form = h('form', { class: 'navn-form', onsubmit: (e) => { e.preventDefault(); Lyd.init(); Lyd.tryk(); gemNavn(); } },
+        h('label', { class: 'navn-etiket', for: 'navn-' + b.id }, 'Barnets navn'),
+        felt,
+        h('button', { class: 'voksen-valg-knap navn-gem', type: 'submit' }, 'Gem navnet'),
+        h('span', { class: 'navn-hint', id: 'navn-hint-' + b.id }, 'Højst 12 tegn.')); // = G.MAX_NAVN (test-navn)
+      const sletNavn = h('button', { class: 'voksen-valg-knap navn-slet', type: 'button', onclick: () => {
+        Lyd.init(); Lyd.tryk();
+        if (ret((d) => G.saetEgetNavn(d, ''), 'Navnet er slettet.', true)) felt.value = '';
+      } }, '🗑️ Slet navnet');
+      const igen = h('button', { class: 'voksen-valg-knap navn-igen', type: 'button', onclick: () => {
+        Lyd.init(); Lyd.tryk();
+        ret((d) => { delete d.navnSpurgt; }, 'Næste gang barnet trykker ▶, spørger spillet om navnet.', true);
+      } }, '✏️ Lad barnet skrive navnet igen');
+      // Optagelsen: barnet siger selv sit navn (eller du gør). Højst 3 sekunder; kun på denne enhed.
+      const optager = lavOptager({
+        maxSek: 3,
+        stopTekst: '⏹ Stop',
+        status: besked,
+        startTekst: () => 'Optager i højst 3 sekunder — sig navnet, og tryk ⏹ Stop.',
+        gemt: () => { besked('Optagelsen er gemt. Tryk ▶ Lyt for at høre den.'); opdater(); },
+      });
+      navneOptagere.push(optager);
+      const optag = h('button', { class: 'voksen-valg-knap navn-optag', type: 'button', onclick: (e) => { Lyd.init(); optager.optag(klipId, e.currentTarget); } }, '🔴 Optag navnet');
+      const lyt = h('button', { class: 'voksen-valg-knap navn-lyt', type: 'button', onclick: () => {
+        Lyd.init();
+        if (!voksen.tale) { besked('Oplæsning er slået fra under «Lyd» — slå den til for at høre optagelsen.'); return; }
+        ctx.Lyd.klip(klipId, '');
+      } }, '▶ Lyt');
+      const sletKlip = h('button', { class: 'voksen-valg-knap navn-slet-klip', type: 'button', onclick: async () => {
+        Lyd.init(); Lyd.tryk();
+        try { await KL.slet('klip', klipId); } catch (e) { besked('Optagelsen kunne ikke slettes her på enheden.'); return; }
+        ctx.Lyd.fjernLokaltKlip(klipId);
+        besked('Optagelsen er slettet.');
+        opdater();
+      } }, '🗑️ Slet optagelsen');
+      // En optagelse uden navn bruges aldrig (harNavneklip i app.js kræver begge) — derfor først navnet, så optagelsen
+      const foerst = h('p', { class: 'navn-hjaelp navn-foerst' }, 'Skriv navnet først — så kan du optage det.');
+      function opdater() {
+        const harNavn = !!G.laesEgetNavn(lager, b.noegle);
+        const harKlip = ctx.Lyd.harLokaltKlip(klipId);
+        sletNavn.disabled = !harNavn;
+        optag.disabled = !harNavn && !optager.optager(); // en igangværende optagelse kan altid stoppes
+        foerst.hidden = harNavn;
+        lyt.disabled = !harKlip;
+        sletKlip.disabled = !harKlip;
+      }
+      opdater();
+      return h('div', { class: 'navn-blok' },
+        h('h3', null, 'Navn'),
+        h('p', { class: 'navn-hjaelp' }, 'Barnet skriver selv sit navn, første gang det trykker ▶. Navnet vises i spillet og bliver på denne enhed (og i «Gem en kopi»).'),
+        form,
+        h('div', { class: 'voksen-knaprad navn-knaprad' }, sletNavn, igen),
+        h('p', { class: 'navn-hjaelp' }, 'Optag navnet, så spillet kan sige det: «Hej!» ved start og «Du klarede det!» eller «Prøv igen» med navnet, højst én gang hver anden runde. Barnet kan selv sige det, eller du kan. Uden optagelse siges sætningerne uden navn.'),
+        optager.kan ? foerst : null,
+        h('div', { class: 'voksen-knaprad navn-knaprad' }, optager.kan ? optag : null, lyt, sletKlip),
+        optager.kan ? null : h('p', { class: 'navn-hjaelp' }, 'Denne browser kan ikke optage lyd.'),
+        status);
+    }
+
     function visIndstillinger() {
+      stopNavneOptagere();
       const skifter = (label, til, fn) => {
         const k = h('button', { class: 'skifter' + (til ? ' til' : ''), type: 'button', role: 'switch', 'aria-checked': til ? 'true' : 'false' }, h('span', { class: 'skifter-knop' }));
         // fn kan returnere false for at afvise skiftet (fx det sidste emne, der er slået til)
@@ -629,6 +734,7 @@
           onclick: (e) => { Lyd.init(); Lyd.tryk(); voksen[felt] = m; gemV(); e.currentTarget.parentNode.querySelectorAll('button').forEach((x) => x.classList.toggle('valgt', x === e.currentTarget)); },
         }, tekst(m)))));
       const barnBlok = (b) => h('section', null, h('h2', null, b.navn),
+        navnBlok(b),
         tidsvalg(b),
         skifter('Åbn alle verdener', voksen.aabneAlle[b.id], (v) => { voksen.aabneAlle[b.id] = v; }),
         ...[['Matematik', VERDENER.filter((v) => !v.blandet)], ['Dansk', DANSK_VERDENER]].filter((x) => x[1].length).map(([titel, liste]) =>
@@ -667,7 +773,7 @@
       // Kun kopier under de nye nøgler kan fortrydes (en kopi fra før omdøbningen ville overskrive nyere data)
       const kanFortryde = G.kanFortryde(lager);
       skift(h('div', { class: 'skaerm voksen indstillinger' },
-        topbar('Indstillinger', visMenu),
+        topbar('Indstillinger', () => { stopNavneOptagere(); visMenu(); }),
         h('div', { class: 'overblik-indhold' },
           h('section', null, h('h2', null, 'Lyd'),
             skifter('Lydeffekter', voksen.lyd, (v) => { voksen.lyd = v; }),
@@ -684,6 +790,7 @@
           ...BOERN.map(barnBlok),
           h('section', null, h('h2', null, 'Sikkerhedskopi'),
             h('p', null, 'Fremskridtet ligger kun på denne iPad. Gem en kopi engang imellem — fx som mail til dig selv.'),
+            BOERN.some((b) => G.laesEgetNavn(lager, b.noegle)) ? h('p', { class: 'navn-hjaelp' }, 'Kopien indeholder barnets navn — gem den kun et sted, du stoler på.') : null,
             ulaeselige.length ? h('div', { class: 'voksen-advarsel' },
               h('p', null, '⚠️ ' + ulaeselige.map(navnPaa).join(' og ') + ' kunne ikke læses, og der var ikke plads til en reservekopi. Spillet gemmer derfor ikke. Tryk først «Gem en kopi» (så kommer de ulæselige data med i filen), og derefter «Ryd ulæselige data», hvor du vælger filen.'),
               rydKnap) : null,
@@ -969,34 +1076,25 @@
       nyVoksenopgave();
     }
 
-    // =================================================================
-    //  🎙️ Indtal — bogstavlyde og ord optages her på enheden (bag voksenlåsen). Intet sendes nogen steder hen.
-    // =================================================================
-    function visIndtal() {
-      const DA = window.Dansk, LK = window.Lydklip, KL = ctx.KlipLager;
-      const liste = (DA && DA.LYDLISTE) || [];
-      let optagelse = null; // { id, recorder, stream, chunks }
-      const status = h('p', { class: 'voksen-hjaelp indtal-status' }, '');
-      const kanOptage = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
-      const raekker = {};
-      const taelIndtalt = () => {
-        const n = liste.filter((l) => ctx.Lyd.harLokaltKlip(l.id)).length;
-        taeller.textContent = n + ' af ' + liste.length + ' indtalt';
-      };
-      const taeller = h('b', { class: 'indtal-taeller' }, '');
-      const opdaterRaekke = (l) => {
-        const r = raekker[l.id];
-        const har = ctx.Lyd.harLokaltKlip(l.id);
-        r.classList.toggle('har', har);
-        r.querySelector('.indtal-lyt').disabled = !har;
-        r.querySelector('.indtal-flueben').textContent = har ? '✓' : '';
-      };
+    // Optag et kort lydklip her på enheden: MediaRecorder → WebAudio → lydklip.js (mono, beskåret, normaliseret WAV) →
+    // IndexedDB og Lyd. Bruges af 🎙️ Indtal og af barnets navn. Intet sendes nogen steder hen.
+    // valg: { status(tekst), startTekst(id), gemt(id, r), maxSek (stopper selv), stopTekst (knappens tekst under optagelsen) }
+    function lavOptager(valg) {
+      const LK = window.Lydklip, KL = ctx.KlipLager;
+      const kan = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
+      let optagelse = null; // { id, recorder, stream, chunks, knap, tekst, timer }
+      // Sættes FØR der ventes på mikrofonen (getUserMedia kan tage sekunder på iPad): et nyt tryk imens starter ikke en
+      // optagelse til, og stop() (Tilbage, skærmen forlades) annullerer den, så mikrofonen slukkes, når den svarer
+      let starter = null; // { id, annulleret }
+      const slukSpor = (stream) => { if (stream) stream.getTracks().forEach((t) => { try { t.stop(); } catch (e) { /* allerede slukket */ } }); };
       async function stop() {
+        if (starter) { starter.annulleret = true; starter = null; }
         const o = optagelse;
         if (!o) return;
         optagelse = null;
+        clearTimeout(o.timer);
         o.knap.classList.remove('optager');
-        o.knap.textContent = '🔴';
+        o.knap.textContent = o.tekst;
         const faerdig = new Promise((res) => { o.recorder.onstop = res; });
         try { o.recorder.stop(); } catch (e) { /* allerede stoppet */ }
         await faerdig;
@@ -1010,35 +1108,76 @@
           const kanaler = [];
           for (let k = 0; k < lyd.numberOfChannels; k++) kanaler.push(lyd.getChannelData(k));
           const r = LK.behandl(kanaler, lyd.sampleRate);
-          if (!r) { status.textContent = 'Der var kun stilhed — prøv igen tættere på mikrofonen.'; return; }
+          if (!r) { valg.status('Der var kun stilhed — prøv igen tættere på mikrofonen.'); return; }
           await KL.gem('klip', o.id, r.wav);
           ctx.Lyd.saetLokaltKlip(o.id, r.wav);
-          status.textContent = 'Gemt: ' + o.id + ' (' + r.sek.toFixed(1).replace('.', ',') + ' s). Tryk ▶ for at lytte.';
-          opdaterRaekke(liste.find((l) => l.id === o.id));
-          taelIndtalt();
+          valg.gemt(o.id, r);
         } catch (e) {
-          status.textContent = 'Optagelsen kunne ikke gemmes (' + (e && e.message ? e.message : 'ukendt fejl') + ').';
+          valg.status('Optagelsen kunne ikke gemmes (' + (e && e.message ? e.message : 'ukendt fejl') + ').');
         }
       }
-      async function optag(l, knap) {
-        if (optagelse) { const forrige = optagelse.id; await stop(); if (forrige === l.id) return; }
-        if (!kanOptage) { status.textContent = 'Denne browser kan ikke optage lyd.'; return; }
+      async function optag(id, knap) {
+        if (starter) return; // mikrofonen er ved at starte: et tryk mere starter ikke en til
+        if (optagelse) { const forrige = optagelse.id; await stop(); if (forrige === id) return; }
+        if (!kan) { valg.status('Denne browser kan ikke optage lyd.'); return; }
+        const s = starter = { id, annulleret: false };
+        let stream = null;
         try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          if (s.annulleret) { slukSpor(stream); return; } // stoppet, mens mikrofonen startede
+          starter = null;
           const recorder = new MediaRecorder(stream);
           const chunks = [];
           recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
           recorder.start();
-          optagelse = { id: l.id, recorder, stream, chunks, knap };
+          const o = optagelse = { id, recorder, stream, chunks, knap, tekst: knap.textContent, timer: null };
+          // Højst maxSek: så stopper optagelsen selv (men kun denne — ikke en ny, der er startet bagefter)
+          if (valg.maxSek) o.timer = setTimeout(() => { if (optagelse === o) stop(); }, valg.maxSek * 1000);
           knap.classList.add('optager');
-          knap.textContent = '⏹';
-          status.textContent = 'Optager «' + l.id + '» — sig lyden, og tryk ⏹.';
+          knap.textContent = valg.stopTekst || '⏹';
+          valg.status(valg.startTekst(id));
         } catch (e) {
-          status.textContent = 'Mikrofonen kunne ikke bruges. Giv spillet lov til mikrofonen i browserens indstillinger.';
+          if (starter === s) starter = null;
+          slukSpor(stream); // fx kunne MediaRecorder ikke laves: mikrofonen må ikke blive ved med at være tændt
+          if (!s.annulleret) valg.status('Mikrofonen kunne ikke bruges. Giv spillet lov til mikrofonen i browserens indstillinger.');
         }
       }
+      return { kan, optag, stop, optager: () => !!optagelse };
+    }
+
+    // =================================================================
+    //  🎙️ Indtal — bogstavlyde og ord optages her på enheden (bag voksenlåsen). Intet sendes nogen steder hen.
+    // =================================================================
+    function visIndtal() {
+      const DA = window.Dansk, LK = window.Lydklip;
+      const liste = (DA && DA.LYDLISTE) || [];
+      const status = h('p', { class: 'voksen-hjaelp indtal-status' }, '');
+      const raekker = {};
+      const taelIndtalt = () => {
+        const n = liste.filter((l) => ctx.Lyd.harLokaltKlip(l.id)).length;
+        taeller.textContent = n + ' af ' + liste.length + ' indtalt';
+      };
+      const taeller = h('b', { class: 'indtal-taeller' }, '');
+      const opdaterRaekke = (l) => {
+        const r = raekker[l.id];
+        const har = ctx.Lyd.harLokaltKlip(l.id);
+        r.classList.toggle('har', har);
+        r.querySelector('.indtal-lyt').disabled = !har;
+        r.querySelector('.indtal-flueben').textContent = har ? '✓' : '';
+      };
+      const optager = lavOptager({
+        status: (t) => { status.textContent = t; },
+        startTekst: (id) => 'Optager «' + id + '» — sig lyden, og tryk ⏹.',
+        gemt: (id, r) => {
+          status.textContent = 'Gemt: ' + id + ' (' + r.sek.toFixed(1).replace('.', ',') + ' s). Tryk ▶ for at lytte.';
+          opdaterRaekke(liste.find((l) => l.id === id));
+          taelIndtalt();
+        },
+      });
+      const kanOptage = optager.kan;
+      const stop = optager.stop;
       const rk = liste.map((l) => {
-        const optagKnap = h('button', { class: 'ikon-knap indtal-optag', type: 'button', 'aria-label': 'Optag ' + l.id, onclick: (e) => { Lyd.init(); optag(l, e.currentTarget); } }, '🔴');
+        const optagKnap = h('button', { class: 'ikon-knap indtal-optag', type: 'button', 'aria-label': 'Optag ' + l.id, onclick: (e) => { Lyd.init(); optager.optag(l.id, e.currentTarget); } }, '🔴');
         const lytKnap = h('button', { class: 'ikon-knap indtal-lyt', type: 'button', 'aria-label': 'Lyt til ' + l.id, onclick: () => { Lyd.init(); ctx.Lyd.klip(l.id, ''); } }, '▶');
         const r = h('div', { class: 'indtal-raekke' },
           h('span', { class: 'indtal-bogstav' }, l.bogstav),

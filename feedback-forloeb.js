@@ -5,6 +5,8 @@
      valg), rate/pitch, Safari-grebet (60 ms efter cancel), referencen til ytringen og skønnet, når onend udebliver,
      er spillets eksisterende iOS-løsninger og bruges uændret. Forslagets egen talekode bruges ikke.
    - Klip (fx bogstavlyde) går gennem Lyd.klip, som selv venter på ended.
+   - Barnets navn (navnKlip + efter, 12-10-2026): tekst → navnet som et klip optaget på enheden → efter. Uden klip siges
+     tekst + efter som én ytring — navnet er aldrig tekst (repoet er offentligt, og talen kan være enhedens stemme).
    - Lydeffekter og oplæsning er to indstillinger i spillet: er effekterne slået fra, kommer talen stadig.
    - run() stopper anden tale, før forløbet starter (som svar() gør i dag), men ikke et klip. stop() stopper kun det forløb, der kører —
      ikke et tryk-klik uden for forløbet; ellers ville skærmskiftet (der kalder stop()) skære hvert navigationsklik over.
@@ -64,8 +66,15 @@
       if (!Tale.stemme && typeof Tale.opdaterStemmer === 'function') Tale.opdaterStemmer();
       return !!Tale.stemme;
     };
+    // Løbenummer: stop() og et nyt sig() afbryder et igangværende «tekst → navn → efter». Tale.sig kalder sit efter også,
+    // når sætningen blev afbrudt — uden nummeret ville navnet og resten blive sagt efter et stop.
+    let nr = 0;
+    // Lyd.navnGen tælles op af hver Tale.sig og Tale.stop (app.js): talte noget andet imens, springes navnet over
+    const navnGen = () => (Lyd && typeof Lyd.navnGen === 'number' ? Lyd.navnGen : 0);
+    const harNavneklip = (id) => !!id && !!Lyd && typeof Lyd.harLokaltKlip === 'function' && typeof Lyd.klip === 'function' && Lyd.harLokaltKlip(id);
     return {
       sig(y, faerdig) {
+        const mit = ++nr;
         if (taleTil() === false) { faerdig('fra'); return; }
         const maaTale = harStemme() || !kunDansk;
         // Indtalt klip (fx en bogstavlyd): Lyd.klip venter selv på ended (og siger reserven, hvis klippet ikke kan afspilles)
@@ -74,12 +83,31 @@
           return;
         }
         const tekst = y.tekst || y.reserve || '';
-        if (!tekst) { faerdig('tom'); return; }
+        // Barnets navn: tekst → navneklippet → efter. Kun et klip optaget på ENHEDEN (aldrig tekst, aldrig en reserve).
+        if (harNavneklip(y.navnKlip)) {
+          if (!maaTale) { faerdig('ingen-stemme'); return; }
+          let g = 0;
+          // Næste del, hvis intet har afbrudt: stop()/nyt sig (nr) → intet mere; anden tale (navnGen) → slut som sagt
+          const videre = (fn) => () => { if (mit !== nr) return; if (navnGen() !== g) { faerdig('sagt'); return; } fn(); };
+          const resten = () => {
+            if (!y.efter) { faerdig('sagt'); return; }
+            Tale.sig(y.efter, () => faerdig('sagt')); // et sent faerdig efter stop gør intet (forløbet er afgjort)
+          };
+          const navn = () => {
+            Promise.resolve(Lyd.klip(y.navnKlip, '')).then(videre(resten), () => faerdig('tale-fejl'));
+          };
+          if (tekst) { Tale.sig(tekst, videre(navn)); g = navnGen(); } else { g = navnGen(); navn(); }
+          return;
+        }
+        // Uden navneklip: én ytring som i dag (navnet nævnes ikke)
+        const hele = [tekst, y.efter || ''].filter(Boolean).join(' ');
+        if (!hele) { faerdig('tom'); return; }
         if (!maaTale) { faerdig('ingen-stemme'); return; }
-        Tale.sig(tekst, () => faerdig('sagt'));
+        Tale.sig(hele, () => faerdig('sagt'));
       },
       // Når forløbet afbrydes: tale og klip stoppes
       stop() {
+        nr++;
         if (Tale && typeof Tale.stop === 'function') Tale.stop();
         if (Lyd && typeof Lyd.stopKlip === 'function') Lyd.stopKlip(); // findes først efter integrationen
       },
@@ -137,7 +165,8 @@
         if (faerdig) return;
         id = timer(() => { stopTale(); slut('fejlstop'); }, fejlstopTale); // aldrig «sagt» på et gæt
         try {
-          tale.sig({ tekst: opts.tekst || '', klip: opts.klip || '', reserve: opts.reserve || '' }, (status) => slut(status || 'sagt'));
+          tale.sig({ tekst: opts.tekst || '', klip: opts.klip || '', reserve: opts.reserve || '', navnKlip: opts.navnKlip || '', efter: opts.efter || '' },
+            (status) => slut(status || 'sagt'));
         } catch (e) {
           stopTale();
           slut('tale-fejl');
@@ -209,8 +238,8 @@
             if (!(await vent(PAUSE_EFTER_EFFEKT, signal)) || !levende()) return stoppet();
           }
         }
-        // 2. Én ytring — vent på dens slutning
-        if (opts.tekst || opts.klip) {
+        // 2. Én ytring — vent på dens slutning (med barnets navn: tekst → navneklip → efter, se taleFraSpillet)
+        if (opts.tekst || opts.klip || opts.navnKlip || opts.efter) {
           const t = await sig(opts, signal);
           ud.tale = t;
           if (!levende() || t === 'afbrudt') return stoppet();
