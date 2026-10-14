@@ -63,8 +63,8 @@
       // egetNavn (valgfrit, 12-10-2026): det navn, barnet selv har skrevet — findes kun på enheden; mangler = Dino/Enhjørning
       // navnSpurgt (valgfrit): true, når barnet har set «Hvad hedder du?» (skrevet eller sprunget over); mangler = spørg
       lektioner: {},        // verdensId → true, når verdenens lektion er vist (B2)
-      dansk: {},            // dansk-emneId → standardEmne() — samme form som emner (B4)
-      fag: null,            // 'matematik' | 'dansk' — det sidste valg (null: barnet har ikke valgt endnu)
+      dansk: {},            // dansk-emneId → standardEmne() — samme form som emner (B4). Også engelsk (engFarver …, 13-10-2026)
+      fag: null,            // 'matematik' | 'dansk' | 'engelsk' — det sidste valg (null: barnet har ikke valgt endnu)
       historier: {},        // historienr → standardHistorie() — Historiebogen (B5)
       tilstand: null,       // B10: 'eventyr' | 'frit' — det sidste valg på «Eventyr eller Vælg selv?»
     };
@@ -156,7 +156,7 @@
     if (erObjekt(d.emner)) for (const k in d.emner) ud.emner[k] = normaliserEmne(d.emner[k]);
     ud.dansk = {};
     if (erObjekt(d.dansk)) for (const k in d.dansk) ud.dansk[k] = normaliserEmne(d.dansk[k]);
-    ud.fag = d.fag === 'dansk' || d.fag === 'matematik' ? d.fag : null;
+    ud.fag = d.fag === 'dansk' || d.fag === 'matematik' || d.fag === 'engelsk' ? d.fag : null; // engelsk: 13-10-2026
     ud.tilstand = d.tilstand === 'eventyr' || d.tilstand === 'frit' ? d.tilstand : null;
     ud.historier = {};
     if (erObjekt(d.historier)) for (const k in d.historier) if (/^[1-9]\d{0,2}$/.test(k)) ud.historier[k] = normaliserHistorie(d.historier[k]);
@@ -197,6 +197,8 @@
       const p = normaliserPauset(d.pausetDansk);
       if (p) ud.pausetDansk = p; else delete ud.pausetDansk;
     }
+    // Engelsk husker sin afbrudte mission kun i hukommelsen (app.js saetPauset): et felt fra en fil eller en hånd fjernes
+    delete ud.pausetEngelsk;
     // Barnets eget navn: to valgfrie felter (ingen migrering). Ugyldigt → slettes. d.navn bruges aldrig som eget navn.
     if (Object.prototype.hasOwnProperty.call(d, 'egetNavn')) {
       const n = normaliserEgetNavn(d.egetNavn);

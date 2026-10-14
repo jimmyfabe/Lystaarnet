@@ -1,8 +1,8 @@
 /* sw.js — service worker, så spillet virker uden net.
    Ved hver ny udgave: tæl VERSION op. Filerne hentes med cache: 'reload',
    så GitHub Pages' HTTP-cache ikke giver en blanding af gamle og nye filer. */
-const VERSION = 'mat-2026-10-13-v134';
-// FILER-HASH: 6a2c6cd90330ddb8 mat-2026-10-13-v134 — opdateres med: node test/test-sw.js --opdater
+const VERSION = 'mat-2026-10-14-v147';
+// FILER-HASH: c59d608673095f9a mat-2026-10-14-v147 — opdateres med: node test/test-sw.js --opdater
 const FILER = [
   './',
   'index.html',
@@ -24,6 +24,7 @@ const FILER = [
   'lydpalet.js',
   'feedback-forloeb.js',
   'dansk-opgaver.js',
+  'engelsk-opgaver.js', // engelsk for begyndere (13-10-2026): ordlisterne og opgaverne
   'grafik.js', // tegningerne (fase A): venner, verdener, tårnet, kortet og samledyrene
   'lyd/liste.json', // listen over indtalte klip i lyd/ (tom: Jimmys optagelser er fjernet 12-10; læg hver ny .wav på FILER-listen)
   'manifest.json',

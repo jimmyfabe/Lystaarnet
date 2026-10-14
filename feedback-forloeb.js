@@ -7,6 +7,8 @@
    - Klip (fx bogstavlyde) går gennem Lyd.klip, som selv venter på ended.
    - Barnets navn (navnKlip + efter, 12-10-2026): tekst → navnet som et klip optaget på enheden → efter. Uden klip siges
      tekst + efter som én ytring — navnet er aldrig tekst (repoet er offentligt, og talen kan være enhedens stemme).
+   - Engelsk (en + tekst, 13-10-2026): først det engelske ord med den engelske stemme (Tale.sigEn — kun en Piper-fil, aldrig
+     enhedens stemme), så den danske tekst. To ytringer efter hinanden, aldrig to stemmer i samme sætning.
    - Lydeffekter og oplæsning er to indstillinger i spillet: er effekterne slået fra, kommer talen stadig.
    - run() stopper anden tale, før forløbet starter (som svar() gør i dag), men ikke et klip. stop() stopper kun det forløb, der kører —
      ikke et tryk-klik uden for forløbet; ellers ville skærmskiftet (der kalder stop()) skære hvert navigationsklik over.
@@ -83,6 +85,19 @@
           return;
         }
         const tekst = y.tekst || y.reserve || '';
+        // Engelsk: det engelske ord (Tale.sigEn) → den danske tekst. Talte noget andet imens (navnGen) eller blev forløbet
+        // stoppet (nr), kommer den danske tekst ikke.
+        if (y.en && typeof Tale.sigEn === 'function') {
+          let g = 0;
+          Tale.sigEn(y.en, () => {
+            if (mit !== nr) return;
+            if (navnGen() !== g || !tekst) { faerdig('sagt'); return; }
+            if (!maaTale) { faerdig('ingen-stemme'); return; }
+            Tale.sig(tekst, () => faerdig('sagt'));
+          });
+          g = navnGen(); // Tale.sigEn har selv talt navnGen op (Lyd.stopNavn)
+          return;
+        }
         // Barnets navn: tekst → navneklippet → efter. Kun et klip optaget på ENHEDEN (aldrig tekst, aldrig en reserve).
         if (harNavneklip(y.navnKlip)) {
           if (!maaTale) { faerdig('ingen-stemme'); return; }
@@ -165,7 +180,7 @@
         if (faerdig) return;
         id = timer(() => { stopTale(); slut('fejlstop'); }, fejlstopTale); // aldrig «sagt» på et gæt
         try {
-          tale.sig({ tekst: opts.tekst || '', klip: opts.klip || '', reserve: opts.reserve || '', navnKlip: opts.navnKlip || '', efter: opts.efter || '' },
+          tale.sig({ tekst: opts.tekst || '', klip: opts.klip || '', reserve: opts.reserve || '', navnKlip: opts.navnKlip || '', efter: opts.efter || '', en: opts.en || '' },
             (status) => slut(status || 'sagt'));
         } catch (e) {
           stopTale();
@@ -239,7 +254,7 @@
           }
         }
         // 2. Én ytring — vent på dens slutning (med barnets navn: tekst → navneklip → efter, se taleFraSpillet)
-        if (opts.tekst || opts.klip || opts.navnKlip || opts.efter) {
+        if (opts.tekst || opts.klip || opts.navnKlip || opts.efter || opts.en) {
           const t = await sig(opts, signal);
           ud.tale = t;
           if (!levende() || t === 'afbrudt') return stoppet();

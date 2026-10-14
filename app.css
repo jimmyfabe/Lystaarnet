@@ -153,7 +153,7 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
 /* ---------- Startside (index) ---------- */
 /* Fase A: flade kort med en fast bundkant (ingen gradient, ingen sløret skygge). Hvert barns kort har sit temas farver
    (index.html sætter dem på .spiller-dino/.spiller-enhjorning): lys bund med vennen, navnet på en bjælke i temaets farve.
-   Voksen er mindre og rolig i de neutrale farver. */
+   Den voksnes to kort (Voksen og Indstillinger) er mindre og rolige i de neutrale farver. */
 .index { align-items: center; justify-content: center; gap: 3vmin; padding: 16px; }
 .index-titel {
   display: flex;
@@ -169,14 +169,17 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
 /* Ét stillestående tårn, fuldt tændt — to gange skriftens højde, så det er tårnet, man ser først */
 .index-titel .fyrtaarn.med-tegning { width: 2em; height: 2em; flex-shrink: 0; }
 .spiller-liste {
+  --kort-b: clamp(200px, 30vmin, 300px);   /* børnenes kort (3:4) */
+  --voksen-b: clamp(160px, 22vmin, 230px); /* den voksnes to kort */
+  --kort-mellem: 4vmin;
   display: flex;
-  gap: 4vmin;
+  gap: var(--kort-mellem);
   flex-wrap: wrap;
   justify-content: center;
-  align-items: flex-end; /* ellers strækkes Voksen til børnenes højde */
+  align-items: flex-end;
 }
 .spiller-kort {
-  width: clamp(200px, 30vmin, 300px);
+  width: var(--kort-b);
   aspect-ratio: 3 / 4;
   border: 4px solid var(--farve-1);
   border-radius: 32px;
@@ -192,10 +195,14 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
   --navn: clamp(30px, 5vmin, 46px); /* navnets skrift — bjælken er lige høj på begge børns kort */
 }
 .spiller-kort:active { transform: translateY(6px); box-shadow: 0 2px 0 var(--farve-1-moerk); }
-.spiller-voksen {
+/* Voksen og Indstillinger står under hinanden ved siden af børnenes kort og er tilsammen lige så høje som dem */
+.voksen-gruppe { display: flex; flex-direction: column; gap: var(--kort-mellem); }
+.voksen-gruppe .spiller-kort {
   --farve-1: var(--voksen-1); --farve-1-moerk: var(--voksen-2); --baggrund-2: var(--papir);
-  width: clamp(150px, 20vmin, 210px);
-  --navn: clamp(22px, 3.6vmin, 34px);
+  width: var(--voksen-b);
+  height: calc((var(--kort-b) * 4 / 3 - var(--kort-mellem)) / 2);
+  aspect-ratio: auto;
+  --navn: clamp(19px, 2.4vmin, 24px); /* «Indstillinger» skal kunne være der på en telefon; ≥ 19 px fed = stor tekst (kontrast 4,1:1) */
 }
 .spiller-figur {
   flex: 1 1 auto;
@@ -208,11 +215,12 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
   font-size: clamp(90px, 15vmin, 150px);
   line-height: 1;
 }
-.spiller-voksen .spiller-figur { font-size: clamp(60px, 10vmin, 100px); }
+/* Figuren fylder resten af kortet (flex-basis 0): tegningen bestemmer ikke kortets højde */
+.voksen-gruppe .spiller-figur { flex: 1 1 0; font-size: clamp(44px, 7vmin, 72px); }
 /* Tegningen fylder feltet over navnet (emojien bruger skriftstørrelsen ovenfor) */
 .spiller-figur.med-tegning { padding: 8% 6% 2%; }
 .spiller-figur.med-tegning svg { display: block; width: 100%; height: 100%; margin: 0; }
-.spiller-voksen .spiller-figur.med-tegning { padding: 14% 18% 6%; }
+.voksen-gruppe .spiller-figur.med-tegning { padding: 7% 10% 3%; }
 .spiller-navn {
   flex: 0 0 auto;
   min-height: calc(var(--navn) * 1.45);
@@ -226,16 +234,17 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
 }
 /* Lange navne («Enhjørning») må ikke stikke ud af kortet på en smal telefon */
 .spiller-navn.langt { font-size: clamp(22px, 3.8vmin, 38px); }
+/* Telefonen på højkant: 2 × 2 — børnene øverst, den voksnes to kort som en lavere række under dem */
 @media (orientation: portrait) and (max-width: 600px) {
-  .spiller-kort { width: 40vw; }
-  .spiller-voksen { width: 30vw; }
+  .spiller-liste { --kort-b: 40vw; }
+  .voksen-gruppe { flex-direction: row; }
+  .voksen-gruppe .spiller-kort { width: var(--kort-b); height: calc(var(--kort-b) * 3 / 4); }
 }
 /* Telefonen på langs (ca. 390 px høj): kortene følger højden, så tårn, titel og kort kan være der uden at skæres */
 @media (orientation: landscape) and (max-height: 500px) {
   .index { gap: 2vh; }
   .index-titel { font-size: 9vh; }
-  .spiller-kort { width: auto; height: 60vh; }
-  .spiller-voksen { width: auto; height: 44vh; }
+  .spiller-liste { --kort-b: 45vh; --voksen-b: 40vh; } /* børnenes kort er 60vh høje */
 }
 
 /* ---------- Startskærm (barn) ---------- */
@@ -1319,6 +1328,28 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
 .laas-knap { position: relative; width: 180px; height: 180px; border: none; border-radius: 50%; background: var(--hvid); box-shadow: 0 8px 20px var(--skygge); -webkit-user-select: none; user-select: none; touch-action: none; }
 .laas-ring { --p: 0; position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(var(--farve-1) calc(var(--p) * 360deg), transparent 0); -webkit-mask: radial-gradient(circle, transparent 62%, #000 63%); mask: radial-gradient(circle, transparent 62%, #000 63%); }
 .laas-ikon { font-size: 70px; }
+/* ⚙️ Indstillinger i den åbne voksenmenu: en rolig pille i topbaren — den fører kun til låsen */
+.indstillinger-knap {
+  flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-width: var(--tryk); min-height: var(--tryk); height: var(--ikon); padding: 0 18px 0 14px;
+  border: none; border-radius: 999px; background: var(--hvid); color: var(--tekst);
+  box-shadow: 0 4px 0 var(--skygge), 0 6px 14px var(--skygge);
+  font-family: inherit; font-size: 18px; font-weight: 700;
+  transition: transform 0.08s;
+}
+.indstillinger-knap:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--skygge); }
+.indstillinger-ikon { font-size: 24px; line-height: 1; }
+/* Smal skærm: kun ⚙️ (rund som de andre ikonknapper), så titlen kan stå i midten uden at ramme pillen (målt: med tekst
+   overlapper den ved 421 px, ikke ved 480 px) — ordet læses stadig af VoiceOver */
+@media (max-width: 479px) {
+  .indstillinger-knap { position: relative; width: var(--ikon); padding: 0; }
+  .indstillinger-tekst { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+}
+/* Pillen er bredere end 🏠: tre spalter (1fr auto 1fr), så «Voksendel» står midt på skærmen og ikke midt mellem knapperne.
+   Er der ikke plads til lige brede sider (ca. 421–530 px), giver siden ved 🏠 sig — intet overlapper. */
+.menu[data-del="aaben"] > .topbar { display: grid; grid-template-columns: 1fr auto 1fr; }
+.menu[data-del="aaben"] > .topbar > :first-child { justify-self: start; }
+.menu[data-del="aaben"] > .topbar > :last-child { justify-self: end; }
 
 /* Overblik og indstillinger */
 .overblik-indhold { display: flex; flex-direction: column; gap: 18px; padding: 8px 20px 32px; max-width: 980px; width: 100%; margin: 0 auto; }
@@ -2617,3 +2648,69 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
 .tegn-selv .tegn-selv-ok { position: static; margin: 0; }
 @supports (width: 1cqw) { .tegn-selv .sand-felt { width: min(460px, 76cqw, 92cqh); } }
 @container (max-aspect-ratio: 1/1) { .tegn-selv { flex-direction: column; } .tegn-selv .sand-felt { width: min(460px, 92cqw, calc(100cqh - 150px)); } }
+
+/* =====================================================================
+   Engelsk for helt nye begyndere (13-10-2026): hør ordet → tryk på billedet. Ingen læsetekst.
+   ===================================================================== */
+:root {
+  /* «Farver»: ordets egen farve, ens i begge temaer (som --form-0 …) — rød er altid rød */
+  --eng-red: #e0302f; --eng-blue: #2f6fe0; --eng-green: #2e9e48; --eng-yellow: #f7d117; --eng-black: #232323;
+  --eng-white: #ffffff; --eng-orange: #f5891f; --eng-pink: #f491c1; --eng-purple: #8a4fc4; --eng-brown: #8b5a2b;
+  --himmel-moerk: #3d8fc7;
+  --eng-b: clamp(64px, 15vmin, 140px); /* billedets side på svarkortene */
+}
+/* Telefonen på højkant: kortene står side om side under opgaven — billedet efter bredden */
+@media (orientation: portrait) and (max-width: 600px) { :root { --eng-b: clamp(64px, min(21vw, 11vh), 116px); } }
+/* Det tredje fagkort er himmelblåt (ikke temaets farver): engelsk er noget nyt. Mørk tekst: 6,4:1 på --himmel */
+.fag-kort.engelsk { color: var(--tekst); background: radial-gradient(circle at 35% 22%, var(--hvid), var(--himmel) 46%); box-shadow: 0 9px 0 var(--himmel-moerk), 0 16px 30px var(--skygge); }
+.fag-kort.engelsk .fag-navn { text-shadow: none; }
+/* Engelsk uden lyd (fund 3, 14-10-2026): et 🔇-mærke på fagkortet og verdenerne — ordet kan ikke høres, så intet tæller.
+   Hjørnet er frit på hvert kort: 📖 sidder øverst til højre i Vælg selv, stjernerne over og 🔒/vækst under stationen */
+.uden-lyd-maerke {
+  position: absolute; z-index: 2; top: -6px; left: -6px;
+  display: grid; place-items: center; width: 1.6em; height: 1.6em;
+  border-radius: 50%; background: var(--hvid); box-shadow: 0 3px 8px var(--skygge);
+  font-size: clamp(22px, 3.4vmin, 30px); line-height: 1; pointer-events: none;
+}
+.fag-kort.engelsk { position: relative; }
+.fag-kort .uden-lyd-maerke { left: auto; top: -10px; right: -10px; font-size: clamp(26px, 4.4vmin, 40px); }
+.station .uden-lyd-maerke { top: 50%; left: -16px; transform: translateY(-50%); font-size: calc(var(--s) * 0.24); }
+/* Tre fagkort: på højkant under hinanden (to og ét stod skævt) */
+@media (orientation: portrait) { .fagvalg-liste.fag-3 { flex-direction: column; flex-wrap: nowrap; gap: 4vmin; } }
+@media (orientation: portrait) and (max-width: 600px) { .fagvalg-liste.fag-3 .fag-kort { width: min(46vw, 25vh); } }
+@media (orientation: landscape) and (max-height: 500px) { .fagvalg-liste.fag-3 { gap: 4vmin; } }
+
+/* Svarkortene: ét billede pr. kort — farveklat, tal med terningøjne, samledyr eller figur */
+.valg-billede .valg-knap { padding: 8px; display: flex; align-items: center; justify-content: center; }
+.eng-billede { display: inline-flex; align-items: center; justify-content: center; }
+.eng-klat, .eng-dyr-tegning, .eng-form .form-svg { display: block; width: var(--eng-b); height: var(--eng-b); overflow: visible; }
+.eng-klat-flade { fill: var(--klat); stroke: var(--kontur); stroke-width: 3; stroke-linejoin: round; }
+.eng-dyr-e { font-size: calc(var(--eng-b) * 0.8); line-height: 1; }
+.eng-tal-indhold { display: flex; flex-direction: column; align-items: center; gap: calc(var(--eng-b) * 0.06); }
+.eng-tal-tal { font-size: calc(var(--eng-b) * 0.62); font-weight: 900; line-height: 1; color: var(--tekst); font-variant-numeric: tabular-nums; }
+.valg-knap.rigtig .eng-tal-tal { color: var(--hvid); }
+.eng-terninger { display: block; width: auto; height: calc(var(--eng-b) * 0.34); }
+/* Telefonen på højkant: kortene har plads i højden — større terninger, så øjnene kan tælles (målt i WebKit 14-10-2026:
+   390x844 27,8 → 36,8 px, 360x640 23,9 → 31,7 px; billedet bliver i kortet) */
+@media (orientation: portrait) and (max-width: 600px) { .valg-billede .eng-terninger { height: calc(var(--eng-b) * 0.45); } }
+.eng-terning { fill: var(--hvid); stroke: var(--kontur); stroke-width: 2; }
+.eng-pip { fill: var(--tekst); }
+/* Hjælpen: det rigtige billede i stort i hjælpefeltet (ordet siges på engelsk og så på dansk) */
+.eng-hjaelp { display: flex; align-items: center; justify-content: center; padding: 8px 18px; border-radius: 24px; background: var(--hvid); box-shadow: 0 4px 12px var(--skygge); --eng-b: clamp(84px, 16vmin, 150px); }
+@supports (width: 1cqw) { .eng-hjaelp { --eng-b: min(150px, 34cqw); } }
+/* Telefonen på langs: tre lave, brede kort under hinanden. Billedet følger kortets højde, og tallet står ved siden af
+   terningerne, så øjnene kan tælles (fund 5, 14-10-2026: billedet var 46 px og terningerne 16 px) */
+@media (orientation: landscape) and (max-height: 500px) {
+  :root { --eng-b: min(64px, 16vh); } /* reserve uden container-enheder (iOS før 16) */
+  .valg-billede .valg-knap { padding: 4px; }
+  .valg-billede .eng-tal-indhold { flex-direction: row; gap: calc(var(--eng-b) * 0.1); }
+  .valg-billede .eng-tal-tal { font-size: calc(var(--eng-b) * 0.8); }
+  .valg-billede .eng-terninger { height: calc(var(--eng-b) * 0.6); }
+  .eng-hjaelp { --eng-b: 70px; padding: 4px 12px; }
+}
+@supports (width: 1cqh) {
+  @media (orientation: landscape) and (max-height: 500px) {
+    /* Kortets højde sætter billedet; bredden kun for tallet med to terninger (ca. 2,3 × billedet) */
+    .valg-billede .valg-knap { container-type: size; --eng-b: min(96cqh, 42cqw); }
+  }
+}

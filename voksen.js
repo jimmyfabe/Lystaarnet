@@ -1,5 +1,6 @@
-/* voksen.js — voksendelen: voksenlås (hold 3 sekunder), dagens dosis (gymnasiematematik uden hjælpemidler),
-   forældreoverblik (ét barn ad gangen — børnene sammenlignes aldrig), indstillinger og familieduel.
+/* voksen.js — voksendelen i to dele (13-10-2026). Åben (voksen.html): Lær, dagens dosis (gymnasiematematik uden
+   hjælpemidler), prøve og familieduel. Låst (voksen.html#indstillinger, hold 3 sekunder): forældreoverblik (ét barn ad
+   gangen — børnene sammenlignes aldrig), Indtal og indstillinger.
    Startes af app.js (window.Voksen.start) med fælles hjælpere. Opgaverne kommer fra voksen-opgaver.js. */
 (function () {
   'use strict';
@@ -9,8 +10,10 @@
     { id: 'dino', navn: 'Dino', e: '🦖', noegle: 'mat_dino_v1', side: 'dino.html', figur: 'bobo', bestemt: 'Dinoen', gave: false },
     { id: 'enhjorning', navn: 'Enhjørning', e: '🦄', noegle: 'mat_enhjorning_v1', side: 'enhjorning.html', figur: 'luna', bestemt: 'Enhjørningen', gave: true },
   ];
-  const LAAS_NOEGLE = 'mat_voksen_aaben';  // sessionStorage: låst op i denne fane
+  const LAAS_NOEGLE = 'mat_voksen_aaben';  // sessionStorage: indstillingerne er låst op i denne fane
   const LAAS_MINUTTER = 30;
+  const LAAST_HASH = '#indstillinger';      // voksen.html#indstillinger = den låste del (forsidens Indstillinger-kort)
+  const VOKSEN_NOEGLE = 'mat_voksen_v1';
   const MAX_KOPI_BYTES = 2 * 1024 * 1024; // en kopi fra spillet fylder langt mindre
 
   function start(ctx) {
@@ -18,10 +21,14 @@
     const D = ctx.D;
     const DANSK_VERDENER = (ctx.DANSK_VERDENER || []).filter((v) => v.emne && D && D.EMNER[v.emne]); // dansk med opgaver
     const VO = window.VoksenOpgaver;
+    // Voksendata, som lageret havde, da siden sidst læste eller gemte dem — se pageshow nedenfor (bfcache)
+    const laesVoksenRaa = () => { try { return lager.getItem(VOKSEN_NOEGLE); } catch (e) { return null; } };
+    let kendtVoksen = laesVoksenRaa();
     // Gem gennem app.js: den ved, om voksendata er skrivebeskyttede (ulæselige og uden kopi)
     let gemFejlVist = false;
     const gemV = () => {
       const ok = ctx.gemVoksen();
+      if (ok) kendtVoksen = laesVoksenRaa();
       if (!ok && !gemFejlVist) {
         gemFejlVist = true;
         alert(ctx.lagerAdvarsel() || 'Ændringen kunne ikke gemmes. Lageret er måske fuldt — tag en kopi under Indstillinger.');
@@ -34,10 +41,61 @@
     function topbar(titel, tilbage, hoejre) {
       return h('div', { class: 'topbar' },
         tilbage ? h('button', { class: 'ikon-knap', type: 'button', 'aria-label': 'Tilbage', onclick: () => { Lyd.init(); Lyd.tryk(); tilbage(); } }, '⬅️')
-          : h('a', { class: 'ikon-knap', href: 'index.html', 'aria-label': 'Til forsiden', onclick: () => { try { sessionStorage.removeItem(LAAS_NOEGLE); } catch (e) { /* intet lager */ } } }, '🏠'), // 🏠 låser igen, så et barn ikke finder voksendelen åben
+          : h('a', { class: 'ikon-knap', href: 'index.html', 'aria-label': 'Til forsiden', onclick: laasIgen }, '🏠'), // 🏠 låser igen, så et barn ikke finder indstillingerne åbne
         h('div', { class: 'topbar-titel' }, titel),
         hoejre || h('span', { class: 'topbar-plads' }));
     }
+
+    // =================================================================
+    //  To dele (Jimmy 13-10-2026): den ÅBNE voksendel (voksen.html: Lær, Dagens dosis, Prøve, Familieduel) og den LÅSTE
+    //  (voksen.html#indstillinger: Overblik pr. barn, Indtal, Indstillinger). Den eneste vej ind i den låste del er et helt
+    //  hold på låsen — eller en oplåsning i denne fane, der er under 30 minutter gammel, når siden indlæses eller kommer
+    //  tilbage fra bfcache. Den åbne menu låser altid igen, så ⚙️, ⬅️, Tilbage/frem og et hash-skift fra den åbne del
+    //  møder låsen. Hver låst skærm tjekker selv (vagt), så heller ikke en gammel knap kan åbne den.
+    // =================================================================
+    let oplaast = false;   // den låste del må vises nu
+    let iLaastDel = false; // skærmen, der står nu, hører til den låste del (låsen selv medregnet)
+    let fraAaben = false;  // kom fra den åbne menu (⚙️): så går ⬅️ tilbage dertil i stedet for 🏠 til forsiden
+    let tilbageSendt = false; // ⬅️ har bedt browseren om Tilbage; popstate kommer bagefter (et dobbelttryk går ét skridt)
+    const laastAdresse = () => location.hash === LAAST_HASH;
+    const laastPost = () => { try { return !!(history.state && history.state.laast); } catch (e) { return false; } }; // ⚙️'s post
+    function laasIgen() {
+      oplaast = false;
+      try { sessionStorage.removeItem(LAAS_NOEGLE); } catch (e) { /* intet lager */ }
+    }
+    function vagt() {
+      iLaastDel = true;
+      if (oplaast) return true;
+      visLaas();
+      return false;
+    }
+    // Ind i den låste del: menuen, hvis der er låst op, ellers låsen
+    function visLaastDel() { if (vagt()) visLaastMenu(); }
+    // ⚙️ i den åbne menu: adressen får #indstillinger (Tilbage går til den åbne menu igen), og låsen kommer altid frem.
+    // Posten mærkes, så ⬅️ og Frem kan kende den.
+    function tilIndstillinger() {
+      laasIgen();
+      try { history.pushState({ laast: 1 }, '', LAAST_HASH); } catch (e) { /* uden historik: kun skærmen */ }
+      fraAaben = true;
+      visLaastDel();
+    }
+    // ⬅️ fra låsen og den låste menu: ⚙️'s post fjernes med Tilbage (popstate → den åbne menu), så historikken ikke vokser
+    // for hver ⚙️/⬅️. Uden den post (fx efter en genindlæsning) som før: den åbne menu på samme post.
+    function tilAaben() {
+      if (!laastPost()) { visMenu(); return; }
+      if (tilbageSendt) return;
+      tilbageSendt = true;
+      history.back();
+    }
+    // Tilbage/frem i browseren mellem voksen.html og #indstillinger (og et hash, der skrives i adresselinjen).
+    // Ud af den låste del kasseres en halv optagelse (mikrofonen slukker); ind i den møder man låsen.
+    function foelgAdressen() {
+      tilbageSendt = false;
+      if (laastAdresse() && !iLaastDel) { fraAaben = laastPost(); visLaastDel(); } // Frem til ⚙️'s post: ⬅️ igen
+      else if (!laastAdresse() && iLaastDel) { stopOptagere(); visMenu(); }
+    }
+    window.addEventListener('hashchange', foelgAdressen);
+    window.addEventListener('popstate', foelgAdressen);
 
     // =================================================================
     //  Voksenlås: hold knappen inde i 3 sekunder (Jimmy 13-10-2026: intet regnestykke). Et kort tryk åbner ikke;
@@ -46,12 +104,22 @@
     function erAaben() {
       try { return Date.now() - Number(sessionStorage.getItem(LAAS_NOEGLE) || 0) < LAAS_MINUTTER * 60000; } catch (e) { return false; }
     }
-    function laasOp() { try { sessionStorage.setItem(LAAS_NOEGLE, String(Date.now())); } catch (e) { /* kun i hukommelsen */ } }
-    // Tilbage/swipe efter 🏠 viser siden fra browserens cache (bfcache) med menuen åben, selvom 🏠 slettede oplåsningen
-    // (eller de 30 minutter er gået): så låses igen, og en igangværende optagelse kasseres, så mikrofonen slukker.
-    window.addEventListener('pageshow', (e) => { if (e.persisted && !erAaben()) { stopOptagere(); visLaas(); } });
+    function laasOp() { oplaast = true; try { sessionStorage.setItem(LAAS_NOEGLE, String(Date.now())); } catch (e) { /* kun i hukommelsen */ } }
+    // Tilbage/swipe viser siden fra browserens cache (bfcache) med sin gamle kopi af voksendata. Har en anden side i fanen
+    // gemt imens (fx tidsgrænsen i den låste del, dagens dosis i den åbne), starter siden forfra — i begge dele, som
+    // storage-lytteren i app.js gør — ellers skrev næste gem de gamle data tilbage.
+    // Efter 🏠 (der slettede oplåsningen), eller når de 30 minutter er gået, låses igen, og en igangværende optagelse
+    // kasseres, så mikrofonen slukker. Den åbne del har intet at låse.
+    window.addEventListener('pageshow', (e) => {
+      if (!e.persisted) return;
+      if (laesVoksenRaa() !== kendtVoksen) { location.reload(); return; }
+      if (erAaben()) return;
+      oplaast = false;
+      if (iLaastDel) { stopOptagere(); visLaas(); }
+    });
 
     function visLaas() {
+      iLaastDel = true;
       let timer = null, startTid = 0;
       const ring = h('span', { class: 'laas-ring' });
       const knap = h('button', { class: 'laas-knap', type: 'button', 'aria-label': 'Hold inde i 3 sekunder' }, ring, h('span', { class: 'laas-ikon', 'aria-hidden': 'true' }, '🔐'));
@@ -63,16 +131,17 @@
         startTid = Date.now();
         timer = setInterval(() => {
           if (document.hidden) { stop(); return; } // skjult: aldrig et helt hold
+          if (!document.body.contains(knap)) { stop(); return; } // låsen er væk (fx Tilbage midt i et hold): intet åbner
           const p = Math.min(1, (Date.now() - startTid) / 3000);
           ring.style.setProperty('--p', p);
-          if (p >= 1) { stop(); Lyd.rigtig(); laasOp(); visMenu(); }
+          if (p >= 1) { stop(); Lyd.rigtig(); laasOp(); visLaastMenu(); }
         }, 50);
       };
       knap.addEventListener('pointerdown', begynd);
       ['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) => knap.addEventListener(ev, stop));
       knap.addEventListener('contextmenu', (e) => e.preventDefault());
       skift(h('div', { class: 'skaerm voksen laas' },
-        topbar('Voksendel'),
+        topbar('Indstillinger', fraAaben ? tilAaben : null),
         h('div', { class: 'voksen-midte' }, knap, h('p', { class: 'voksen-hjaelp' }, 'Hold knappen inde i 3 sekunder.'))),
       (e) => { if (e.key === 'Enter' || e.key === ' ') { if (e.type === 'keydown' && !e.repeat) begynd(); } });
       // Hver tast, der slippes, stopper ringen — ikke kun den første (ellers åbnede to korte tryk efter 3 sekunder).
@@ -98,19 +167,36 @@
     // =================================================================
     function dageTraenet() { return Object.keys(voksen.traening.dage).filter((k) => voksen.traening.dage[k].opgaver > 0).length; }
 
+    const kort = (ikon, titel, under, fn) => h('button', { class: 'menu-kort', type: 'button', onclick: () => { Lyd.init(); Lyd.tryk(); fn(); } },
+      h('span', { class: 'menu-ikon', 'aria-hidden': 'true' }, ikon), h('b', null, titel), under ? h('small', null, under) : null);
+    const advarselLinje = () => { const a = ctx.lagerAdvarsel(); return a ? h('p', { class: 'voksen-advarsel' }, '⚠️ ' + a) : null; };
+
+    // Den åbne menu: den voksnes eget spil. ⚙️ fører til låsen — aldrig direkte til indstillingerne.
     function visMenu() {
-      const kort = (ikon, titel, under, fn) => h('button', { class: 'menu-kort', type: 'button', onclick: () => { Lyd.init(); Lyd.tryk(); fn(); } },
-        h('span', { class: 'menu-ikon', 'aria-hidden': 'true' }, ikon), h('b', null, titel), under ? h('small', null, under) : null);
+      laasIgen();
+      iLaastDel = false;
+      fraAaben = false;
+      if (laastAdresse()) { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* kun skærmen */ } }
       const dage = dageTraenet();
-      const advarsel = ctx.lagerAdvarsel();
-      skift(h('div', { class: 'skaerm voksen menu' },
-        topbar('Voksendel'),
-        advarsel ? h('p', { class: 'voksen-advarsel' }, '⚠️ ' + advarsel) : null,
+      const tilLaas = h('button', { class: 'indstillinger-knap', type: 'button', title: 'Indstillinger', onclick: () => { Lyd.init(); Lyd.tryk(); tilIndstillinger(); } },
+        h('span', { class: 'indstillinger-ikon', 'aria-hidden': 'true' }, '⚙️'), h('span', { class: 'indstillinger-tekst' }, 'Indstillinger'));
+      skift(h('div', { class: 'skaerm voksen menu', 'data-del': 'aaben' },
+        topbar('Voksendel', null, tilLaas),
+        advarselLinje(),
         h('div', { class: 'menu-gitter' },
           kort('📘', 'Lær', 'Bogen afsnit for afsnit' + laerStatus(), visLaer),
           kort('🧠', 'Dagens dosis', '5 opgaver · ca. 5 min' + (dage ? ' · ' + dage + (dage === 1 ? ' dag' : ' dage') + ' trænet' : ''), () => visVerdensvalg('dosis')),
           kort('⏱️', 'Prøve', '8 opgaver fra én verden', () => visVerdensvalg('proeve')),
-          kort('🤝', 'Familieduel', 'Barn og voksen · fælles mål', visDuelValg),
+          kort('🤝', 'Familieduel', 'Barn og voksen · fælles mål', visDuelValg))));
+    }
+
+    // Den låste menu (efter låsen): overblik pr. barn, Indtal og Indstillinger
+    function visLaastMenu() {
+      if (!vagt()) return;
+      skift(h('div', { class: 'skaerm voksen menu', 'data-del': 'laast' },
+        topbar('Indstillinger', fraAaben ? tilAaben : null),
+        advarselLinje(),
+        h('div', { class: 'menu-gitter' },
           ...BOERN.map((b) => kort(b.e, b.navn, 'Overblik', () => visOverblik(b))),
           kort('🎙️', 'Indtal', 'Bogstavlyde til dansk', visIndtal),
           kort('⚙️', 'Indstillinger', 'Lyd, stemme, emner, tidsgrænse, kopi', visIndstillinger))));
@@ -509,6 +595,7 @@
     //  Forældreoverblik — ét barn ad gangen, aldrig sammenligning
     // =================================================================
     function visOverblik(b) {
+      if (!vagt()) return;
       const d = G.indlaesBarn(lager, b.noegle, b.navn).data;
       // Tid de sidste 7 dage
       const dage = [];
@@ -557,7 +644,7 @@
       const sidste = d.sidsteVerden && O.EMNER[d.sidsteVerden] ? d.sidsteVerden : 'taelle';
       const antalDyr = Object.keys(d.maerker).length;
       skift(h('div', { class: 'skaerm voksen overblik' },
-        topbar(b.e + ' ' + b.navn, visMenu),
+        topbar(b.e + ' ' + b.navn, visLaastMenu),
         h('div', { class: 'overblik-indhold' },
           h('section', null, h('h2', null, 'Tid'), h('p', null, 'I dag: ' + idag.min + ' min' + (voksen.tidsgraense[b.id] ? ' (grænse ' + voksen.tidsgraense[b.id] + ' min)' : '') + ' · runder i alt: ' + d.runderIalt + ' · dyr i samlebogen: ' + antalDyr), soejler),
           h('section', null, h('h2', null, 'Matematik'), h('table', { class: 'overblik-tabel' }, verdener)),
@@ -682,6 +769,7 @@
     }
 
     function visIndstillinger() {
+      if (!vagt()) return;
       stopNavneOptagere();
       const skifter = (label, til, fn) => {
         const k = h('button', { class: 'skifter' + (til ? ' til' : ''), type: 'button', role: 'switch', 'aria-checked': til ? 'true' : 'false' }, h('span', { class: 'skifter-knop' }));
@@ -740,7 +828,7 @@
       // Kun kopier under de nye nøgler kan fortrydes (en kopi fra før omdøbningen ville overskrive nyere data)
       const kanFortryde = G.kanFortryde(lager);
       skift(h('div', { class: 'skaerm voksen indstillinger' },
-        topbar('Indstillinger', () => { stopNavneOptagere(); visMenu(); }),
+        topbar('Indstillinger', () => { stopNavneOptagere(); visLaastMenu(); }),
         h('div', { class: 'overblik-indhold' },
           h('section', null, h('h2', null, 'Lyd'),
             skifter('Lydeffekter', voksen.lyd, (v) => { voksen.lyd = v; }),
@@ -1082,6 +1170,7 @@
     //  🎙️ Indtal — bogstavlyde og ord optages her på enheden (bag voksenlåsen). Intet sendes nogen steder hen.
     // =================================================================
     function visIndtal() {
+      if (!vagt()) return;
       const DA = window.Dansk, LK = window.Lydklip;
       const liste = (DA && DA.LYDLISTE) || [];
       const status = h('p', { class: 'voksen-hjaelp indtal-status' }, '');
@@ -1139,7 +1228,7 @@
         return r;
       });
       skift(h('div', { class: 'skaerm voksen indtal' },
-        topbar('🎙️ Indtal', () => { stop(); visMenu(); }),
+        topbar('🎙️ Indtal', () => { stop(); visLaastMenu(); }),
         h('div', { class: 'overblik-indhold' },
           h('section', null,
             h('p', null, 'Sid et stille sted 10–15 cm fra mikrofonen. Tryk 🔴, sig lyden, og tryk ⏹. Holdelyde (m, s, l …) i ca. 1 sekund; stoplyde (p, t, k …) helt korte uden «ø» bagefter. Tryk ▶ for at lytte, og optag igen, hvis det ikke lød rigtigt.'),
@@ -1169,9 +1258,10 @@
       }
     }
 
-    // Start: låst op i denne fane? Så direkte til menuen.
+    // Start: voksen.html → den åbne menu (også gamle hjemmeskærm-ikoner og bogmærker). #indstillinger → låsen, eller
+    // menuen, hvis indstillingerne er låst op i denne fane inden for 30 minutter (fx efter «Indlæs en kopi»).
     window.Voksen._visAfsnit = visAfsnit; // til test
-    if (erAaben()) visMenu(); else visLaas();
+    if (laastAdresse()) { oplaast = erAaben(); visLaastDel(); } else visMenu();
   }
 
   window.Voksen = { start };
