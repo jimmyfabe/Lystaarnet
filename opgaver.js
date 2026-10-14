@@ -2531,6 +2531,55 @@
     return pulje.find((m) => antal(m) === faerrest);
   }
 
+  // ---------- Vennebogen: nye venner låses op med lysperlerne (Jimmy 14-10-2026) ----------
+  // Tegningerne er 0. klasse-udgaven fra Codex' «Lystårnet-univers» (grafik.univers). Vennerne kommer én ad gangen i en
+  // fast rækkefølge, når barnets lysperler (data.perler: én pr. mission i eventyret) når grænsen. Ingen nye felter i de
+  // gemte data: oplåsningen regnes ud af perlerne, og data.figur må være en af vennerne. Hver ven koster én perle mere
+  // end den forrige (3, 6, 10, 15 … 78), så den første kommer på den første spilledag, og de sidste tager et par måneder.
+  // Rækkefølgen skifter mellem venner, der passer til hvert af de to temaer. e = emojien, hvis grafik.js mangler.
+  const NYE_VENNER = [
+    { id: 'spire', navn: 'Spire', e: '🌱', perler: 3 },
+    { id: 'glimt', navn: 'Glimt', e: '💎', perler: 6 },
+    { id: 'tulle', navn: 'Tulle', e: '🐌', perler: 10 },
+    { id: 'puf', navn: 'Puf', e: '⛅', perler: 15 },
+    { id: 'bolt', navn: 'Bolt', e: '🤖', perler: 21 },
+    { id: 'plask', navn: 'Plask', e: '💧', perler: 28 },
+    { id: 'nova', navn: 'Nova', e: '🌟', perler: 36 },
+    { id: 'kroelle', navn: 'Krølle', e: '🌀', perler: 45 },
+    { id: 'klik', navn: 'Klik', e: '📷', perler: 55 },
+    { id: 'zuzu', navn: 'Zuzu', e: '👽', perler: 66 },
+    { id: 'bobli', navn: 'Bobli', e: '👾', perler: 78 },
+  ];
+  const perleTal = (p) => Math.max(0, Math.floor(Number(p) || 0));
+  // De nye venner, barnet har låst op (id'er i rækkefølgen)
+  function oplaasteVenner(perler) {
+    const p = perleTal(perler);
+    return NYE_VENNER.filter((v) => p >= v.perler).map((v) => v.id);
+  }
+  // Den næste ven, der venter: { id, navn, perler (grænsen), fra (den forriges grænse), mangler } — null, når alle er her
+  function naesteVen(perler) {
+    const p = perleTal(perler);
+    const i = NYE_VENNER.findIndex((v) => p < v.perler);
+    if (i < 0) return null;
+    const v = NYE_VENNER[i];
+    return { id: v.id, navn: v.navn, perler: v.perler, fra: i ? NYE_VENNER[i - 1].perler : 0, mangler: v.perler - p };
+  }
+  // Vennen, som netop denne perle låste op (perlerne gik fra foer til efter), ellers null
+  function nyVen(foer, efter) {
+    const a = perleTal(foer), b = perleTal(efter);
+    return NYE_VENNER.find((v) => a < v.perler && b >= v.perler) || null;
+  }
+  // Er id en ny ven, som perlerne ikke har låst op endnu? (rejsevennerne og ukendte id'er er aldrig låst)
+  function venLaast(id, perler) {
+    const v = NYE_VENNER.find((x) => x.id === id);
+    return !!v && perleTal(perler) < v.perler;
+  }
+  // Barnets rejseven ud fra de gemte data: data.figur, hvis spillet kender id'et (kendte) og vennen er låst op — ellers
+  // standard (temaets første ven). Et ukendt eller låst id i data.figur bliver stående (gem.js) og falder kun tilbage her.
+  function valgtVen(figur, perler, kendte, standard) {
+    return typeof figur === 'string' && (kendte || []).indexOf(figur) >= 0 && !venLaast(figur, perler) ? figur : standard;
+  }
+
   // ---------- Til voksenoverblikket: «hvad driller» i almindelige ord ----------
   function beskrivNoegle(noegle) {
     const [art, rest] = String(noegle).split(/:(.*)/s);
@@ -2637,6 +2686,7 @@
     TING, EMNER, MAERKER, FORMER, FORMER_PR_NIVEAU, MOENSTER_BRIKKER, G,
     antalOrd, antalValg, lavValg, lavValgTrin, lavValgTekst, talForvekslere, LYT_TYPER,
     lavOpgave, lavRunde, lavBlandetRunde, klemNiveau, opdaterNiveau, maerkeForRunde,
+    NYE_VENNER, oplaasteVenner, naesteVen, nyVen, venLaast, valgtVen,
     PULJE, puljeFroe, puljeNr, puljeOpgave,
     beskrivNoegle, HJEMME_IDEER, klokkeNavn,
     SOEMBRAET, MAALE_TING, vurderFigur, figurPasser, stregPasser, eksempelFigur,

@@ -1,6 +1,6 @@
 /* lydklip.js — indtalte lydklip (fx bogstavlyde) gøres klar til spillet.
    Rene funktioner uden DOM, så de kan testes i Node (test/test-lydklip.js):
-   mono → ny samplerate (22,05 kHz) → beskær stilhed → normalisér → WAV (16 bit) → base64.
+   mono → ny samplerate (22,05 kHz) → højpas → støjport → beskær stilhed → fast lydstyrke → fades → WAV (16 bit) → base64.
    Optagelsen selv (MediaRecorder + WebAudio) og IndexedDB ligger i app.js / voksen.js. */
 (function (root) {
   'use strict';
@@ -125,13 +125,193 @@
     return ud.slice(0, j);
   }
 
-  // Hele vejen: kanaler fra WebAudio (AudioBuffer) → færdig WAV. Returnerer null, hvis der kun var stilhed.
+  // ---------- Renere optagelse (14-10-2026 — barnets navn skal kunne høres) ----------
+  // Niveauerne måles i rammer på 10 ms. Støjgulvet er optagelsens stille dele, så tærsklerne følger rummet.
+  const RAMME_SEK = 0.01;
+
+  // Højpas: 4. ordens Butterworth ved 90 Hz (to biquads, RBJ-opskriften) — fjerner 50 Hz-brum, rumlen og DC, ikke stemmen
+  function hoejpas(samples, rate, fc) {
+    rate = rate || RATE;
+    fc = fc || 90;
+    const ud = Float32Array.from(samples);
+    const w = 2 * Math.PI * fc / rate, c = Math.cos(w);
+    for (const q of [0.5412, 1.3066]) {
+      const a = Math.sin(w) / (2 * q), a0 = 1 + a;
+      const b0 = (1 + c) / 2 / a0, b1 = -(1 + c) / a0, a1 = -2 * c / a0, a2 = (1 - a) / a0;
+      let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+      for (let i = 0; i < ud.length; i++) {
+        const x = ud[i];
+        const y = b0 * x + b1 * x1 + b0 * x2 - a1 * y1 - a2 * y2;
+        x2 = x1; x1 = x; y2 = y1; y1 = y;
+        ud[i] = y;
+      }
+    }
+    return ud;
+  }
+
+  // RMS pr. ramme: { r: Float32Array, n: prøver pr. ramme }
+  function rammeRms(samples, rate) {
+    const n = Math.max(1, Math.round((rate || RATE) * RAMME_SEK));
+    const r = new Float32Array(Math.ceil(samples.length / n));
+    for (let k = 0; k < r.length; k++) {
+      const a = k * n, b = Math.min(samples.length, a + n);
+      let e = 0;
+      for (let i = a; i < b; i++) e += samples[i] * samples[i];
+      r[k] = Math.sqrt(e / (b - a));
+    }
+    return { r: r, n: n };
+  }
+
+  // Støjgulvet: de stille dele af optagelsen = 10.-percentilen af rammernes RMS (mindst 1e-5, ca. -100 dBFS)
+  function stoejgulv(r) {
+    if (!r.length) return 1e-5;
+    const s = Array.from(r).sort((a, b) => a - b);
+    return Math.max(1e-5, s[Math.floor(s.length * 0.1)]);
+  }
+
+  // Rammer med lyd: over støjgulvet × 2,5 (+8 dB) og højst 40 dB under den kraftigste ramme (ellers tæller højpassets
+  // efterklang med i en helt ren optagelse, hvor støjgulvet er digital stilhed). Uden nogen stille del (optagelsen
+  // startede og stoppede midt i lyden) er et kraftigt signal (over ca. -30 dBFS) lyd hele vejen; et svagt er kun støj.
+  function aktiveRammer(r, gulv) {
+    let top = 0;
+    for (const v of r) top = Math.max(top, v);
+    if (top <= gulv * 2.5) return Array.from(r, () => top > 0.03);
+    const graense = Math.max(gulv * 2.5, top * 0.01);
+    return Array.from(r, (v) => v > graense);
+  }
+
+  // Korte, isolerede spidser er ikke lyd: et løb på højst 50 ms (et bump på 30 ms rammer op til 4-5 rammer), der ligger
+  // over 200 ms fra det nærmeste længere løb — fx fingeren på ⏹ til sidst eller et pop, når mikrofonen starter. Ellers
+  // holder de beskæringen åben («navn … pause … dunk») og trækker stemmen ned i normaliseringen. Korte lyde tæt på
+  // stemmen (et «t» efter vokalen) bliver. Er der intet længere løb, røres intet.
+  function udenSpidser(aktiv) {
+    const KORT = 5, AFSTAND = 20;
+    const loeb = [];
+    for (let k = 0; k < aktiv.length; k++) {
+      if (!aktiv[k] || (k > 0 && aktiv[k - 1])) continue;
+      let j = k;
+      while (j < aktiv.length && aktiv[j]) j++;
+      loeb.push([k, j - 1]);
+    }
+    const lange = loeb.filter((l) => l[1] - l[0] + 1 > KORT);
+    if (!lange.length) return aktiv.slice();
+    const ud = aktiv.slice();
+    for (const [a, b] of loeb) {
+      if (b - a + 1 > KORT) continue;
+      const afstand = Math.min(...lange.map(([la, lb]) => (lb < a ? a - lb : la - b)));
+      if (afstand > AFSTAND) for (let k = a; k <= b; k++) ud[k] = false;
+    }
+    return ud;
+  }
+
+  // Støjport: rammer uden lyd dæmpes til 10 % (-20 dB) — porten åbner 20 ms før lyden og holder 120 ms efter, så svage
+  // begyndelser og endelser bliver. Forstærkningen glider lineært fra ramme til ramme (intet klik). Er lyden ikke
+  // tydeligt over støjen (under 6 × støjgulvet), gøres intet: så kunne porten tage stemmen med.
+  function stoejport(samples, r, n, aktiv, gulv) {
+    let top = 0;
+    for (const v of r) top = Math.max(top, v);
+    if (top < gulv * 6) return Float32Array.from(samples);
+    const FOER = 2, EFTER = 12, DYB = 0.1;
+    const aaben = new Uint8Array(r.length);
+    for (let k = 0; k < r.length; k++) {
+      if (aktiv[k]) for (let j = Math.max(0, k - FOER); j <= Math.min(r.length - 1, k + EFTER); j++) aaben[j] = 1;
+    }
+    const ud = new Float32Array(samples.length);
+    for (let i = 0; i < samples.length; i++) {
+      const x = i / n - 0.5; // rammernes midtpunkter
+      const k0 = Math.max(0, Math.floor(x)), k1 = Math.min(r.length - 1, k0 + 1);
+      const t = Math.min(1, Math.max(0, x - k0));
+      const g0 = aaben[k0] ? 1 : DYB, g1 = aaben[k1] ? 1 : DYB;
+      ud[i] = samples[i] * (g0 + (g1 - g0) * t);
+    }
+    return ud;
+  }
+
+  // Beskær stilhed ud fra rammerne med lyd: fra 60 ms før den første til 80 ms efter den sidste
+  function beskaerAktiv(samples, n, aktiv, rate) {
+    rate = rate || RATE;
+    const foerste = aktiv.indexOf(true), sidste = aktiv.lastIndexOf(true);
+    if (foerste < 0) return new Float32Array(0);
+    const a = Math.max(0, foerste * n - Math.round(0.06 * rate));
+    const b = Math.min(samples.length, (sidste + 1) * n + Math.round(0.08 * rate));
+    return samples.slice(a, b);
+  }
+
+  // Begrænser: hver prøve ganges med den mindste dæmpning, der skal til inden for ±5 ms, glattet med et glidende
+  // gennemsnit over samme vindue. Så kommer ingen prøve over loftet, og dæmpningen ændrer sig blødt.
+  function begraens(samples, loft, rate) {
+    const n = samples.length, W = Math.max(1, Math.round(0.005 * (rate || RATE)));
+    const g = new Float32Array(n);
+    let over = false;
+    for (let i = 0; i < n; i++) {
+      const a = Math.abs(samples[i]);
+      g[i] = a > loft ? loft / a : 1;
+      if (a > loft) over = true;
+    }
+    if (!over) return Float32Array.from(samples);
+    // Glidende minimum over [i - W, i + W] med en monoton kø
+    const m = new Float32Array(n), koe = new Int32Array(n);
+    let h0 = 0, h1 = 0;
+    for (let i = 0, j = 0; i < n; i++) {
+      for (; j < n && j <= i + W; j++) {
+        while (h1 > h0 && g[koe[h1 - 1]] >= g[j]) h1--;
+        koe[h1++] = j;
+      }
+      while (koe[h0] < i - W) h0++;
+      m[i] = g[koe[h0]];
+    }
+    const sum = new Float64Array(n + 1);
+    for (let i = 0; i < n; i++) sum[i + 1] = sum[i] + m[i];
+    const ud = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const a = Math.max(0, i - W), b = Math.min(n, i + W + 1);
+      ud[i] = samples[i] * ((sum[b] - sum[a]) / (b - a));
+    }
+    return ud;
+  }
+
+  // Fast lydstyrke: lydens RMS (kun rammerne med lyd) bliver `maal` (0,15 ≈ -16,5 dBFS), så stille og høje optagelser
+  // lyder lige kraftigt. Højst × 40. Spidser over loftet (0,9) tages af begrænseren, der højst må dæmpe 6 dB — kræver en
+  // spids mere, sænkes det hele i stedet. Intet klipper.
+  function normaliserLydstyrke(samples, lydRms, maal, loft) {
+    maal = maal || 0.15;
+    loft = loft || 0.9;
+    let top = 0;
+    for (let i = 0; i < samples.length; i++) top = Math.max(top, Math.abs(samples[i]));
+    if (top < 1e-6 || !(lydRms > 0)) return Float32Array.from(samples);
+    const k = Math.min(maal / lydRms, 40, 2 * loft / top);
+    return begraens(Float32Array.from(samples, (v) => v * k), loft, RATE);
+  }
+
+  // Korte fades ind og ud (10 ms), så klippet hverken starter eller slutter med et klik
+  function fade(samples, rate, sek) {
+    const ud = Float32Array.from(samples);
+    const n = Math.min(Math.round((sek || 0.01) * (rate || RATE)), Math.floor(ud.length / 2));
+    for (let i = 0; i < n; i++) {
+      const g = i / n;
+      ud[i] *= g;
+      ud[ud.length - 1 - i] *= g;
+    }
+    return ud;
+  }
+
+  // Hele vejen: kanaler fra WebAudio (AudioBuffer) → færdig WAV. Returnerer null, hvis der kun var stilhed (eller jævn
+  // støj uden en stemme). mono → 22,05 kHz → højpas → støjgulv → rammer med lyd (uden spidser) → støjport → beskær →
+  // fast lydstyrke → fades.
   function behandl(kanaler, rate) {
     let s = tilMono(kanaler);
     s = nySamplerate(s, rate, RATE);
-    s = beskaerStilhed(s, RATE);
-    if (!s.length) return null;
-    s = normaliser(s, 0.9);
+    s = hoejpas(s, RATE);
+    const m = rammeRms(s, RATE);
+    const gulv = stoejgulv(m.r);
+    const aktiv = udenSpidser(aktiveRammer(m.r, gulv));
+    if (aktiv.indexOf(true) < 0) return null;
+    let e = 0, antal = 0;
+    for (let k = 0; k < m.r.length; k++) if (aktiv[k]) { e += m.r[k] * m.r[k]; antal++; }
+    s = stoejport(s, m.r, m.n, aktiv, gulv);
+    s = beskaerAktiv(s, m.n, aktiv, RATE);
+    s = normaliserLydstyrke(s, Math.sqrt(e / antal));
+    s = fade(s, RATE);
     return { wav: lavWav(s, RATE), sek: s.length / RATE };
   }
 
@@ -175,7 +355,7 @@
       da.find((v) => v.localService) || da[0];
   }
 
-  const Lydklip = { RATE, danskeStemmer, vaelgStemme, tilMono, nySamplerate, beskaerStilhed, normaliser, lavWav, laesWav, tilBase64, fraBase64, behandl, lavEksport, laesEksport, GYLDIGT_ID, navnKlipId, erNavnKlip };
+  const Lydklip = { RATE, danskeStemmer, vaelgStemme, tilMono, nySamplerate, beskaerStilhed, normaliser, hoejpas, rammeRms, stoejgulv, aktiveRammer, udenSpidser, stoejport, beskaerAktiv, begraens, normaliserLydstyrke, fade, lavWav, laesWav, tilBase64, fraBase64, behandl, lavEksport, laesEksport, GYLDIGT_ID, navnKlipId, erNavnKlip };
   if (typeof module !== 'undefined' && module.exports) module.exports = Lydklip;
   else root.Lydklip = Lydklip;
 })(typeof self !== 'undefined' ? self : this);

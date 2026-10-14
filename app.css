@@ -429,6 +429,90 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
   .ok-knap { position: static; align-self: center; margin-bottom: 5vmin; }
 }
 
+/* ---------- Vennebogen (14-10-2026) ----------
+   Højst fire venner pr. side: én række på langs, 2 × 2 på højkant. Kortene måles i feltet mellem topbaren og knapperne
+   (container-type: size), så hele siden altid er synlig — også på en telefon på langs. ⬅️ ✔ ➡️ står samlet nederst. */
+.vennebog-side { flex: 1 1 0; min-height: 0; width: 100%; container-type: size; display: flex; align-items: center; justify-content: center; }
+.vennebog-gitter {
+  --mellem: clamp(10px, 2.4vmin, 24px);
+  --kort: min(250px, calc((100cqw - 32px - 3 * var(--mellem)) / 4), calc((100cqh - 16px) / 1.12));
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--mellem);
+  max-width: calc(4 * var(--kort) + 3 * var(--mellem));
+}
+@media (orientation: portrait) {
+  .vennebog-gitter {
+    --kort: min(260px, calc((100cqw - 32px - var(--mellem)) / 2), calc((100cqh - 16px - var(--mellem)) / 2.24));
+    max-width: calc(2 * var(--kort) + var(--mellem));
+  }
+}
+.vennebog-gitter.blad-frem { animation: bladFrem 0.25s ease-out; }
+.vennebog-gitter.blad-tilbage { animation: bladTilbage 0.25s ease-out; }
+@keyframes bladFrem { from { transform: translateX(28px); opacity: 0.3; } to { transform: none; opacity: 1; } }
+@keyframes bladTilbage { from { transform: translateX(-28px); opacity: 0.3; } to { transform: none; opacity: 1; } }
+.ven-kort {
+  position: relative;
+  width: var(--kort);
+  aspect-ratio: 1 / 1.12;
+  border: 6px solid transparent;
+  border-radius: 34px;
+  background: var(--hvid);
+  box-shadow: 0 6px 0 var(--skygge), 0 10px 20px var(--skygge);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px;
+}
+/* Den valgte ven: grøn kant og et ✔-mærke i ✔-knappens farver (ui-review 14-10-2026) — den næste ven har guldet */
+.ven-kort.valgt { border-color: var(--rigtig); background: var(--papir); }
+.ven-kort.valgt::after {
+  content: '\2714\FE0E';
+  position: absolute;
+  top: 6%;
+  right: 7%;
+  width: clamp(30px, calc(var(--kort) * 0.19), 46px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(14px, calc(var(--kort) * 0.08), 22px);
+  line-height: 1;
+  color: var(--hvid);
+  background: radial-gradient(circle at 35% 30%, #4fbf7c, var(--rigtig) 55%, var(--rigtig-moerk));
+  box-shadow: 0 3px 0 var(--rigtig-moerk);
+}
+.ven-kort-tegning { font-size: calc(var(--kort) * 0.5); line-height: 1; }
+.ven-kort-tegning .ven-tegning { width: 1.1em; height: 1.1em; margin: 0; }
+.ven-kort .figur-navn { font-size: clamp(18px, calc(var(--kort) * 0.12), 28px); }
+.ven-kort.hop .ven-kort-tegning { animation: hop 0.5s; }
+.ven-kort.ryst { animation: ryst 0.35s; }
+/* Låst: en skygge af vennen med en lås. Den næste har guldkant og en prik pr. perle, den koster (fyldt = samlet) */
+/* Låste kort er lige så store og står lige så højt som de åbne: kanten farves, baggrunden går helt ud */
+.ven-kort.laast { background: rgba(255, 253, 248, 0.55); border-color: rgba(0, 0, 0, 0.06); }
+.ven-kort.laast .ven-kort-tegning { filter: brightness(0); opacity: 0.2; }
+.ven-kort.naeste { border-color: var(--guld); }
+.ven-kort.naeste .ven-kort-tegning { opacity: 0.32; }
+.ven-kort-laas { position: absolute; top: 8%; right: 9%; font-size: clamp(22px, calc(var(--kort) * 0.15), 36px); line-height: 1; }
+/* Perlerne til den næste ven er lysperler (✨) som i fejringen: farvede = samlet, grå = mangler. Højst 6 pr. række
+   (12 → 2 × 6). Emojien tegnes ca. 1,36 × font-size bred i WebKit — derfor 0,72 × feltet. ✨ er et billede, ikke
+   tekst (::before): på en telefon er den under 17 px, og 6 skal kunne stå på række i et 140 px kort */
+.ven-kort-perler { --p: clamp(14px, calc(var(--kort) * 0.1), 24px); display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 3px; max-width: calc(6 * var(--p) + 15px); margin-top: 4px; }
+.ven-kort-perler i { width: var(--p); height: var(--p); font-style: normal; font-size: calc(var(--p) * 0.72); line-height: var(--p); text-align: center; }
+.ven-kort-perler i::before { content: '✨'; }
+.ven-kort-perler i.tom { filter: grayscale(1); opacity: 0.35; }
+.vennebog-sider { flex: 0 0 auto; align-self: center; display: flex; gap: 8px; padding: 6px 0; }
+.vennebog-sider i { width: 10px; height: 10px; border-radius: 50%; background: var(--farve-1-moerk); opacity: 0.25; }
+.vennebog-sider i.nu { opacity: 0.8; }
+.vennebog-bund { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; gap: clamp(24px, 7vmin, 72px); padding: 2px 16px max(18px, 3vmin); }
+.vennebog .ok-knap { position: static; margin: 0; align-self: auto; }
+.vennebog-blad { --ikon: clamp(60px, 9vmin, 80px); }
+.vennebog-blad[disabled] { visibility: hidden; }
+
 /* ---------- Verdenskort ---------- */
 .kort-flade { position: relative; flex: 1; margin: 0 8px 8px; }
 /* Landskabet bag stien (grafik.js): beskåret til kortets form, aldrig noget, man kan trykke på */
@@ -517,6 +601,11 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
   animation: svaev 2.4s ease-in-out infinite;
   filter: drop-shadow(0 6px 5px var(--skygge));
 }
+/* En ny ven venter i Vennebogen: vennen lyser, og et ✨ blinker, til bogen er åbnet (ui-review 14-10-2026) */
+.kort-ven.ny-ven { filter: drop-shadow(0 0 10px rgba(255, 214, 90, 0.95)) drop-shadow(0 6px 5px var(--skygge)); }
+.kort-ven.ny-ven::after { content: '✨'; position: absolute; top: -12%; right: -16%; font-size: calc(var(--v) * 0.34); line-height: 1; animation: nyVenGlimt 1.4s ease-in-out infinite; }
+@keyframes nyVenGlimt { 0%, 100% { transform: scale(0.85); opacity: 0.7; } 50% { transform: scale(1.15); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .kort-ven.ny-ven::after { animation: none; } }
 .kort-spil {
   position: absolute;
   right: 2vmin;
@@ -1148,6 +1237,24 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
 .fejring-perle .fyrtaarn { width: clamp(64px, 13vmin, 130px); height: clamp(64px, 13vmin, 130px); }
 .fejring-perle .perle-tal { font-size: max(18px, 0.45em); color: var(--farve-1-moerk); }
 .fejring-perle.gloed .fyrtaarn { animation: gloed 1.2s ease-out; }
+/* En ny ven fra Vennebogen kommer frem ved tårnet (efter dyrets sætning) i et lille skær af tårnets lys */
+/* ui-review 14-10-2026: vennen er stor (1,5 ×) og står i en lille strålekrans som dyrets (.fund-straaler). Kransen
+   ligger bag vennen (isolation) og fylder ikke i layoutet */
+.fejring-ny-ven { position: relative; isolation: isolate; font-size: clamp(120px, 24vmin, 240px); line-height: 1; margin-left: 1.5vmin; border-radius: 50%; background: radial-gradient(circle, rgba(255, 214, 90, 0.6), rgba(255, 214, 90, 0) 68%); }
+.fejring-ny-ven::before {
+  content: '';
+  position: absolute;
+  inset: -20%;
+  z-index: -1;
+  border-radius: 50%;
+  background: repeating-conic-gradient(var(--farve-2-lys) 0 10deg, transparent 10deg 20deg);
+  opacity: 0.6;
+  animation: drej 8s linear infinite;
+  -webkit-mask: radial-gradient(circle, #000 30%, transparent 70%);
+  mask: radial-gradient(circle, #000 30%, transparent 70%);
+}
+.fejring-ny-ven .ven-tegning { width: 1em; height: 1em; margin: 0; }
+.fejring-ny-ven.frem { animation: frem 0.6s cubic-bezier(.2, 1.6, .4, 1); }
 @keyframes gloed { 0% { transform: scale(1); } 30% { transform: scale(1.3); filter: drop-shadow(0 0 28px rgba(255, 214, 90, 1)); } 100% { transform: scale(1); } }
 .flyvende-perle { position: fixed; z-index: 50; font-size: 40px; pointer-events: none; transform: translate(-50%, -50%); }
 .station-groede { position: absolute; right: -12px; bottom: -8px; font-size: calc(var(--s) * 0.34); line-height: 1; filter: drop-shadow(0 2px 2px var(--skygge)); }

@@ -1,6 +1,7 @@
 /* voksen.js — voksendelen i to dele (13-10-2026). Åben (voksen.html): Lær, dagens dosis (gymnasiematematik uden
    hjælpemidler), prøve og familieduel. Låst (voksen.html#indstillinger, hold 3 sekunder): forældreoverblik (ét barn ad
-   gangen — børnene sammenlignes aldrig), Indtal og indstillinger.
+   gangen — børnene sammenlignes aldrig) og indstillinger. 🎙️ Indtal er skjult fra 14-10-2026 (VIS_INDTAL):
+   bogstavoptagelser fra enheden bruges ikke, og de kan slettes under Indstillinger → Stemme.
    Startes af app.js (window.Voksen.start) med fælles hjælpere. Opgaverne kommer fra voksen-opgaver.js. */
 (function () {
   'use strict';
@@ -190,7 +191,12 @@
           kort('🤝', 'Familieduel', 'Barn og voksen · fælles mål', visDuelValg))));
     }
 
-    // Den låste menu (efter låsen): overblik pr. barn, Indtal og Indstillinger
+    // Den låste menu (efter låsen): overblik pr. barn og Indstillinger. 🎙️ Indtal er skjult (Jimmy 14-10-2026: «man kan
+    // ikke høre, hvad jeg siger»): spillet afspiller ikke bogstavoptagelser fra enheden, så ingen skal indtale noget, der
+    // ikke bruges. Skærmen (visIndtal) bliver stående til en bedre løsning; «Slet optagelserne» ligger under Stemme.
+    // Slås den til igen, er ▶ på skærmen stum: Lyd.harKlip (app.js) er false for enhedens bogstavklip — kun barnets
+    // navneklip (egetnavn-*) bruges. Og e2e for optag/gem/eksportér er fjernet (3f852da) — begge dele skal på plads først.
+    const VIS_INDTAL = false;
     function visLaastMenu() {
       if (!vagt()) return;
       skift(h('div', { class: 'skaerm voksen menu', 'data-del': 'laast' },
@@ -198,7 +204,7 @@
         advarselLinje(),
         h('div', { class: 'menu-gitter' },
           ...BOERN.map((b) => kort(b.e, b.navn, 'Overblik', () => visOverblik(b))),
-          kort('🎙️', 'Indtal', 'Bogstavlyde til dansk', visIndtal),
+          VIS_INDTAL ? kort('🎙️', 'Indtal', 'Bogstavlyde til dansk', visIndtal) : null,
           kort('⚙️', 'Indstillinger', 'Lyd, stemme, emner, tidsgrænse, kopi', visIndstillinger))));
     }
 
@@ -948,7 +954,42 @@
           da.map((v) => raekke(v.name, v.name + (v.localService ? '' : ' (kræver net)'), () => proev(v)))) : null,
         status,
         da.length ? null : h('p', null, 'Der er ingen danske stemmer på denne enhed endnu. På iPad: Indstillinger → Tilgængelighed → Talt indhold → Stemmer → Dansk. Hent en stemme, hvor der står «Forbedret» eller «Premium».'),
-        h('p', { class: 'voksen-hjaelp' }, 'Bogstavlyde siges aldrig af stemmen — de kommer fra 🎙️ Indtal (ellers siger spillet «lyden i sol»).'));
+        h('p', { class: 'voksen-hjaelp' }, 'Bogstavlyde siges aldrig af stemmen — spillet siger fx «lyden i sol».'),
+        bogstavOptagelser());
+    }
+
+    // Bogstavoptagelser fra 🎙️ Indtal på denne enhed (skjult 14-10-2026): de spilles ikke, men kan slettes her
+    function bogstavOptagelser() {
+      const status = h('p', { class: ['voksen-hjaelp', 'bogstav-status'].join(' '), role: 'status' }, '');
+      const forklaring = h('p', { class: ['voksen-hjaelp', 'bogstav-optagelser'].join(' ') }, 'Dine bogstavoptagelser bruges ikke i spillet lige nu, men de ligger stadig på denne enhed.');
+      const slet = sletBogstavKnap({ status: (t) => { status.textContent = t; forklaring.hidden = slet.knap.hidden; } });
+      forklaring.hidden = slet.knap.hidden;
+      return h('div', null, forklaring, h('div', { class: 'voksen-knaprad' }, slet.knap), status);
+    }
+
+    // 🗑️ Bogstavoptagelserne på denne enhed (IndexedDB): de slettes kun på den voksnes tryk — efter en bekræftelse. Kun
+    // id'er fra LYDLISTE: barnets navn (egetnavn-*) og tegningerne røres aldrig. Knappen står kun der, når der findes en
+    // bogstavoptagelse. valg.foer() kører lige før sletningen (fx stop en optagelse), valg.status(tekst) bagefter.
+    function sletBogstavKnap(valg) {
+      const LK = window.Lydklip;
+      const liste = (window.Dansk && window.Dansk.LYDLISTE) || [];
+      const ids = () => liste.map((l) => l.id).filter((id) => !LK.erNavnKlip(id) && ctx.Lyd.harLokaltKlip(id));
+      const knap = h('button', { class: 'voksen-valg-knap indtal-slet-alle', type: 'button', onclick: () => slet() }, '🗑️ Slet optagelserne på denne enhed');
+      const opdater = () => { knap.hidden = ids().length === 0; };
+      async function slet() {
+        const alle = ids();
+        if (!alle.length) return;
+        if (!confirm('Slette alle bogstavoptagelser på denne enhed? De bruges ikke i spillet. Barnets navn og tegningerne bliver.')) return;
+        if (valg.foer) valg.foer();
+        let fejl = 0;
+        for (const id of alle) {
+          try { await ctx.KlipLager.slet('klip', id); ctx.Lyd.fjernLokaltKlip(id); } catch (e) { fejl++; }
+        }
+        opdater();
+        valg.status(fejl ? 'Nogle optagelser kunne ikke slettes. Prøv igen.' : 'Optagelserne er slettet.');
+      }
+      opdater();
+      return { knap, opdater };
     }
 
     function gemKopi() {
@@ -1033,7 +1074,8 @@
 
     function startDuel(b) {
       const barnData = G.indlaesBarn(lager, b.noegle, b.navn).data;
-      const figId = FIGURER[barnData.figur] ? barnData.figur : b.figur; // barnets rejseven (tegningen fra grafik.js)
+      // Barnets ven som i børnedelen (minFigur): en ven, perlerne ikke har låst op, falder tilbage til temaets første ven
+      const figId = O.valgtVen(barnData.figur, barnData.perler, Object.keys(FIGURER), b.figur);
       const fig = FIGURER[figId];
       // Barnets emne: den verden, barnet sidst spillede (ikke Lystårnet), ellers plus til 10
       const sidste = VERDENER.find((v) => v.id === barnData.sidsteVerden); // verdens-id → emne (Klokketorvet: «maaling»)
@@ -1178,24 +1220,12 @@
       const taelIndtalt = () => {
         const n = liste.filter((l) => ctx.Lyd.harLokaltKlip(l.id)).length;
         taeller.textContent = n + ' af ' + liste.length + ' indtalt';
-        sletAlle.hidden = n === 0; // kun, når der findes en bogstavoptagelse på enheden
+        sletAlle.opdater();
       };
-      // Bogstavoptagelserne på denne enhed (IndexedDB) går forud for spillets egne lyde — her kan de slettes (13-10-2026).
-      // Kun id'er fra LYDLISTE: barnets navn (egetnavn-*) og tegningerne røres aldrig.
-      const sletAlle = h('button', { class: 'voksen-valg-knap indtal-slet-alle', type: 'button', onclick: () => sletOptagelser() }, '🗑️ Slet optagelserne på denne enhed');
-      async function sletOptagelser() {
-        const ids = liste.map((l) => l.id).filter((id) => !LK.erNavnKlip(id) && ctx.Lyd.harLokaltKlip(id));
-        if (!ids.length) return;
-        if (!confirm('Slette alle bogstavoptagelser på denne enhed? Spillet bruger så sine egne lyde. Barnets navn og tegningerne bliver.')) return;
-        stop();
-        let fejl = 0;
-        for (const id of ids) {
-          try { await ctx.KlipLager.slet('klip', id); ctx.Lyd.fjernLokaltKlip(id); } catch (e) { fejl++; }
-        }
-        liste.forEach(opdaterRaekke);
-        taelIndtalt();
-        status.textContent = fejl ? 'Nogle optagelser kunne ikke slettes. Prøv igen.' : 'Optagelserne er slettet.';
-      }
+      const sletAlle = sletBogstavKnap({
+        foer: () => stop(),
+        status: (t) => { liste.forEach(opdaterRaekke); taelIndtalt(); status.textContent = t; },
+      });
       const taeller = h('b', { class: 'indtal-taeller' }, '');
       const opdaterRaekke = (l) => {
         const r = raekker[l.id];
@@ -1235,7 +1265,7 @@
             h('p', null, 'Klippene gemmes kun på denne enhed og virker med det samme her. «Eksportér» laver én fil, som kan lægges i spillet, så alle enheder får dem.'),
             h('div', { class: 'voksen-knaprad' }, taeller,
               h('button', { class: 'voksen-valg-knap', type: 'button', onclick: eksporter }, '💾 Eksportér'),
-              sletAlle),
+              sletAlle.knap),
             status),
           h('section', { class: 'indtal-liste' }, rk))));
       liste.forEach(opdaterRaekke);

@@ -21,6 +21,8 @@
     gnist: { e: '🐉', navn: 'Gnist' },
     rap:   { e: '🦊', navn: 'Rap' },
   };
+  // Vennebogens venner (opgaver.js NYE_VENNER, Jimmy 14-10-2026): lysperlerne låser dem op én ad gangen (visVennebog)
+  for (const v of (O && O.NYE_VENNER) || []) FIGURER[v.id] = { e: v.e, navn: v.navn };
 
   // Verdenerne på kortet i samme rækkefølge som skolens bog (se docs/INSPIRATION.md).
   // De første ÅBNE_FRA_START er åbne; resten åbner, når verdenen før er mestret.
@@ -281,11 +283,14 @@
   // glad (standard), taenker (efter et forkert svar), jubler (fejringen), vinker (startskærmen og valg af ven), laeser og
   // maler (Historiebogen), taeller (tællehjælpen), maler (Tegnebyen), udforsker (kortet og 🎒), regnvejr (bruges ikke p.t.)
   // og hviler («Vi ses i morgen»). Mangler udtrykket, bruges den gamle tegning med tre udtryk (grafik.venner; CSS viser
-  // glad for de andre), og ellers emojien. data-ven og data-udtryk bruges af saetUdtryk (og testene).
+  // glad for de andre), og ellers emojien. Vennebogens venner (grafik.univers) har én tegning til alle udtryk.
+  // data-ven og data-udtryk bruges af saetUdtryk (og testene).
   function venTegning(id, udtryk) {
     const u = udtryk || 'glad';
     const alle = GR && GR.vennerUdtryk && GR.vennerUdtryk[id];
-    const svg = (alle ? tegning(alle[u], 'ven-tegning') : null) || (GR && GR.venner ? tegning(GR.venner[id], 'ven-tegning') : null);
+    const en = GR && GR.univers && GR.univers[id];
+    const svg = (alle ? tegning(alle[u], 'ven-tegning') : null) || (en ? tegning(en, 'ven-tegning') : null) ||
+      (GR && GR.venner ? tegning(GR.venner[id], 'ven-tegning') : null);
     if (!svg) return document.createTextNode((FIGURER[id] || FIGURER.bobo).e);
     svg.setAttribute('data-ven', id);
     svg.setAttribute('data-udtryk', u);
@@ -481,9 +486,10 @@
     pling() { Palet.boblePop(); },
     hop() { Palet.fodspor(); },
 
-    // ---- Indtalte klip (fx bogstavlyde): optaget på denne enhed (IndexedDB) → lyd/<id>.wav, hvis id'et står
-    // i lyd/liste.json → reserven med talesyntesen. En bogstavlyd må aldrig blive bogstavets navn: reserven er
-    // fx «lyden i sol». Klip er oplæsning, så de følger den voksnes «Oplæsning» til/fra.
+    // ---- Indtalte klip (fx bogstavlyde): lyd/<id>.wav, hvis id'et står i lyd/liste.json → reserven med talesyntesen.
+    // En bogstavlyd må aldrig blive bogstavets navn: reserven er fx «lyden i sol». Klip er oplæsning, så de følger den
+    // voksnes «Oplæsning» til/fra. Fra enheden (IndexedDB) spilles KUN barnets navn: bogstav- og ordoptagelser fra
+    // 🎙️ Indtal bliver liggende, men afspilles ikke (Jimmy 14-10-2026: «man kan ikke høre, hvad jeg siger»).
     lokale: {},      // id → Uint8Array (WAV), indtalt på denne enhed
     liste: null,     // Set med id'er fra lyd/liste.json
     bufre: {},       // id → afkodet AudioBuffer
@@ -491,8 +497,8 @@
     lokaltKlip(id) { return this.lokale[id] || null; },
     saetLokaltKlip(id, bytes) { this.lokale[id] = bytes; delete this.bufre[id]; },
     fjernLokaltKlip(id) { delete this.lokale[id]; delete this.bufre[id]; },
-    // Barnets navn (NAVNEKLIP) findes kun på enheden: aldrig fra lyd/liste.json
-    harKlip(id) { return !!this.lokale[id] || (!erNavneklip(id) && !!(this.liste && this.liste.has(id))); },
+    // Barnets navn (NAVNEKLIP) findes kun på enheden: aldrig fra lyd/liste.json. Alt andet kun fra lyd/liste.json.
+    harKlip(id) { return erNavneklip(id) ? !!this.lokale[id] : !!(this.liste && this.liste.has(id)); },
     indlaesKlip() {
       const lokale = KlipLager.alle('klip').then((alle) => { for (const id in alle) if (alle[id]) this.lokale[id] = new Uint8Array(alle[id]); }).catch(() => {});
       const liste = (/^https?:$/.test(location.protocol) ? fetch('lyd/liste.json').then((r) => (r.ok ? r.json() : [])) : Promise.resolve([]))
@@ -502,7 +508,7 @@
     },
     async afkod(id) {
       if (this.bufre[id]) return this.bufre[id];
-      let bytes = this.lokale[id];
+      let bytes = erNavneklip(id) ? this.lokale[id] : null;
       if (!bytes && !erNavneklip(id) && this.liste && this.liste.has(id)) {
         const r = await fetch('lyd/' + encodeURIComponent(id) + '.wav');
         if (r.ok) bytes = new Uint8Array(await r.arrayBuffer());
@@ -1135,8 +1141,9 @@
     return ikonKnap('🔊', 'Læs op igen', () => { Forloeb.stop(); gentag(); }, 'hoejttaler'); // ikke oven i en feedback
   }
 
+  // En ven fra Vennebogen, som perlerne (fx efter en indlæst backup) ikke har låst op, falder tilbage som et ukendt id
   function minFigur() {
-    const id = data && data.figur && FIGURER[data.figur] ? data.figur : (T.figurer || ['bobo'])[0];
+    const id = O.valgtVen(data && data.figur, data && data.perler, Object.keys(FIGURER), (T.figurer || ['bobo'])[0]);
     return Object.assign({ id: id }, FIGURER[id] || FIGURER.bobo);
   }
 
@@ -1323,15 +1330,125 @@
     if (hilsen) sigHilsen(hilsen, S.gentagTale);
   }
 
+  // ---------- Vennebogen (Jimmy 14-10-2026): temaets to rejsevenner + dem, lysperlerne har låst op ----------
+  // Åbnes fra vennen på kortet. Højst fire venner pr. side, ⬅️/➡️ blader. En låst ven er en skygge med 🔒; den næste har
+  // en ✨ pr. perle, den koster (de farvede er samlet, de grå mangler). Tryk på en ven: «Hej, jeg hedder …!»; ✔ tager den med
+  // (data.figur). Ingen læsetekst — navnene står kun som støtte. Tastatur: 1–4 vælger, ←/→ blader, Enter = ✔, Esc = kortet.
+  const VENNER_PR_SIDE = 4;
+  // En ny ven fra fejringen venter i bogen: vennen på kortet får et ✨, til bogen er åbnet (kun i denne session, intet gemt)
+  let nyVenUset = false;
+  function visVennebog() {
+    nyVenUset = false;
+    const rejse = (T.figurer || ['bobo', 'rex']).filter((id) => FIGURER[id]).slice(0, 2);
+    const alle = rejse.concat(O.NYE_VENNER.map((v) => v.id));
+    const aabne = new Set(rejse.concat(O.oplaasteVenner(data.perler)));
+    const naeste = O.naesteVen(data.perler);
+    const antalSider = Math.ceil(alle.length / VENNER_PR_SIDE);
+    let valgt = minFigur().id;
+    const foer = valgt;
+    // Bogen åbner på den valgte vens side (ui-review 14-10-2026) — en ven uden for bogen: første side
+    let side = Math.floor(Math.max(0, alle.indexOf(valgt)) / VENNER_PR_SIDE);
+    let knapper = [];
+    const gitter = h('div', { class: 'vennebog-gitter' });
+    const sider = h('div', { class: 'vennebog-sider', 'aria-hidden': 'true' });
+    const trykVen = (id, kort) => {
+      Lyd.init(); Lyd.tryk();
+      if (!aabne.has(id)) { hop(kort, 'ryst'); Tale.sig('Saml flere lysperler, så kommer jeg!'); return; }
+      valgt = id;
+      for (const k of knapper) k.classList.toggle('valgt', k.getAttribute('data-ven') === id);
+      hop(kort, 'hop');
+      okKnap.classList.add('puls');
+      Tale.sig('Hej, jeg hedder ' + FIGURER[id].navn + '! Tryk på den grønne knap.');
+    };
+    const venKort = (id) => {
+      const aaben = aabne.has(id);
+      const erNaeste = !aaben && !!naeste && naeste.id === id;
+      const kort = h('button', {
+        class: ['ven-kort', aaben ? 'aaben' : 'laast', erNaeste ? 'naeste' : '', id === valgt ? 'valgt' : ''].filter(Boolean).join(' '),
+        type: 'button', 'data-ven': id,
+        'aria-label': aaben ? FIGURER[id].navn : erNaeste ? ['Låst:', naeste.mangler, 'lysperler', 'mere'].join(' ') : 'Låst',
+        onclick: () => trykVen(id, kort),
+      },
+      h('span', { class: 'ven-kort-tegning', 'aria-hidden': 'true' }, venTegning(id, 'vinker')),
+      aaben ? h('span', { class: 'figur-navn' }, FIGURER[id].navn) : h('span', { class: 'ven-kort-laas', 'aria-hidden': 'true' }, '🔒'),
+      // Perlerne til den næste ven: én ✨ pr. perle fra den forrige vens grænse — farvet = samlet, grå = mangler
+      erNaeste ? h('span', { class: 'ven-kort-perler', 'aria-hidden': 'true' },
+        Array.from({ length: naeste.perler - naeste.fra }, (_, i) => h('i', { class: i < naeste.perler - naeste.fra - naeste.mangler ? 'fuld' : 'tom' }))) : null);
+      return kort;
+    };
+    const forrige = ikonKnap('⬅️', 'Forrige', () => blad(-1), 'vennebog-blad');
+    const frem = ikonKnap('➡️', 'Næste', () => blad(1), 'vennebog-blad');
+    const visSide = () => {
+      knapper = alle.slice(side * VENNER_PR_SIDE, (side + 1) * VENNER_PR_SIDE).map(venKort);
+      gitter.textContent = '';
+      gitter.append(...knapper);
+      forrige.disabled = side === 0;
+      frem.disabled = side >= antalSider - 1;
+      sider.textContent = '';
+      for (let k = 0; k < antalSider; k++) sider.append(h('i', { class: k === side ? 'nu' : 'tom' }));
+    };
+    const blad = (d) => {
+      const ny = Math.max(0, Math.min(antalSider - 1, side + d));
+      if (ny === side) return;
+      side = ny;
+      visSide();
+      hop(gitter, d < 0 ? 'blad-tilbage' : 'blad-frem');
+    };
+    const okKnap = h('button', {
+      class: ['stor-knap', 'ok-knap', 'vennebog-ok'].join(' '), type: 'button', 'aria-label': 'Færdig',
+      onclick: () => {
+        Lyd.init(); Lyd.rigtig();
+        // Uden et nyt valg røres data.figur ikke: en gemt ven, perlerne ikke har låst op (fx efter en backup), bevares
+        if (valgt !== foer) { data.figur = valgt; gem(); }
+        visKort('Godt valgt! ' + FIGURER[valgt].navn + ' tager med.');
+      },
+    }, '✔');
+    visSide();
+    S.gentagTale = 'Her er dine venner. Tryk på en ven.';
+    skift(h('div', { class: ['skaerm', 'vennebog'].join(' ') },
+      h('div', { class: 'topbar' },
+        ikonKnap('🗺️', 'Tilbage til kortet', () => visKort(false)),
+        h('div', { class: 'topbar-titel' }, '🤝 ' + aabne.size + ' / ' + alle.length),
+        hoejttaler()),
+      h('div', { class: 'vennebog-side' }, gitter),
+      sider,
+      h('div', { class: 'vennebog-bund' }, forrige, okKnap, frem)),
+    (e) => {
+      // En fokuseret knap (Tab) beholder sin Enter og sit mellemrum
+      const knapFokus = document.activeElement && document.activeElement.tagName === 'BUTTON';
+      const n = Number(e.key);
+      if (n >= 1 && n <= knapper.length) knapper[n - 1].click();
+      else if (e.key === 'ArrowLeft') forrige.click();
+      else if (e.key === 'ArrowRight') frem.click();
+      else if (e.key === 'Enter' && !knapFokus) { e.preventDefault(); okKnap.click(); }
+      else if (e.key === 'Escape') visKort(false);
+    });
+    Tale.sig(S.gentagTale);
+  }
+
   // ---------- Optageren: et kort lydklip her på enheden ----------
-  // MediaRecorder → WebAudio → lydklip.js (mono, beskåret, normaliseret WAV) → IndexedDB og Lyd. Intet sendes nogen steder
-  // hen. Bruges af voksendelens 🎙️ Indtal og navneoptagelse (gennem ctx) og af barnets «Sig dit navn» (flyttet fra
-  // voksen.js 13-10-2026, så der kun er én optager).
+  // MediaRecorder → WebAudio → lydklip.js (mono, renset, beskåret, fast lydstyrke, WAV) → IndexedDB og Lyd. Intet
+  // sendes nogen steder hen. Bruges af voksendelens 🎙️ Indtal og navneoptagelse (gennem ctx) og af barnets «Sig dit
+  // navn» (flyttet fra voksen.js 13-10-2026, så der kun er én optager).
   // valg: { status(tekst, kode), startTekst(id), gemt(id, r), maxSek (stopper selv), stopTekst (knappens tekst under
   //   optagelsen), foerStart() (mikrofonen har svaret — lige før optagelsen starter: fx stemmen stoppes), behold(id, r)
   //   (valgfri: klippet gemmes IKKE — kalderen gemmer selv; barnets skærm først ved ✔) }
   // kode (til barnets skærm, der ikke viser den voksnes tekst): kan-ikke · mikrofon (nej eller fejl) · stille · fejl
   const kanOptage = () => !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
+  // Mikrofonen med browserens egen rensning (ekko, støj, lydstyrke) i mono (14-10-2026). Værdierne er ønsker, ikke krav;
+  // afviser en ældre browser dem alligevel, prøves der uden — men aldrig efter et nej fra brugeren, uden mikrofon eller
+  // når starten er annulleret imens (s = optagerens starter-tilstand: så ville forsøg 2 tænde mikrofonen kort igen).
+  // Ekko-navnet står i to dele: test-gem (B1) søger alle filer igennem for et af de gamle navne, der står midt i ordet.
+  const MIK_RENS = { ['echoCancel' + 'lation']: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 };
+  async function aabenMikrofon(s) {
+    try {
+      return await navigator.mediaDevices.getUserMedia({ audio: MIK_RENS });
+    } catch (e) {
+      if (!e || !/^(OverconstrainedError|ConstraintNotSatisfiedError|TypeError)$/.test(e.name)) throw e;
+      if (s && s.annulleret) return null;
+      return navigator.mediaDevices.getUserMedia({ audio: true });
+    }
+  }
   function lavOptager(valg) {
     const LK = window.Lydklip;
     const kan = kanOptage();
@@ -1391,8 +1508,8 @@
       const s = starter = { id, annulleret: false };
       let stream = null;
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        if (s.annulleret) { slukSpor(stream); return; } // stoppet, mens mikrofonen startede
+        stream = await aabenMikrofon(s);
+        if (s.annulleret) { slukSpor(stream); return; } // stoppet, mens mikrofonen startede (stream kan være null)
         starter = null;
         if (valg.foerStart) valg.foerStart(id);
         const recorder = new MediaRecorder(stream);
@@ -1795,9 +1912,10 @@
       return knap;
     });
 
+    // Vennen på kortet åbner Vennebogen (14-10-2026): temaets to rejsevenner og dem, lysperlerne har låst op
     const ven = h('button', {
-      class: 'kort-ven', type: 'button', 'aria-label': 'Skift ven: ' + fig.navn,
-      onclick: () => { Lyd.init(); Lyd.tryk(); visFigurValg(false); },
+      class: ['kort-ven', nyVenUset ? 'ny-ven' : ''].filter(Boolean).join(' '), type: 'button', 'aria-label': 'Skift ven: ' + fig.navn,
+      onclick: () => { Lyd.init(); Lyd.tryk(); visVennebog(); },
     }, venTegning(fig.id, 'udforsker'));
     flade.append(ven);
 
@@ -5953,15 +6071,35 @@
       const tekst = stort(maerke.bestemt) + ' er med! ' + stort(pronomen(maerke)) + ' er nu i din samlebog.';
       S.gentagTale = tekst;
       Forloeb.stop(); // fejringens intro afbrydes
+      // Knapperne først efter 900 ms (niveauOp 0,65 s + ro): et hurtigt ▶ må ikke skære dyrets sætning af.
+      // Med en ny ven kommer de først med vennen (visNyVen) — og senest efter 8 s, hvis forløbet hænger: så stoppes det,
+      // ellers springer forløbets lås vennens sætning over. Timerne sættes før run, så knapperne kommer, selv om run kaster.
+      if (nyVen) setTimeout(() => { if (!venVist && token === S.token) { Forloeb.stop(); visNyVen(); } }, 8000);
+      else setTimeout(() => { if (token === S.token) knapper.classList.remove('skjult'); }, 900);
       // Lyd → ro → dyrets sætning → ro → vennen jubler én gang (forløbets animationstrin; ikke med reduceret bevægelse)
-      Forloeb.run({ lyd: 'niveauOp', tekst: tekst, animer: () => { fejrEnGang(ven); return pause(480); } });
-      // Knapperne først efter 900 ms (niveauOp 0,65 s + ro): et hurtigt ▶ må ikke skære dyrets sætning af
+      Forloeb.run({ lyd: 'niveauOp', tekst: tekst, animer: () => { fejrEnGang(ven); return pause(480); } })
+        .then(() => { if (nyVen) visNyVen(); });
+    };
+    // Vennebogen (14-10-2026): låste denne perle en ny ven op, kommer vennen frem ved tårnet, når dyrets sætning er sagt
+    // (én hændelse ad gangen). Barnet tager vennen med fra Vennebogen (vennen på kortet).
+    const nyVen = frit ? null : O.nyVen(data.perler - 1, data.perler);
+    const nyVenEl = nyVen ? h('div', { class: ['fejring-ny-ven', 'skjult'].join(' '), 'data-ven': nyVen.id }, venTegning(nyVen.id, 'jubler')) : null;
+    let venVist = false;
+    const visNyVen = () => {
+      if (venVist || token !== S.token) return;
+      venVist = true;
+      nyVenUset = true;
+      nyVenEl.classList.remove('skjult');
+      hop(nyVenEl, 'frem');
+      const t = ['Du har fået en ny ven!', 'Hej, jeg hedder ' + nyVen.navn + '!'].join(' ');
+      S.gentagTale = t;
       setTimeout(() => { if (token === S.token) knapper.classList.remove('skjult'); }, 900);
+      Forloeb.run({ lyd: 'boblePop', tekst: t });
     };
     // En lysperle flyver fra dyret til tårnet, og tårnet lyser op (historiens røde tråd)
     // Lysperlen (og tårnet) kun i eventyret — i «Vælg selv» er dyret belønningen
     // Tårnet står på stadiet fra før denne perle; når perlen lander, tændes det nye lys (hvis et stadie er nået)
-    const perle = frit ? null : h('div', { class: 'fejring-perle', style: '--lysstyrke:' + lysStyrke(), 'aria-hidden': 'true' }, fyrtaarn('', taarnStadie(data.perler - 1)), h('span', { class: 'perle-tal' }, '✨ ' + data.perler));
+    const perle = frit ? null : h('div', { class: 'fejring-perle', style: '--lysstyrke:' + lysStyrke(), 'aria-hidden': 'true' }, fyrtaarn('', taarnStadie(data.perler - 1)), h('span', { class: 'perle-tal' }, '✨ ' + data.perler), nyVenEl);
     const taend = () => {
       const nu = taarnStadie(data.perler);
       if (perle && perle.firstChild.getAttribute('data-stadie') !== String(nu)) perle.replaceChild(fyrtaarn('', nu), perle.firstChild);
