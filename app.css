@@ -1429,6 +1429,43 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
 .menu-ikon { font-size: 44px; line-height: 1; }
 .verden-kort.valgt { box-shadow: 0 6px 0 var(--farve-2), 0 0 0 4px var(--farve-2-lys), 0 10px 20px var(--skygge); }
 .verden-nr { position: absolute; left: 14px; top: 10px; font-size: 18px; font-weight: 900; opacity: 0.5; }
+/* Vækststigen (forslag B): vennen på trinet i den åbne voksenmenu, hele stigen og «Vennen er vokset» på slutskærmen */
+.vaekst-kort {
+  display: flex; flex-shrink: 0; align-items: center; gap: 14px; margin: 6px auto 0; padding: 8px 24px 8px 12px; min-height: 64px;
+  border: none; border-radius: 22px; background: var(--hvid); color: var(--tekst); font-family: inherit;
+  box-shadow: 0 4px 0 var(--farve-1-lys), 0 8px 16px var(--skygge);
+}
+.vaekst-kort:active { transform: translateY(3px); }
+.vaekst-kort .vaekst-figur { width: 76px; height: 76px; }
+.vaekst-tekst { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.vaekst-tekst b { font-size: 22px; }
+.vaekst-tekst small { font-size: 17px; opacity: 0.8; }
+.vaekst-figur { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; font-size: 40px; line-height: 1; }
+.vaekst-tegning { display: block; width: 100%; height: 100%; }
+.vaekst-stige {
+  list-style: none; margin: 0 auto; padding: 4px 16px 28px; width: 100%; max-width: 1000px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px;
+}
+.vaekst-trin { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px 10px; border-radius: 18px; background: var(--hvid); }
+.vaekst-trin .vaekst-figur { width: 84px; height: 84px; }
+.vaekst-trin:not(.naaet) .vaekst-figur { filter: grayscale(1); opacity: 0.35; }
+.vaekst-trin.nu { box-shadow: 0 0 0 4px var(--farve-2); }
+.vaekst-navn { font-size: 17px; font-weight: 700; }
+.vaekst-trin:not(.naaet) .vaekst-navn { opacity: 0.75; } /* 5,64:1 på --hvid (0,65 gav 4,20) — test-farver.js */
+.vaekst-vokset { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 12px; font-size: 22px; }
+.vaekst-vokset .vaekst-figur { width: clamp(96px, 18vmin, 160px); height: clamp(96px, 18vmin, 160px); animation: vaekstOp 0.6s ease-out; }
+@keyframes vaekstOp { from { transform: scale(0.6); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .vaekst-vokset .vaekst-figur { animation: none; } }
+/* Telefonen på langs (review 17-10-2026): ved 390 px højde giver clamp altid minimum 96 px, så «Vennen er vokset» skubbede
+   slutskærmens knapper ud over bunden (399 af 390) */
+@media (orientation: landscape) and (max-height: 500px) {
+  .vaekst-vokset { font-size: 19px; }
+  .vaekst-vokset .vaekst-figur { width: 64px; height: 64px; }
+  /* Vennen i menuen: et lavere kort (52 px figur), så Familieduel kommer tættere på skærmen */
+  .vaekst-kort { min-height: 56px; padding: 4px 18px 4px 10px; }
+  .vaekst-kort .vaekst-figur { width: 52px; height: 52px; }
+  .vaekst-tekst b { font-size: 19px; }
+}
 .station-stjerner.statisk { position: static; transform: none; }
 
 /* Voksenlås */

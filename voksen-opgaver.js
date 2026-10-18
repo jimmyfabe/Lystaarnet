@@ -1807,6 +1807,36 @@
     abonus: { navn: 'A-bonus', e: '🧭', maxNiveau: 3, typer: { 1: ['prikprodukt', 'ortogonal'], 2: ['prikprodukt', 'ortogonal', 'cirkel', 'determinant', 'parallel'], 3: ['cirkel', 'prikprodukt', 'ortogonal', 'determinant', 'parallel', 'difflign'] } },
   };
 
+  // Vækststigen (forslag B, 15-10-2026): den voksne står på ét af 15 trin, og Codex' ven vokser med trinet (grafik.js
+  // `trin`, kilderne i grafik-kilde/trin/). Skoletrinene er kun et billede på rejsen; 1. klasse udeladt (Jimmys ønske).
+  // Trinet regnes af emnernes egne niveauer, som stadig går op og ned hver for sig: niveau 1 → trin 1, 2 → 6, 3 → 11 og
+  // mestret → 15, og stigen er gennemsnittet over de 8 emner (et emne, der ikke er prøvet, tæller som niveau 1).
+  // Det gemte trin (traening.trin) er det højeste nåede, så vennen aldrig bliver mindre, når et emne går et niveau ned.
+  const VOKSEN_TRIN = [
+    { id: 'boernehave', navn: 'Børnehave' }, { id: '0-klasse', navn: '0. klasse' }, { id: '2-klasse', navn: '2. klasse' },
+    { id: '3-klasse', navn: '3. klasse' }, { id: '4-klasse', navn: '4. klasse' }, { id: '5-klasse', navn: '5. klasse' },
+    { id: '6-klasse', navn: '6. klasse' }, { id: '7-klasse', navn: '7. klasse' }, { id: '8-klasse', navn: '8. klasse' },
+    { id: '9-klasse', navn: '9. klasse' }, { id: '10-klasse', navn: '10. klasse' }, { id: '1g', navn: '1.g' },
+    { id: '2g', navn: '2.g' }, { id: '3g', navn: '3.g' }, { id: 'voksen', navn: 'Voksen' },
+  ];
+  const MAX_TRIN = VOKSEN_TRIN.length;
+  const EMNE_TRIN = [1, 6, 11];
+  function emneTrin(e) {
+    if (!e || typeof e !== 'object') return 1;
+    if (e.mestret === true) return MAX_TRIN;
+    return EMNE_TRIN[(Number.isInteger(e.niveau) ? Math.min(3, Math.max(1, e.niveau)) : 1) - 1];
+  }
+  function beregnTrin(emner) {
+    const ids = Object.keys(VOKSEN_EMNER);
+    const sum = ids.reduce((s, k) => s + emneTrin(emner && emner[k]), 0);
+    return Math.min(MAX_TRIN, Math.max(1, Math.floor(sum / ids.length)));
+  }
+  // Det trin, der skal gemmes: det højeste af det gemte og det, emnerne giver nu (et ugyldigt gemt trin tæller som 1)
+  function opdaterTrin(traening) {
+    const t = traening && Number.isInteger(traening.trin) && traening.trin >= 1 && traening.trin <= MAX_TRIN ? traening.trin : 1;
+    return Math.max(t, beregnTrin(traening && traening.emner));
+  }
+
   // Hver opgave laves med sit eget frø, så den kan bygges igen ud fra { type, niveau, froe } alene.
   // «Kommer igen»-køen gemmer kun de parametre — aldrig færdig HTML (se gem.js voksenGentag).
   function lavVoksenOpgave(type, niveau, rng) {
@@ -2153,7 +2183,7 @@
     return ud;
   }
 
-  const VoksenOpgaver = { KAPITLER, AFSNIT, lavLaerOpgaver, V, VOKSEN_EMNER, HUSKEKORT, TVILLINGER, lavTvilling, tjekBrikker, kanTastes, tjekTastet, facitTekst, noegleVaerdi, lavVoksenOpgave, genskab, gentagParametre, lavDosis, lavProeve, gcd, broek, math };
+  const VoksenOpgaver = { KAPITLER, AFSNIT, lavLaerOpgaver, V, VOKSEN_EMNER, VOKSEN_TRIN, beregnTrin, opdaterTrin, HUSKEKORT, TVILLINGER, lavTvilling, tjekBrikker, kanTastes, tjekTastet, facitTekst, noegleVaerdi, lavVoksenOpgave, genskab, gentagParametre, lavDosis, lavProeve, gcd, broek, math };
   if (typeof module !== 'undefined' && module.exports) module.exports = VoksenOpgaver;
   else root.VoksenOpgaver = VoksenOpgaver;
 })(typeof self !== 'undefined' ? self : this);

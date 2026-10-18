@@ -22,6 +22,10 @@
     const D = ctx.D;
     const DANSK_VERDENER = (ctx.DANSK_VERDENER || []).filter((v) => v.emne && D && D.EMNER[v.emne]); // dansk med opgaver
     const VO = window.VoksenOpgaver;
+    // Vækststigen (forslag B, 15-10-2026): trinet regnes af de gemte emner ved hver start — også for data fra før stigen,
+    // så den voksne lander på det trin, emnerne allerede giver. Intet andet ændres; det gemmes med den næste ændring.
+    voksen.traening.trin = VO.opdaterTrin(voksen.traening);
+    const vaekstTegning = ctx.vaekstTegning || (() => null);
     // Voksendata, som lageret havde, da siden sidst læste eller gemte dem — se pageshow nedenfor (bfcache)
     const laesVoksenRaa = () => { try { return lager.getItem(VOKSEN_NOEGLE); } catch (e) { return null; } };
     let kendtVoksen = laesVoksenRaa();
@@ -184,12 +188,39 @@
       skift(h('div', { class: 'skaerm voksen menu', 'data-del': 'aaben' },
         topbar('Voksendel', null, tilLaas),
         advarselLinje(),
+        vaekstKort(),
         h('div', { class: 'menu-gitter' },
           kort('📘', 'Lær', 'Bogen afsnit for afsnit' + laerStatus(), visLaer),
           kort('🧠', 'Dagens dosis', '5 opgaver · ca. 5 min' + (dage ? ' · ' + dage + (dage === 1 ? ' dag' : ' dage') + ' trænet' : ''), () => visVerdensvalg('dosis')),
           kort('⏱️', 'Prøve', '8 opgaver fra én verden', () => visVerdensvalg('proeve')),
           kort('🤝', 'Familieduel', 'Barn og voksen · fælles mål', visDuelValg))));
     }
+
+    // =================================================================
+    //  Vækststigen (forslag B): vennen vokser fra børnehave til voksen, når emnerne går op i niveau (VO.VOKSEN_TRIN)
+    // =================================================================
+    const trinNu = () => VO.VOKSEN_TRIN[voksen.traening.trin - 1];
+    const vaekstFigur = (id) => h('span', { class: 'vaekst-figur', 'aria-hidden': 'true' }, vaekstTegning(id) || '🌱');
+    function vaekstKort() {
+      const t = trinNu();
+      return h('button', { class: 'vaekst-kort', type: 'button', onclick: () => { Lyd.init(); Lyd.tryk(); visStige(); } },
+        vaekstFigur(t.id),
+        h('span', { class: 'vaekst-tekst' }, h('b', null, t.navn), h('small', null, 'Trin ' + voksen.traening.trin + ' af ' + VO.VOKSEN_TRIN.length)));
+    }
+    function visStige() {
+      const nu = voksen.traening.trin;
+      const antalEmner = Object.keys(VO.VOKSEN_EMNER).length;
+      skift(h('div', { class: 'skaerm voksen stige' },
+        topbar('Vækststigen', visMenu),
+        h('p', { class: 'voksen-hjaelp' }, 'Vennen vokser, når emnerne går op i niveau. Alle ' + antalEmner + ' emner mestret: Voksen.'),
+        h('ol', { class: 'vaekst-stige' }, VO.VOKSEN_TRIN.map((t, i) => h('li', {
+          class: 'vaekst-trin' + (i < nu ? ' naaet' : '') + (i + 1 === nu ? ' nu' : ''), 'aria-current': i + 1 === nu ? 'step' : null,
+        }, vaekstFigur(t.id), h('span', { class: 'vaekst-navn' }, t.navn))))));
+    }
+    // På slutskærmen: er trinet steget i løbet af dosis, prøve eller afsnit (d.trinFoer sættes ved første opgave)?
+    const voksetLinje = (d) => (Number.isInteger(d.trinFoer) && voksen.traening.trin > d.trinFoer
+      ? h('div', { class: 'vaekst-vokset' }, vaekstFigur(trinNu().id), h('b', null, 'Vennen er vokset: ' + trinNu().navn))
+      : null);
 
     // Den låste menu (efter låsen): overblik pr. barn og Indstillinger. 🎙️ Indtal er skjult (Jimmy 14-10-2026: «man kan
     // ikke høre, hvad jeg siger»): spillet afspiller ikke bogstavoptagelser fra enheden, så ingen skal indtale noget, der
@@ -308,6 +339,7 @@
         topbar('📘 ' + A.id + ' ' + A.titel, () => visLaerKapitel(A.kap)),
         h('div', { class: 'voksen-midte' },
           h('div', { class: 'dosis-resultat' }, '✓ ' + d.rigtige + ' af ' + d.opgaver.length),
+          voksetLinje(d),
           h('p', { class: 'voksen-hjaelp' }, d.rigtige === d.opgaver.length ? 'Afsnittet er klaret.' : 'Afsnittet er klaret. Opgaverne, der drillede, kommer igen i dagens dosis.'),
           h('div', { class: 'voksen-knaprad' },
             naeste ? h('button', { class: 'voksen-valg-knap laer-videre', type: 'button', onclick: () => visAfsnit(naeste.id) }, 'Næste afsnit: ' + naeste.id) : null,
@@ -386,6 +418,7 @@
     function visVoksenOpgave(d) {
       const T = voksen.traening;
       const o = d.opgaver[d.i];
+      if (d.trinFoer === undefined) d.trinFoer = T.trin;
       window.Voksen.nu = o; // til test: opgaven på skærmen
       let svaret = false;
       const forklaring = h('div', { class: 'voksen-forklaring skjult' });
@@ -532,6 +565,7 @@
       ed.ialt++;
       if (rigtig) ed.rigtige++;
       T.emner[o.emne] = O.opdaterNiveau(ed, rigtig, E.maxNiveau).data;
+      T.trin = VO.opdaterTrin(T);
       const dg = T.dage[dato] || (T.dage[dato] = { opgaver: 0, rigtige: 0 });
       dg.opgaver++;
       if (rigtig) dg.rigtige++;
@@ -550,6 +584,7 @@
         topbar(d.proeve ? 'Prøve' : 'Dagens dosis', visMenu),
         h('div', { class: 'voksen-midte' },
           h('div', { class: 'dosis-resultat' }, d.rigtige + ' af ' + d.opgaver.length + tid),
+          voksetLinje(d),
           h('p', { class: 'voksen-hjaelp' }, dage + (dage === 1 ? ' dag' : ' dage') + ' trænet i alt. Opgaver, der drillede, kommer igen en anden dag.'),
           h('div', { class: 'voksen-knaprad' },
             d.proeve
@@ -1164,6 +1199,8 @@
             knapper.forEach((kk, i) => { kk.disabled = true; if (o.valg[i].id === o.svar) kk.classList.add('rigtig'); });
             const rigtig = v.id === o.svar;
             if (rigtig) { Lyd.rigtig(); stjerne(); } else { k.classList.add('forkert'); Lyd.blid(); }
+            // Bevidst uden «Vennen er vokset» (review af B 17-10-2026, fund 6): duellen og fejringen af det fælles mål er
+            // barnets. Et nyt trin for den voksne gemmes her (registrerTraening → opdaterTrin) og ses i menuen bagefter.
             registrerTraening(o, rigtig, G.idag());
             forkl.innerHTML = (rigtig ? '' : (v.fejl ? '<b>Typisk fejl:</b> ' + v.fejl + '. ' : '')) + o.forklaring;
             forkl.classList.remove('skjult');

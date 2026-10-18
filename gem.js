@@ -9,6 +9,7 @@
 
   const VERSION = 1;          // børnedata
   const VOKSEN_VERSION = 1;   // voksendata
+  const VOKSEN_MAX_TRIN = 15;  // vækststigen i voksendelen (voksen-opgaver.js VOKSEN_TRIN)
   const MAX_DAGE = 180;       // dagsstatistik gemmes et halvt år tilbage
   const MAX_GENTAG = 6;       // højst så mange «kommer igen»-opgaver pr. emne
 
@@ -600,7 +601,8 @@
     // huskekort: vis reglerne før dagens dosis · proeveUr: vis et ur i prøven (begge kan slås fra)
     // tastatur: tal-svar tastes på eget taltastatur i stedet for at vælges (slået fra som standard)
     // laer (B7): afsnitsId → { faerdig, rigtige, ialt, dato } — hvor langt den voksne er nået i «📘 Lær»
-    return { valgt: 'regnetricks', emner: {}, gentag: [], dage: {}, huskekort: true, proeveUr: true, tastatur: false, laer: {} };
+    // trin (forslag B, 15-10-2026): det højeste trin på vækststigen (1–15); voksen.js regner det af emnerne ved start
+    return { valgt: 'regnetricks', emner: {}, gentag: [], dage: {}, huskekort: true, proeveUr: true, tastatur: false, laer: {}, trin: 1 };
   }
 
   function normaliserVoksen(d) {
@@ -631,6 +633,7 @@
     ud.traening.huskekort = t.huskekort !== false;
     ud.traening.proeveUr = t.proeveUr !== false;
     ud.traening.tastatur = t.tastatur === true;
+    ud.traening.trin = Number.isInteger(t.trin) && t.trin >= 1 && t.trin <= VOKSEN_MAX_TRIN ? t.trin : 1;
     ud.traening.emner = {};
     if (erObjekt(t.emner)) for (const k in t.emner) ud.traening.emner[k] = normaliserEmne(t.emner[k]);
     ud.traening.gentag = Array.isArray(t.gentag) ? t.gentag.map(voksenGentag).filter(Boolean).slice(-10) : [];
@@ -774,7 +777,7 @@
   }
 
   const Gem = {
-    VERSION, VOKSEN_VERSION, MAX_DAGE, MAX_GENTAG, MIGRERINGER,
+    VERSION, VOKSEN_VERSION, VOKSEN_MAX_TRIN, MAX_DAGE, MAX_GENTAG, MIGRERINGER,
     idag, standardBarn, standardEmne, standardDag, standardHistorie, normaliserHistorie, standardVoksen, standardTraening,
     GAMLE_NOEGLER, HOVEDNOEGLER, migrerNoegler, nyNoegle,
     migrer, normaliserBarn, normaliserEmne, normaliserVoksen, normaliserPauset, voksenGentag, rens,

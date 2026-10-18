@@ -296,6 +296,8 @@
     svg.setAttribute('data-udtryk', u);
     return svg;
   }
+  // Vækststigens ven i voksendelen (grafik.trin, forslag B) — mangler tegningen, viser voksen.js en reserve
+  const vaekstTegning = (id) => (GR && GR.trin ? tegning(GR.trin[id], 'vaekst-tegning') : null);
   // Skift udtryk ved at bytte hele tegningen (én SVG pr. udtryk) — intet sker, hvis vennen allerede har udtrykket
   function saetUdtryk(el, udtryk) {
     const svg = el && el.querySelector('.ven-tegning');
@@ -6474,7 +6476,7 @@
       hentMission();
       visStart();
     } else if (T.side === 'voksen' && window.Voksen) {
-      window.Voksen.start({ h, G, O, D, lager, voksen, Lyd, Tale, Piper, Forloeb, KlipLager, lavOptager, skift, hop, vent, FIGURER, venTegning, VERDENER, DANSK_VERDENER, fyrtaarn, tegnVisning, valgIndhold, gemVoksen, lagerAdvarsel });
+      window.Voksen.start({ h, G, O, D, lager, voksen, Lyd, Tale, Piper, Forloeb, KlipLager, lavOptager, skift, hop, vent, FIGURER, venTegning, vaekstTegning, VERDENER, DANSK_VERDENER, fyrtaarn, tegnVisning, valgIndhold, gemVoksen, lagerAdvarsel });
     } else {
       visIndex();
     }
