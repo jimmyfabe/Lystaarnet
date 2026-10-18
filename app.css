@@ -2801,12 +2801,13 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
   --eng-red: #e0302f; --eng-blue: #2f6fe0; --eng-green: #2e9e48; --eng-yellow: #f7d117; --eng-black: #232323;
   --eng-white: #ffffff; --eng-orange: #f5891f; --eng-pink: #f491c1; --eng-purple: #8a4fc4; --eng-brown: #8b5a2b;
   --himmel-moerk: #3d8fc7;
+  --himmel-lys: #b9e3ff; /* glansen på Engelsk-kortet: lys himmel, ikke hvid (hvid ligner det kort, der lyser) */
   --eng-b: clamp(64px, 15vmin, 140px); /* billedets side på svarkortene */
 }
 /* Telefonen på højkant: kortene står side om side under opgaven — billedet efter bredden */
 @media (orientation: portrait) and (max-width: 600px) { :root { --eng-b: clamp(64px, min(21vw, 11vh), 116px); } }
 /* Det tredje fagkort er himmelblåt (ikke temaets farver): engelsk er noget nyt. Mørk tekst: 6,4:1 på --himmel */
-.fag-kort.engelsk { color: var(--tekst); background: radial-gradient(circle at 35% 22%, var(--hvid), var(--himmel) 46%); box-shadow: 0 9px 0 var(--himmel-moerk), 0 16px 30px var(--skygge); }
+.fag-kort.engelsk { color: var(--tekst); background: radial-gradient(circle at 35% 22%, var(--himmel-lys), var(--himmel) 42%); box-shadow: 0 9px 0 var(--himmel-moerk), 0 16px 30px var(--skygge); }
 .fag-kort.engelsk .fag-navn { text-shadow: none; }
 /* Engelsk uden lyd (fund 3, 14-10-2026): et 🔇-mærke på fagkortet og verdenerne — ordet kan ikke høres, så intet tæller.
    Hjørnet er frit på hvert kort: 📖 sidder øverst til højre i Vælg selv, stjernerne over og 🔒/vækst under stationen */
@@ -2827,7 +2828,7 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
 /* Svarkortene: ét billede pr. kort — farveklat, tal med terningøjne, samledyr eller figur */
 .valg-billede .valg-knap { padding: 8px; display: flex; align-items: center; justify-content: center; }
 .eng-billede { display: inline-flex; align-items: center; justify-content: center; }
-.eng-klat, .eng-dyr-tegning, .eng-form .form-svg { display: block; width: var(--eng-b); height: var(--eng-b); overflow: visible; }
+.eng-klat, .eng-dyr-tegning, .eng-ting-tegning, .eng-form .form-svg { display: block; width: var(--eng-b); height: var(--eng-b); overflow: visible; }
 .eng-klat-flade { fill: var(--klat); stroke: var(--kontur); stroke-width: 3; stroke-linejoin: round; }
 .eng-dyr-e { font-size: calc(var(--eng-b) * 0.8); line-height: 1; }
 .eng-tal-indhold { display: flex; flex-direction: column; align-items: center; gap: calc(var(--eng-b) * 0.06); }
@@ -2842,6 +2843,10 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
 /* Hjælpen: det rigtige billede i stort i hjælpefeltet (ordet siges på engelsk og så på dansk) */
 .eng-hjaelp { display: flex; align-items: center; justify-content: center; padding: 8px 18px; border-radius: 24px; background: var(--hvid); box-shadow: 0 4px 12px var(--skygge); --eng-b: clamp(84px, 16vmin, 150px); }
 @supports (width: 1cqw) { .eng-hjaelp { --eng-b: min(150px, 34cqw); } }
+/* Mens hjælpen siger ordet, lyser det rigtige svarkort med fuld styrke og guldkant (.lytter, som i dansk); kun de
+   andre kort hviler — ikke hele panelet */
+.runde-krop.engelsk-opgave .svar-panel.venter { opacity: 1; }
+.runde-krop.engelsk-opgave .svar-panel.venter .valg-knap:not(.forkert):not(.lytter) { opacity: 0.55; }
 /* Telefonen på langs: tre lave, brede kort under hinanden. Billedet følger kortets højde, og tallet står ved siden af
    terningerne, så øjnene kan tælles (fund 5, 14-10-2026: billedet var 46 px og terningerne 16 px) */
 @media (orientation: landscape) and (max-height: 500px) {
@@ -2857,4 +2862,61 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
     /* Kortets højde sætter billedet; bredden kun for tallet med to terninger (ca. 2,3 × billedet) */
     .valg-billede .valg-knap { container-type: size; --eng-b: min(96cqh, 42cqw); }
   }
+}
+
+/* «Sig efter mig» (18-10-2026): rejsevennen og en taleboble med 👂 (ved klokken også uret). Svaret er én stor, grøn
+   knap, «Jeg sagde det». Vennen står i opgaven, så den lille ven i hjørnet skjules. Størrelserne følger feltet
+   (cqw/cqh); på højkant står boblen under vennen. Uret er mindst 142 px, så tallene er mindst 17 px. */
+.runde-krop.sig-opgave .runde-ven { display: none; }
+.sig-efter { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: clamp(14px, 3vmin, 32px); max-width: 100%; }
+.sig-ven { display: block; font-size: clamp(110px, 24vmin, 220px); line-height: 1; filter: drop-shadow(0 4px 4px var(--skygge)); }
+.sig-ven .ven-tegning { display: block; width: 1em; height: 1em; margin: 0; }
+.sig-boble {
+  position: relative; display: flex; align-items: center; justify-content: center; gap: clamp(10px, 2.4vmin, 24px);
+  margin-left: 10px; padding: clamp(14px, 3vmin, 26px);
+  border: 4px solid var(--farve-1-lys); border-radius: 32px; background: var(--hvid); box-shadow: 0 8px 18px var(--skygge);
+}
+/* Halen peger på vennen */
+.sig-boble::before {
+  content: ''; position: absolute; left: -16px; top: 50%; box-sizing: border-box; width: 28px; height: 28px; margin-top: -14px;
+  background: var(--hvid); border-left: 4px solid var(--farve-1-lys); border-bottom: 4px solid var(--farve-1-lys);
+  border-radius: 0 0 0 6px; transform: rotate(45deg);
+}
+.sig-boble .lyt-knap { position: relative; width: clamp(110px, 20vmin, 170px); height: clamp(110px, 20vmin, 170px); font-size: clamp(60px, 11vmin, 96px); }
+.sig-boble .ur-svg { position: relative; width: clamp(150px, 24vmin, 220px); }
+@supports (width: 1cqw) {
+  .sig-ven { font-size: min(220px, 34cqw, 70cqh); }
+  .sig-boble .lyt-knap { width: min(170px, 28cqw, 50cqh); height: min(170px, 28cqw, 50cqh); font-size: min(96px, 16cqw, 28cqh); }
+  .sig-efter.med-ur .lyt-knap { width: min(120px, 18cqw, 36cqh); height: min(120px, 18cqw, 36cqh); font-size: min(68px, 10cqw, 20cqh); }
+  .sig-boble .ur-svg { width: min(220px, 30cqw, 62cqh); min-width: 142px; }
+}
+@container (orientation: portrait) {
+  .sig-efter { flex-direction: column; }
+  .sig-ven { font-size: min(220px, 60cqw, 34cqh); }
+  .sig-boble { margin: 10px 0 0; }
+  .sig-boble::before { left: 50%; top: -16px; margin: 0 0 0 -14px; transform: rotate(135deg); }
+  .sig-boble .lyt-knap { width: min(170px, 46cqw, 30cqh); height: min(170px, 46cqw, 30cqh); font-size: min(96px, 26cqw, 17cqh); }
+  .sig-efter.med-ur .lyt-knap { width: min(120px, 26cqw, 30cqh); height: min(120px, 26cqw, 30cqh); font-size: min(68px, 15cqw, 17cqh); }
+  .sig-boble .ur-svg { width: min(220px, 50cqw, 30cqh); }
+}
+/* Svaret: den grønne knap (som ✔ på taltastaturet) — tegnet for at tale og teksten.
+   Den hvide tekst står kun på --rigtig eller mørkere (4,7:1); lyset på knappen kommer fra den hvide cirkel om 🗣️ */
+.valg-sig .valg-knap {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 10px 14px;
+  color: var(--hvid); background: linear-gradient(to bottom, var(--rigtig) 35%, var(--rigtig-moerk) 140%);
+  box-shadow: 0 7px 0 var(--rigtig-moerk), 0 12px 24px var(--skygge-stor);
+}
+.valg-sig .valg-knap:active { box-shadow: 0 2px 0 var(--rigtig-moerk); }
+/* Mens sætningen siges, hviler knappen synligt (slået fra) — den tændes, når det er barnets tur */
+.valg-sig .valg-knap:disabled { opacity: 0.55; cursor: default; }
+/* 🗣️ er grå og forsvinder på grønt: den står i en hvid cirkel (emojien er ca. 1,36em bred i WebKit på Windows) */
+.sig-ikon {
+  flex: none; display: grid; place-items: center; width: 1.7em; height: 1.7em;
+  font-size: clamp(32px, 5.6vmin, 54px); line-height: 1;
+  border-radius: 50%; background: var(--hvid); box-shadow: 0 3px 0 var(--rigtig-moerk);
+}
+.sig-tekst { font-size: clamp(20px, 3vmin, 28px); font-weight: 800; line-height: 1.15; text-shadow: 0 2px 0 var(--rigtig-moerk); }
+@media (orientation: landscape) and (max-height: 500px) {
+  .valg-sig .valg-knap { flex-direction: row; gap: 12px; }
+  .sig-ikon { font-size: 26px; }
 }

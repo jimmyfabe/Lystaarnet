@@ -1,9 +1,11 @@
 /* engelsk-opgaver.js — Engelsk for helt nye begyndere (Jimmy 13-10-2026): barnet hører et engelsk ord og trykker på
-   billedet. Ingen læsetekst. Fire verdener (farver, tal, dyr, figurer) med 6–10 ord hver.
+   billedet. Ingen læsetekst. Syv verdener med 6–10 ord hver: farver, tal, dyr, figurer og (18-10-2026) hverdagens ting
+   i køkkenet, hjemme og på legepladsen.
    To stemmer, aldrig i samme sætning: spørgsmålet og det danske ord siges af den danske stemme (Piper-dansk), det
    engelske ord kun af Piper-filen med den engelske stemme (talefiler.js STEMME_EN) — aldrig af enhedens stemme.
    Rene funktioner uden DOM, så alt kan testes i Node (test/test-engelsk.js). Billederne tegnes i app.js ud fra
-   ord.billede: { art: 'farve' | 'tal' | 'dyr' | 'form', … } — kun spillets egne tegninger (grafik.js, formSvg, terninger). */
+   ord.billede: { art: 'farve' | 'tal' | 'dyr' | 'form' | 'ting', … } — kun spillets egne tegninger (grafik.js, formSvg,
+   terninger; tingene fra grafik-kilde/hverdag/ → grafik.js hverdag). */
 (function (root) {
   'use strict';
 
@@ -23,6 +25,7 @@
     const m = (O.MAERKER[samling] || []).find((x) => x.id === id);
     return { art: 'dyr', tegning: samling + '/' + id, e: m ? m.e : '' };
   };
+  const TING = (id) => ({ art: 'ting', tegning: id });
   const VERDENER = {
     engFarver: {
       navn: 'Farver', type: 'engFarve', ikon: '🎨', kerne: 5,
@@ -80,6 +83,52 @@
         ['rectangle', 'rektangel', { art: 'form', form: 'rektangel' }, ['square']],
       ],
     },
+    // Hverdagens ting (Jimmy 18-10-2026: «biler, kopper, kander og andre ting fra køkkenet og hverdagen, computeren,
+    // legepladsen»). Tegningerne: grafik-kilde/hverdag/<id>.svg (id = det engelske ord) → grafik.js hverdag.
+    engKoekken: {
+      navn: 'Køkken', type: 'engKoekken', ikon: '🍴', kerne: 5,
+      spoerg: 'Lyt. Hvad er det?', tekst: 'Hvad hører du?',
+      ord: [
+        ['cup', 'kop', TING('cup'), ['glass', 'jug']],
+        ['plate', 'tallerken', TING('plate'), ['bowl']],
+        ['spoon', 'ske', TING('spoon'), ['fork', 'knife']],
+        ['glass', 'glas', TING('glass'), ['cup']],
+        ['bowl', 'skål', TING('bowl'), ['plate', 'pot']],
+        ['fork', 'gaffel', TING('fork'), ['spoon', 'knife']],
+        ['knife', 'kniv', TING('knife'), ['spoon', 'fork']],
+        ['jug', 'kande', TING('jug'), ['cup', 'pot']],
+        ['pot', 'gryde', TING('pot'), ['bowl', 'jug']],
+        ['fridge', 'køleskab', TING('fridge'), []],
+      ],
+    },
+    engHjemme: {
+      navn: 'Hjemme', type: 'engHjemme', ikon: '🏠', kerne: 5,
+      spoerg: 'Lyt. Hvad er det?', tekst: 'Hvad hører du?',
+      ord: [
+        ['car', 'bil', TING('car'), ['bus', 'bike']],
+        ['bus', 'bus', TING('bus'), ['car']],
+        ['book', 'bog', TING('book'), []],
+        ['phone', 'telefon', TING('phone'), ['computer']],
+        ['bed', 'seng', TING('bed'), ['table']],
+        ['chair', 'stol', TING('chair'), ['table']],
+        ['table', 'bord', TING('table'), ['chair', 'bed']],
+        ['door', 'dør', TING('door'), []],
+        ['bike', 'cykel', TING('bike'), ['car']],
+        ['computer', 'computer', TING('computer'), ['phone']],
+      ],
+    },
+    engLegeplads: {
+      navn: 'Legeplads', type: 'engLegeplads', ikon: '⚽', kerne: 4,
+      spoerg: 'Lyt. Hvad er det?', tekst: 'Hvad hører du?',
+      ord: [
+        ['ball', 'bold', TING('ball'), []],
+        ['swing', 'gynge', TING('swing'), ['slide']],
+        ['slide', 'rutsjebane', TING('slide'), ['swing']],
+        ['tree', 'træ', TING('tree'), []],
+        ['sandbox', 'sandkasse', TING('sandbox'), []],
+        ['bench', 'bænk', TING('bench'), []],
+      ],
+    },
   };
 
   // ORD: id → { id, en, da, emne, billede, naer } · VERDENER[emne].ord bliver en liste af id'er
@@ -126,11 +175,87 @@
   const GEN = {};
   for (const emne of Object.keys(VERDENER)) GEN[VERDENER[emne].type] = hoerOgFind(emne);
 
+  // ---------- «Sig efter mig» (Jimmy 18-10-2026): korte sætninger, der bygger op til en lille samtale ----------
+  // Den danske stemme siger først, hvad sætningen bruges til (da), så siger den engelske stemme sætningen (en). Barnet
+  // siger den højt og trykker på «Jeg sagde det» — der er ingen mikrofon, og udtalen bedømmes ikke: at sige det er at
+  // klare det (fejl straffes aldrig). «My name is»: så barnets eget navn fra optagelsen på enheden (app.js) — eller en
+  // pause, hvor barnet selv siger navnet. Navnet er aldrig tekst her (ditNavn — dansk bruger navn: true om
+  // bogstavets navn). udtryk = vennens udtryk, mens den siger sætningen.
+  const TIMER = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
+  const SIG = {
+    hello: { en: 'Hello!', da: 'Sådan siger du hej. Sig efter mig, og tryk så på den grønne knap.', udtryk: 'vinker' },
+    myName: { en: 'My name is', da: 'Sådan siger du, hvad du hedder. Sig efter mig, og sig dit navn til sidst.', udtryk: 'glad', ditNavn: true },
+    yourName: { en: 'What is your name?', da: 'Sådan spørger du, hvad den anden hedder. Sig efter mig.', udtryk: 'taenker' },
+    howAreYou: { en: 'How are you?', da: 'Sådan spørger du, hvordan den anden har det. Sig efter mig.', udtryk: 'taenker' },
+    fine: { en: 'I am fine, thank you.', da: 'Sådan siger du, at du har det godt. Sig efter mig.', udtryk: 'jubler' },
+    whatTime: { en: 'What time is it?', da: 'Sådan spørger du, hvad klokken er. Sig efter mig.', udtryk: 'taenker', ur: true },
+    oclock: { en: (t) => 'It is ' + TIMER[t - 1] + " o'clock.", da: 'Se på uret. Sådan siger du, hvad klokken er. Sig efter mig.', udtryk: 'glad', ur: true },
+    thanks: { en: 'Thank you!', da: 'Sådan siger du tak. Sig efter mig.', udtryk: 'glad' },
+    goodbye: { en: 'Goodbye!', da: 'Sådan siger du farvel. Sig efter mig.', udtryk: 'vinker' },
+  };
+  // Midten af samtalen pr. niveau: små enheder, der hører sammen (spørgsmål og svar), mellem «Hello!» og «Goodbye!».
+  // Klokken (niveau 3): «What time is it?» og «It is … o'clock.» viser det samme ur (hele timer 1–12).
+  const SIG_ENHEDER = {
+    1: [['myName'], ['thanks']],
+    2: [['yourName', 'myName'], ['howAreYou', 'fine'], ['thanks']],
+    3: [['yourName', 'myName'], ['howAreYou', 'fine'], ['whatTime', 'oclock'], ['thanks']],
+  };
+  const SIG_ROS = ['Godt sagt!', 'Flot!', 'Sådan!'];
+  const sigEn = (id, time) => (typeof SIG[id].en === 'function' ? SIG[id].en(time) : SIG[id].en);
+  function sigOpgave(id, niveau, time, ros) {
+    const s = SIG[id];
+    const en = sigEn(id, time);
+    const ur = s.ur ? time : null;
+    return {
+      fag: 'engelsk', emne: 'engSig', type: 'engSig', niveau: niveau, noegle: 'engSig:' + id + (ur ? ':' + ur : ''), ikon: '💬',
+      tale: s.da,                                                  // dansk stemme
+      lyd: [{ en: en }].concat(s.ditNavn ? [{ ditNavn: true }] : []), // så sætningen (kun den engelske stemmes fil) — og navnet
+      tekst: 'Sig efter mig.',
+      vis: { art: 'engelskSig', saetning: id, udtryk: s.udtryk, klokke: ur ? ur + ':00' : null },
+      svar: 'sagt', valg: ['sagt'], valgArt: 'sig',
+      ordEn: en,
+      ros: SIG_ROS[ros % SIG_ROS.length],                         // ros efter «Jeg sagde det» (dansk stemme; ordDa er ordverdenernes danske ord)
+      hjaelp: [],
+    };
+  }
+  // Én sætning (til GEN og puljen): fra niveauets sætninger
+  GEN.engSig = function (niveau, rng) {
+    const n = Math.min(3, Math.max(1, niveau));
+    const ids = ['hello', 'goodbye'].concat(...SIG_ENHEDER[n]);
+    return sigOpgave(vaelg(rng, ids), n, 1 + Math.floor(rng() * 12), Math.floor(rng() * SIG_ROS.length));
+  };
+  // Runden er en samtale: «Hello!» først, «Goodbye!» til sidst, og midten er niveauets enheder i rækkefølge fra et
+  // tilfældigt sted. En enhed, der ikke er plads til, springes over (så et spørgsmål aldrig står uden svar), og samme
+  // sætning kommer aldrig to gange i træk. Passer ingen enhed, fyldes op med «Thank you!» eller «My name is».
+  function sigRunde(niveau, rng, antal) {
+    const enheder = SIG_ENHEDER[niveau];
+    const time = 1 + Math.floor(rng() * 12);
+    const ids = ['hello'];
+    let k = Math.floor(rng() * enheder.length);
+    while (ids.length < antal - 1) {
+      const plads = antal - 1 - ids.length, sidst = ids[ids.length - 1];
+      let e = null;
+      for (let j = 0; j < enheder.length && !e; j++) { const u = enheder[k++ % enheder.length]; if (u.length <= plads && u[0] !== sidst) e = u; }
+      ids.push(...(e || [sidst === 'thanks' ? 'myName' : 'thanks']));
+    }
+    if (antal > 1) ids.push('goodbye');
+    const ros0 = Math.floor(rng() * SIG_ROS.length);
+    return ids.slice(0, antal).map((id, i) => sigOpgave(id, niveau, time, ros0 + i));
+  }
+
   // Emner (verdener) og niveauer — samme form som opgaver.js/dansk-opgaver.js, så rundemotoren og gem.js kan bruge dem
   const EMNER = {};
   for (const emne of Object.keys(VERDENER)) {
     const t = VERDENER[emne].type;
     EMNER[emne] = { navn: VERDENER[emne].navn, maxNiveau: 3, niveauer: { 1: [t], 2: [t], 3: [t] } };
+  }
+  EMNER.engSig = { navn: 'Sig efter mig', maxNiveau: 3, niveauer: { 1: ['engSig'], 2: ['engSig'], 3: ['engSig'] } };
+  // De engelske ytringer i et emne (🔇 på kortet, når én af dem ikke kan høres)
+  const udtalerFor = (emne) => (emne === 'engSig' ? saetningerSig() : VERDENER[emne].ord.map((id) => udtaleEn(ORD[id])));
+  function saetningerSig() {
+    const ud = [];
+    for (const id of Object.keys(SIG)) if (typeof SIG[id].en === 'function') TIMER.forEach((x, i) => ud.push(SIG[id].en(i + 1))); else ud.push(SIG[id].en);
+    return ud;
   }
 
   function lavOpgave(type, niveau, rng) { return GEN[type](niveau, rng); }
@@ -154,6 +279,7 @@
     opts = opts || {};
     const antal = opts.antal || 5;
     niveau = Math.min(EMNER[emneId].maxNiveau, Math.max(1, Math.round(Number(niveau)) || 1));
+    if (emneId === 'engSig') return sigRunde(niveau, rng, antal); // en samtale; ingen gentagelser (intet kan gå galt)
     const V = VERDENER[emneId];
     const type = EMNER[emneId].niveauer[niveau][0];
     const ordIPuljen = niveau <= 1 ? V.kerne : V.ord.length;
@@ -189,15 +315,19 @@
   }
 
   // Alle sætninger, stemmerne kan sige i den engelske del (vaerktoej/tale-tekster.js laver Piper-filerne ud fra dem):
-  // dansk = spørgsmålene og de danske ord · engelsk = de engelske ord. Intet andet går til den engelske stemme.
+  // dansk = spørgsmålene, de danske ord og «Sig efter mig»s forklaringer og ros · engelsk = de engelske ord og sætninger.
+  // Intet andet går til den engelske stemme.
   function saetninger() {
     const dansk = [], engelsk = [];
     for (const emne of Object.keys(VERDENER)) dansk.push(VERDENER[emne].spoerg);
     for (const id of Object.keys(ORD)) { dansk.push(udtaleDa(ORD[id])); engelsk.push(udtaleEn(ORD[id])); }
+    for (const id of Object.keys(SIG)) dansk.push(SIG[id].da);
+    dansk.push('Sig efter mig.', ...SIG_ROS);
+    engelsk.push(...saetningerSig());
     return { dansk: dansk, engelsk: engelsk };
   }
 
-  const Engelsk = { VERDENER, ORD, EMNER, GEN, antalValg, udtaleEn, udtaleDa, lavOpgave, puljeOpgave, lavRunde, saetninger, lavRng };
+  const Engelsk = { VERDENER, ORD, EMNER, GEN, SIG, SIG_ENHEDER, TIMER, antalValg, udtaleEn, udtaleDa, udtalerFor, lavOpgave, puljeOpgave, lavRunde, saetninger, lavRng };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Engelsk;
   else root.Engelsk = Engelsk;
