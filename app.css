@@ -1744,14 +1744,53 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
   gap: 8px;
 }
 .vaelg-gruppe-titel span { font-size: 1.3em; }
+/* Overskriften er en knap (18-10-2026): et tryk læser afsnittet op — barnet kan næsten ikke læse endnu */
+.vaelg-gruppe-knap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--tryk);
+  max-width: 100%;
+  padding: 2px 18px 2px 10px;
+  border: 3px solid var(--farve-1); /* kanten viser knappen: mindst 3:1 mod baggrunden (U3, test-farver) */
+  border-radius: 999px;
+  background: var(--hvid);
+  box-shadow: 0 3px 0 var(--farve-1-moerk);
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+.vaelg-gruppe-knap:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--farve-1-moerk); }
+/* Smal telefon: 🗺️ 🔤 «🎒 Vælg selv» 🔊 — som kortets topbar giver mellemrummene plads, så titlen står hel ved 360 px */
+@media (max-width: 440px) { .vaelg-selv .topbar { gap: 6px; padding-left: 10px; padding-right: 10px; } .vaelg-selv .topbar-hoejre { gap: 6px; } }
 /* Vennen udforsker ved den første overskrift (til højre, står på gitteret) */
 .vaelg-gruppe-titel .vaelg-ven { margin-left: auto; font-size: clamp(50px, 8vmin, 76px); line-height: 1; margin-bottom: -4px; }
 .vaelg-gitter {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(clamp(146px, 19vmin, 190px), 1fr));
-  gap: clamp(10px, 2vmin, 18px);
+  gap: clamp(12px, 2vmin, 18px); /* mindst fokusringens 8 + 4 px (U4, test-farver) */
 }
 .vaelg-felt { position: relative; }
+/* Landskab på iPad og computer (standard: tastaturcover): afsnittene står side om side i deres naturlige bredde, og alle kort
+   har samme faste størrelse, så hele faget ses uden at rulle (UI-review 18-10-2026, U1). Størrelsen regnes af listens højde
+   (container-enheder): det værste tilfælde, matematik (7 + 2 + 1 + 1 kort), er tre rækker kort under to rækker overskrifter.
+   Portræt og telefon på langs ruller som før (gitteret ovenfor). */
+@media (orientation: landscape) and (min-height: 700px) {
+  .vaelg-selv-liste { display: flex; flex-wrap: wrap; align-content: flex-start; align-items: flex-start; gap: clamp(12px, 2.4vmin, 22px) clamp(24px, 4vmin, 40px); }
+  .vaelg-gruppe { flex: 0 1 auto; min-width: 0; margin: 0; }
+  /* alle overskrifter er så høje som vennen, så kortene i afsnit side om side står på samme linje */
+  .vaelg-gruppe-titel { min-height: clamp(50px, 8vmin, 76px); }
+  .vaelg-gitter { display: flex; flex-wrap: wrap; }
+  .vaelg-felt { flex: 0 0 auto; width: clamp(146px, 21vmin, 220px); } /* reserve uden container-enheder (Safari før 16) */
+}
+@supports (container-type: size) {
+  @media (orientation: landscape) and (min-height: 700px) {
+    .vaelg-selv-liste { container-type: size; }
+    /* 3 rækker kort = listens højde − to rækker overskrifter (vennens højde) − deres margen − kortenes og afsnittenes
+       mellemrum − 8 px luft */
+    .vaelg-felt { width: clamp(146px, (100cqh - 2 * clamp(50px, 8vmin, 76px) - 16px - clamp(12px, 2vmin, 18px) - clamp(12px, 2.4vmin, 22px) - 8px) / 3, 220px); }
+  }
+}
 .vaelg-emne {
   width: 100%;
   aspect-ratio: 1;
@@ -1768,6 +1807,8 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
   color: var(--hvid);
 }
 .vaelg-emne:active { transform: translateY(4px) scale(0.97); }
+/* Fokusringen ligger uden for den hårde skygge (6 px), ellers forsvinder den i skyggen forneden (U4, test-farver) */
+.vaelg-emne:focus-visible { outline-offset: 8px; }
 .vaelg-emne .station-ikon { font-size: clamp(44px, 7.5vmin, 76px); }
 .vaelg-emne .station-ikon.fyrtaarn { width: clamp(40px, 6vmin, 64px); height: clamp(48px, 7.5vmin, 76px); }
 .vaelg-emne .station-ikon.med-tegning { width: clamp(48px, 8vmin, 82px); height: clamp(48px, 8vmin, 82px); }

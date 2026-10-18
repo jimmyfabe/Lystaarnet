@@ -100,14 +100,21 @@
     historiebog: 'I Historiebogen er der små historier. Tryk på et ord, så hører du det. Læs historien, tegn den, og skriv et ord fra den.',
   };
 
-  // «Vælg selv» (🎒): alle emner som store ikoner, i grupper. Geometri står for sig.
+  // «Vælg selv» (🎒): fagets emner som store ikoner, delt i afsnit (Jimmy 18-10-2026: «når man vælger dansk er det det
+  // man kommer ind på»). Hver verden står i præcis ét afsnit af sit fag; overskriften læses op ved tryk (tale).
+  // Overskriftens ikon må ikke stå på et kort eller en knap på samme skærm (UI-review 18-10: 📖 lignede lektionsknappen).
+  // Dansk følger læsningens vej: lytte → bogstaverne → læse. Engelsk: de første ord → hverdagens ting → selv sige det.
   const VAELG_GRUPPER = [
-    { e: '🔢', navn: 'Tal', verdener: ['taelle', 'plus10', 'venner', 'minus', 'tiere', 'tierbro', 'moenstre'] },
-    { e: '🔺', navn: 'Former', verdener: ['former', 'tegne'] },
-    { e: '🕰️', navn: 'Klokken og penge', verdener: ['torvet'] },
-    { e: '🗼', navn: 'Det hele blandet', verdener: ['taarn'] },
-    { e: '🔤', navn: 'Dansk', verdener: ['rim', 'lyde', 'alfabet', 'lydering', 'smaaord', 'historiebog', 'jagt'] },
-    { e: '🇬🇧', navn: 'Engelsk', verdener: ['engFarver', 'engTal', 'engDyr', 'engFormer', 'engKoekken', 'engHjemme', 'engLegeplads', 'engSig'] },
+    { fag: 'matematik', e: '🔢', navn: 'Tal', tale: 'Tal. Her tæller og regner vi.', verdener: ['taelle', 'plus10', 'venner', 'minus', 'tiere', 'tierbro', 'moenstre'] },
+    { fag: 'matematik', e: '📐', navn: 'Former', tale: 'Former. Her leger vi med figurer.', verdener: ['former', 'tegne'] },
+    { fag: 'matematik', e: '💰', navn: 'Klokken og penge', tale: 'Klokken og penge.', verdener: ['torvet'] },
+    { fag: 'matematik', e: '🧩', navn: 'Det hele blandet', tale: 'Det hele blandet.', verdener: ['taarn'] },
+    { fag: 'dansk', e: '🎧', navn: 'Rim og lyde', tale: 'Rim og lyde. Her lytter vi til ordene.', verdener: ['rim', 'lyde'] },
+    { fag: 'dansk', e: '🅰️', navn: 'Bogstaver', tale: 'Bogstaver. Her leger vi med bogstaverne.', verdener: ['alfabet', 'jagt'] },
+    { fag: 'dansk', e: '📝', navn: 'Læse og skrive', tale: 'Læse og skrive. Her læser vi ord og historier.', verdener: ['lydering', 'smaaord', 'historiebog'] },
+    { fag: 'engelsk', e: '🌱', navn: 'De første ord', tale: 'De første ord. Farver, tal, dyr og figurer på engelsk.', verdener: ['engFarver', 'engTal', 'engDyr', 'engFormer'] },
+    { fag: 'engelsk', e: '🧺', navn: 'Hverdagens ting', tale: 'Hverdagens ting. Køkkenet, hjemmet og legepladsen på engelsk.', verdener: ['engKoekken', 'engHjemme', 'engLegeplads'] },
+    { fag: 'engelsk', e: '🗣️', navn: 'Sig det selv', tale: 'Sig det selv. Sig det, du hører på engelsk.', verdener: ['engSig'] },
   ];
 
   // Skolens ord bruges i oplæsningen (tælle videre, tage væk, forskel, 10'er-venner …)
@@ -1810,14 +1817,17 @@
 
   // Matematik, dansk eller engelsk? Store kort (tast 1, 2, 3). Vises ved hver start (Jimmy 18-10-2026): det sidste valg
   // (data.fag) lyser, og Enter vælger det — som «Eventyr eller Vælg selv?». Man kan også skifte fra kortet.
-  function visFagValg(hilsen) {
+  // Fra Vælg selv (tilVaelgSelv) går et fag direkte til det fags Vælg selv — «Eventyr eller Vælg selv?» springes over
+  // (Jimmy 18-10-2026: «når man vælger dansk er det det man kommer ind på»)
+  function visFagValg(hilsen, tilVaelgSelv) {
     S.runde = null;
     const fagene = FAG.filter((f) => f.id !== 'engelsk' || E);
     const vaelg = (f) => {
       Lyd.init(); Lyd.rigtig();
       data.fag = f.id;
       gem();
-      visTilstandValg(f.tale);
+      if (tilVaelgSelv) visVaelgSelv(f.tale + ' Vælg selv. Tryk på det, du vil lege med.');
+      else visTilstandValg(f.tale);
     };
     const kort = (f) => h('button', {
       class: 'fag-kort ' + f.id + (data.fag === f.id ? ' sidst' : ''), type: 'button', 'aria-label': f.label, 'data-fag': f.id,
@@ -1844,9 +1854,9 @@
 
   // Skift fag (i topbarerne): åbner fagvalget. Ikonet er et andet fag end det, barnet er i (🔢 eller 🔤) — i engelsk
   // et neutralt 📚 (der er to andre fag, og 🔢 lovede matematik, men åbnede fagvalget)
-  function fagSkiftKnap(fag) {
+  function fagSkiftKnap(fag, tilVaelgSelv) {
     const label = fag === 'dansk' ? 'Skift til matematik' : fag === 'engelsk' ? 'Skift fag' : 'Skift til dansk';
-    return ikonKnap(fag === 'matematik' ? '🔤' : fag === 'engelsk' ? '📚' : '🔢', label, () => visFagValg(), 'fag-knap');
+    return ikonKnap(fag === 'matematik' ? '🔤' : fag === 'engelsk' ? '📚' : '🔢', label, () => visFagValg(undefined, tilVaelgSelv), 'fag-knap');
   }
 
   // B10: Eventyr eller Vælg selv? To store kort efter fagvalget — vises hver gang (ét tryk); det sidste valg lyser
@@ -1874,7 +1884,7 @@
         h('div', { class: 'topbar-hoejre' }, advarselKnap(), hoejttaler())),
       h('div', { class: 'fagvalg-liste' },
         kort('eventyr', '🗺️', 'Eventyr', 'Eventyr — verdenerne i rækkefølge'),
-        kort('frit', '🎒', 'Vælg selv', 'Vælg selv — alle emner'))),
+        kort('frit', '🎒', 'Vælg selv', 'Vælg selv — fagets emner'))),
     (e) => {
       if (e.key === '1') vaelg('eventyr');
       else if (e.key === '2') vaelg('frit');
@@ -6341,11 +6351,13 @@
     Tale.sig(S.gentagTale);
   }
 
-  // ---------- 🎒 Vælg selv: alle emner frit (også dem, eventyret ikke er nået til) ----------
+  // ---------- 🎒 Vælg selv: fagets emner frit (også dem, eventyret ikke er nået til) ----------
   // Runder her tæller på samme emne-niveau og mestring som i eventyret — øvelse hjælper eventyret videre.
+  // Kun det fag, barnet er i (data.fag); de andre fag nås med fagknappen, som på kortet.
   function visVaelgSelv(hilsen) {
     stopUr();
     S.runde = null;
+    const fag = fagNu();
     const felt = (v) => {
       const antalStj = stjerner(v.emne);
       const knap = h('button', {
@@ -6363,22 +6375,27 @@
     };
     // Vennen udforsker (med luppen) ved den første gruppes overskrift — står oven på gitteret og ruller med
     let venVist = false;
-    const grupper = VAELG_GRUPPER.map((g) => {
-      const verdener = g.verdener.map((id) => alleVerdener().find((v) => v.id === id)).filter((v) => v && (v.blandet || ((emneDef(v.emne) || v.emne === 'historie' || v.emne === 'jagt') && emneSlaaetTil(v.emne))));
+    const grupper = VAELG_GRUPPER.filter((g) => g.fag === fag).map((g) => {
+      const verdener = g.verdener.map((id) => verdenerFor(fag).find((v) => v.id === id)).filter((v) => v && (v.blandet || ((emneDef(v.emne) || v.emne === 'historie' || v.emne === 'jagt') && emneSlaaetTil(v.emne))));
       if (!verdener.length) return null;
       const ven = venVist ? null : h('span', { class: 'vaelg-ven', 'aria-hidden': 'true' }, venTegning(minFigur().id, 'udforsker'));
       venVist = true;
+      // Overskriften er en knap: et tryk læser afsnittet op (barnet kan næsten ikke læse endnu)
+      const titel = h('button', { class: 'vaelg-gruppe-knap', type: 'button', onclick: () => { Lyd.init(); Tale.sig(g.tale); } },
+        h('span', { 'aria-hidden': 'true' }, g.e), g.navn);
       return h('section', { class: 'vaelg-gruppe' },
-        h('h2', { class: 'vaelg-gruppe-titel' }, h('span', { 'aria-hidden': 'true' }, g.e), g.navn, ven),
+        h('h2', { class: 'vaelg-gruppe-titel' }, titel, ven),
         h('div', { class: 'vaelg-gitter' }, verdener.map(felt)));
     });
     S.gentagTale = 'Vælg selv. Tryk på det, du vil lege med.';
     const knapper = () => [...document.querySelectorAll('.vaelg-emne')];
-    skift(h('div', { class: 'skaerm vaelg-selv' },
+    const fagKnap = D ? fagSkiftKnap(fag, true) : null; // de andre fag (🔢 / 🔤 / 📚) — et fag fører direkte til dets Vælg selv
+    skift(h('div', { class: ['skaerm', 'vaelg-selv', 'fag-' + fag].join(' ') }, // (som én streng tog tale-tekster.js den for tale)
       h('div', { class: 'topbar' },
         ikonKnap('🗺️', 'Tilbage til eventyret', () => visKort(false)),
+        fagKnap,
         h('div', { class: 'topbar-titel' }, '🎒 Vælg selv'),
-        hoejttaler()),
+        fagKnap ? h('div', { class: 'topbar-hoejre' }, topbarPlads(), hoejttaler()) : hoejttaler()), // titlen i midten
       h('div', { class: 'vaelg-selv-liste' }, grupper)),
     (e) => {
       if (e.key === 'Escape') visKort(false);
