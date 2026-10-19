@@ -97,13 +97,34 @@
     return ud;
   }
 
+  // Enkle formler til «isoler» og «isolerBrik» (fase 1, 19-10-2026): [id, navn, z, a, b, art] betyder z = a·b eller z = a/b.
+  // Hver formel giver to opgaver (isolér a eller b), i alt 20. Nøglen «isoler:<id>-<variabel>» er fælles for de to typer.
+  const ISOLER_ENKLE = [
+    ['ohm', 'Ohms lov', 'U', 'R', 'I', 'gange'], ['effekt', 'Effekt', 'P', 'U', 'I', 'gange'], ['kraft', 'Kraft', 'F', 'm', 'a', 'gange'],
+    ['rekt', 'Rektanglets areal', 'A', 'l', 'b', 'gange'], ['energi', 'Energi', 'E', 'P', 't', 'gange'], ['arbejde', 'Arbejde', 'W', 'F', 's', 'gange'],
+    ['prop', 'Proportionalitet', 'y', 'k', 'x', 'gange'], ['fart', 'Fart', 'v', 's', 't', 'dele'], ['rho', 'Massefylde', 'ρ', 'm', 'V', 'dele'],
+    ['tryk', 'Tryk', 'p', 'F', 'A', 'dele'],
+  ];
+  // Hver enkel formel og variabel: { id, navn, f (MathML), x, z, a, b, art, isoleret: 'a' | 'b' }
+  const isolerEnkle = () => {
+    const ud = [];
+    for (const [id, navn, z, a, b, art] of ISOLER_ENKLE) {
+      const f = math(mi(z) + mo('=') + (art === 'gange' ? mi(a) + mo('·') + mi(b) : frac(mi(a), mi(b))));
+      for (const isoleret of ['a', 'b']) {
+        const x = isoleret === 'a' ? a : b;
+        ud.push({ id: id + '-' + x, navn, f, x, z, a, b, art, isoleret });
+      }
+    }
+    return ud;
+  };
+
   // ---------- Generatorer ----------
   // Hver: (niveau, rng) → { emne, type, niveau, noegle, spoerg (MathML/HTML), p (parametre), valg, svar, forklaring }
   const V = {
     // ===== 1. Regnetricks =====
     // 49² = (50 − 1)² = 2500 − 100 + 1
     kvadratTrick(niveau, rng) {
-      const runde = vaelg(rng, niveau >= 2 ? [30, 40, 50, 60, 70, 80, 90, 100] : [20, 30, 40, 50]);
+      const runde = vaelg(rng, niveau >= 3 ? [30, 40, 50, 60, 70, 80, 90, 100, 150, 200] : niveau === 2 ? [20, 30, 40, 50, 60, 70, 80, 90, 100, 150, 200] : [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]);
       const d = vaelg(rng, niveau >= 3 ? [-2, -1, 1, 2] : [-1, 1]);
       const n = runde + d;
       const facit = n * n;
@@ -133,7 +154,7 @@
 
     // Fortegn: −3² og (−3)²
     fortegn(niveau, rng) {
-      const a = heltal(rng, 2, 9);
+      const a = heltal(rng, 2, 12);
       const medParentes = rng() < 0.5;
       const eks = niveau >= 2 && rng() < 0.5 ? 3 : 2;
       const facit = medParentes ? Math.pow(-a, eks) : -Math.pow(a, eks);
@@ -193,8 +214,9 @@
 
     // x⁰ = 1 og 10-tals-notation
     nulPotens(niveau, rng) {
-      if (niveau >= 2 && rng() < 0.6) {
-        const a = heltal(rng, 2, 4), b = heltal(rng, 2, 4), m = heltal(rng, 2, 6), n = -heltal(rng, 1, 3);
+      // Niveau 1 (fase 1, 19-10-2026): halvdelen er 10-tals-notation med positive eksponenter, så x⁰ ikke fylder hele dosen
+      if (rng() < (niveau >= 2 ? 0.6 : 0.5)) {
+        const a = heltal(rng, 2, 4), b = heltal(rng, 2, 4), m = heltal(rng, niveau >= 2 ? 2 : 1, niveau >= 2 ? 6 : 4), n = niveau >= 2 ? -heltal(rng, 1, 3) : heltal(rng, 1, 4);
         const t = a * b, e = m + n;
         const vis = (k, x) => ({ vis: math(mn(k) + mo('·') + sup(mn(10), mn(x))), nøgle: 't:' + k + 'e' + x });
         const o = {
@@ -202,9 +224,10 @@
           spoerg: 'Udregn ' + math(row(mn(a) + mo('·') + sup(mn(10), mn(m))) + mo('·') + row(mn(b) + mo('·') + sup(mn(10), mn(n)))),
           forklaring: 'Gang tallene for sig og læg eksponenterne sammen: ' + math(mn(t) + mo('·') + sup(mn(10), mn(e))),
         };
-        return opgave(o, rng, vis(t, e), [Object.assign(vis(t, m * n), { fejl: 'Ganget eksponenterne' }), Object.assign(vis(a + b, e), { fejl: 'Lagt tallene sammen' }), Object.assign(vis(t, m - n), { fejl: 'Fortegnsfejl i eksponenten' })]);
+        return opgave(o, rng, vis(t, e), [Object.assign(vis(t, m * n), { fejl: 'Ganget eksponenterne' }), Object.assign(vis(a + b, e), { fejl: 'Lagt tallene sammen' }),
+          Object.assign(vis(t, m - n), { fejl: n < 0 ? 'Fortegnsfejl i eksponenten' : 'Trukket eksponenterne fra hinanden' }), Object.assign(vis(t, e + 1), { fejl: null }), Object.assign(vis(t, e - 1), { fejl: null })]);
       }
-      const x = vaelg(rng, ['x', 'a', '7', '123']);
+      const x = vaelg(rng, ['x', 'a', 'y', 'b', 'k', 't', '2', '7', '58', '123', '999', '2026']);
       const o = {
         emne: 'broeker', type: 'nulPotens', niveau, noegle: 'nul:' + x, p: { x },
         spoerg: 'Hvad er ' + math(sup(/\d/.test(x) ? mn(x) : mi(x), mn(0))) + (/\d/.test(x) ? '' : ' (for ' + math(mi(x) + mo('≠') + mn(0)) + ')') + '?',
@@ -281,18 +304,28 @@
 
     // Isolér en variabel i en formel
     isoler(niveau, rng) {
-      const formler = [
-        { navn: 'Ohms lov', f: math(mi('U') + mo('=') + mi('R') + mo('·') + mi('I')), x: 'I', rigtig: frac(mi('U'), mi('R')), forkert: [[frac(mi('R'), mi('U')), 'Brøken vendt om'], [mi('U') + mo('·') + mi('R'), 'Ganget i stedet for at dele'], [mi('U') + mo('−') + mi('R'), 'Trukket fra i stedet for at dele']] },
-        { navn: 'Effekt', f: math(mi('P') + mo('=') + mi('U') + mo('·') + mi('I')), x: 'U', rigtig: frac(mi('P'), mi('I')), forkert: [[frac(mi('I'), mi('P')), 'Brøken vendt om'], [mi('P') + mo('·') + mi('I'), 'Ganget i stedet for at dele'], [mi('P') + mo('−') + mi('I'), 'Trukket fra']] },
-        { navn: 'Fart', f: math(mi('v') + mo('=') + frac(mi('s'), mi('t'))), x: 's', rigtig: mi('v') + mo('·') + mi('t'), forkert: [[frac(mi('v'), mi('t')), 'Delt i stedet for at gange'], [frac(mi('t'), mi('v')), 'Brøken vendt om'], [mi('v') + mo('+') + mi('t'), 'Lagt til']] },
-        { navn: 'Trekantens areal', f: math(mi('A') + mo('=') + frac(mn(1), mn(2)) + mo('·') + mi('g') + mo('·') + mi('h')), x: 'h', rigtig: frac(mn(2) + mi('A'), mi('g')), forkert: [[frac(mi('A'), mn(2) + mi('g')), 'Halvdelen havnet forkert'], [frac(mi('A'), mi('g')), 'Glemt ½'], [mn(2) + mi('A') + mo('·') + mi('g'), 'Ganget med g']] },
-        { navn: 'Lineær funktion', f: math(mi('y') + mo('=') + mi('a') + mi('x') + mo('+') + mi('b')), x: 'x', rigtig: frac(mi('y') + mo('−') + mi('b'), mi('a')), forkert: [[frac(mi('y'), mi('a')) + mo('−') + mi('b'), 'Delt før der blev trukket fra'], [frac(mi('y') + mo('+') + mi('b'), mi('a')), 'Fortegnsfejl'], [mi('a') + mo('·') + par(mi('y') + mo('−') + mi('b')), 'Ganget i stedet for at dele']] },
-      ];
-      const nr = heltal(rng, 0, niveau >= 2 ? formler.length - 1 : 2);
+      // De 20 enkle formler (fase 1, 19-10-2026: før 3 på niveau 1 og 5 på niveau 2–3)
+      const enkle = isolerEnkle().map((e) => {
+        const [z, a, b] = [mi(e.z), mi(e.a), mi(e.b)];
+        const anden = e.isoleret === 'a' ? b : a;
+        if (e.art === 'gange') return { id: e.id, niv: 1, navn: e.navn, f: e.f, x: e.x, rigtig: frac(z, anden), forkert: [[frac(anden, z), 'Brøken vendt om'], [z + mo('·') + anden, 'Ganget i stedet for at dele'], [z + mo('−') + anden, 'Trukket fra i stedet for at dele']] };
+        if (e.isoleret === 'a') return { id: e.id, niv: 1, navn: e.navn, f: e.f, x: e.x, rigtig: z + mo('·') + b, forkert: [[frac(z, b), 'Delt i stedet for at gange'], [frac(b, z), 'Brøken vendt om'], [z + mo('+') + b, 'Lagt til']] };
+        return { id: e.id, niv: 1, navn: e.navn, f: e.f, x: e.x, rigtig: frac(a, z), forkert: [[frac(z, a), 'Brøken vendt om'], [a + mo('·') + z, 'Ganget i stedet for at dele'], [a + mo('−') + z, 'Trukket fra i stedet for at dele']] };
+      });
+      const pi = mi('π'), r2 = sup(mi('r'), mn(2)), v2 = sup(mi('v'), mn(2));
+      const formler = enkle.concat([
+        { id: 'trekant-h', niv: 2, navn: 'Trekantens areal', f: math(mi('A') + mo('=') + frac(mn(1), mn(2)) + mo('·') + mi('g') + mo('·') + mi('h')), x: 'h', rigtig: frac(mn(2) + mi('A'), mi('g')), forkert: [[frac(mi('A'), mn(2) + mi('g')), 'Halvdelen havnet forkert'], [frac(mi('A'), mi('g')), 'Glemt ½'], [mn(2) + mi('A') + mo('·') + mi('g'), 'Ganget med g']] },
+        { id: 'lin-x', niv: 2, navn: 'Lineær funktion', f: math(mi('y') + mo('=') + mi('a') + mi('x') + mo('+') + mi('b')), x: 'x', rigtig: frac(mi('y') + mo('−') + mi('b'), mi('a')), forkert: [[frac(mi('y'), mi('a')) + mo('−') + mi('b'), 'Delt før der blev trukket fra'], [frac(mi('y') + mo('+') + mi('b'), mi('a')), 'Fortegnsfejl'], [mi('a') + mo('·') + par(mi('y') + mo('−') + mi('b')), 'Ganget i stedet for at dele']] },
+        { id: 'omkreds-r', niv: 2, navn: 'Cirklens omkreds', f: math(mi('O') + mo('=') + mn(2) + mo('·') + pi + mo('·') + mi('r')), x: 'r', rigtig: frac(mi('O'), mn(2) + pi), forkert: [[frac(mn(2) + pi, mi('O')), 'Brøken vendt om'], [mi('O') + mo('·') + mn(2) + pi, 'Ganget i stedet for at dele'], [frac(mi('O'), mn(2)), 'Glemt π']] },
+        { id: 'kinetisk-m', niv: 2, navn: 'Kinetisk energi', f: math(mi('E') + mo('=') + frac(mn(1), mn(2)) + mo('·') + mi('m') + mo('·') + v2), x: 'm', rigtig: frac(mn(2) + mi('E'), v2), forkert: [[frac(mi('E'), mn(2) + v2), 'Halvdelen havnet forkert'], [frac(mn(2) + mi('E'), mi('v')), 'Glemt kvadratet'], [frac(mi('E'), v2), 'Glemt ½']] },
+        { id: 'cirkel-r', niv: 2, navn: 'Cirklens areal', f: math(mi('A') + mo('=') + pi + mo('·') + r2), x: 'r', rigtig: sqrt(frac(mi('A'), pi)), forkert: [[frac(mi('A'), pi), 'Glemt kvadratroden'], [sqrt(frac(pi, mi('A'))), 'Brøken vendt om'], [frac(mi('A'), mn(2) + pi), 'Delt med 2 i stedet for at tage kvadratroden']] },
+        { id: 'cylinder-h', niv: 3, navn: 'Cylinderens rumfang', f: math(mi('V') + mo('=') + pi + mo('·') + r2 + mo('·') + mi('h')), x: 'h', rigtig: frac(mi('V'), pi + r2), forkert: [[frac(pi + r2, mi('V')), 'Brøken vendt om'], [mi('V') + mo('·') + pi + r2, 'Ganget i stedet for at dele'], [frac(mi('V'), pi + mi('r')), 'Glemt kvadratet']] },
+      ]).filter((F) => F.niv <= niveau);
+      const nr = heltal(rng, 0, formler.length - 1);
       const F = formler[nr];
       const vis = (udtryk) => math(mi(F.x) + mo('=') + udtryk);
       // Nøglen er fælles med isolerBrik (samme formel og variabel), så de to aldrig står i samme dosis/prøve
-      const id = ['ohm-I', 'effekt-U', 'fart-s', 'trekant-h', 'lin-x'][nr];
+      const id = F.id;
       const o = {
         emne: 'ligninger', type: 'isoler', niveau, noegle: 'isoler:' + id, p: { nr },
         spoerg: F.navn + ': ' + F.f + '. Isolér ' + math(mi(F.x)) + '.',
@@ -318,9 +351,13 @@
 
     // ===== 4. Trekanter =====
     pythagoras(niveau, rng) {
-      const tripler = [[3, 4, 5], [6, 8, 10], [5, 12, 13], [9, 12, 15], [8, 15, 17], [12, 16, 20], [7, 24, 25]];
-      const [a, b, c] = vaelg(rng, niveau >= 2 ? tripler : tripler.slice(0, 3));
-      const katete = niveau >= 2 && rng() < 0.5;
+      // Fase 1 (19-10-2026): flere tripler, og kateten kan også spørges om på niveau 1 (før 3 forskellige opgaver dér)
+      const tripler = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((k) => [3 * k, 4 * k, 5 * k]).concat([[5, 12, 13], [10, 24, 26], [15, 36, 39], [20, 48, 52], [8, 15, 17], [16, 30, 34], [7, 24, 25], [14, 48, 50]]);
+      // 18 tripler på niveau 1, 25 på niveau 2–3 — hver kan spørges om hypotenusen eller en af kateterne
+      const svaere = [[20, 21, 29], [12, 35, 37], [9, 40, 41], [33, 56, 65], [24, 45, 51], [28, 45, 53], [11, 60, 61]];
+      let [a, b, c] = vaelg(rng, niveau >= 2 ? tripler.concat(svaere) : tripler);
+      const katete = rng() < 0.5;
+      if (katete && rng() < 0.5) [a, b] = [b, a];   // den kendte katete kan være den korte eller den lange
       const o = {
         emne: 'trekanter', type: 'pythagoras', niveau, noegle: 'pyth:' + [a, b, c].join(',') + (katete ? 'k' : ''), p: { a, b, c, katete },
         spoerg: katete
@@ -340,14 +377,17 @@
 
     // Ensvinklede trekanter: skalafaktor
     ensvinklede(niveau, rng) {
-      const [a, b, c] = vaelg(rng, [[3, 4, 5], [2, 3, 4], [4, 5, 6], [5, 6, 8]]);
-      const k = vaelg(rng, niveau >= 2 ? [2, 3, 4, 5] : [2, 3]);
+      // Fase 1 (19-10-2026): 10 sæt sider (før 4), og der kan spørges om både den mellemste og den længste side
+      const [a, b, c] = vaelg(rng, [[3, 4, 5], [2, 3, 4], [4, 5, 6], [5, 6, 8], [3, 5, 7], [2, 4, 5], [4, 6, 7], [3, 6, 8], [5, 7, 9], [2, 5, 6]]);
+      const k = vaelg(rng, niveau >= 2 ? [2, 3, 4, 5] : [2, 3, 4]);
+      const spurgt = rng() < 0.5 ? 'b' : 'c';
+      const [s, anden] = spurgt === 'c' ? [c, b] : [b, c];
       const o = {
-        emne: 'trekanter', type: 'ensvinklede', niveau, noegle: 'ens:' + [a, b, c, k].join(','), p: { a, b, c, k },
-        spoerg: 'To trekanter er ensvinklede. Den lille har siderne ' + math(mn(a)) + ', ' + math(mn(b)) + ' og ' + math(mn(c)) + '. I den store svarer ' + math(mn(a)) + ' til ' + math(mn(a * k)) + '. Hvad svarer ' + math(mn(b)) + ' til?',
-        forklaring: 'Skalafaktoren er ' + math(frac(mn(a * k), mn(a)) + mo('=') + mn(k)) + ', så ' + math(mn(b) + mo('·') + mn(k) + mo('=') + mn(b * k)) + '.',
+        emne: 'trekanter', type: 'ensvinklede', niveau, noegle: 'ens:' + [a, b, c, k].join(',') + (spurgt === 'c' ? 'c' : ''), p: { a, b, c, k, spurgt },
+        spoerg: 'To trekanter er ensvinklede. Den lille har siderne ' + math(mn(a)) + ', ' + math(mn(b)) + ' og ' + math(mn(c)) + '. I den store svarer ' + math(mn(a)) + ' til ' + math(mn(a * k)) + '. Hvad svarer ' + math(mn(s)) + ' til?',
+        forklaring: 'Skalafaktoren er ' + math(frac(mn(a * k), mn(a)) + mo('=') + mn(k)) + ', så ' + math(mn(s) + mo('·') + mn(k) + mo('=') + mn(s * k)) + '.',
       };
-      return opgave(o, rng, tal(b * k), [tal(b + (a * k - a), 'Lagt forskellen til i stedet for at gange'), tal(c * k, 'Brugt den forkerte side'), tal(b * k + 1)]);
+      return opgave(o, rng, tal(s * k), [tal(s + (a * k - a), 'Lagt forskellen til i stedet for at gange'), tal(anden * k, 'Brugt den forkerte side'), tal(s * k + 1)]);
     },
 
     // ===== 5. Funktioner og modeller =====
@@ -369,7 +409,7 @@
 
     // Procentvis vækst: f(x) = b·aˣ
     vaekst(niveau, rng) {
-      const pct = vaelg(rng, [2, 3, 4, 5, 8, 10, 12, 20, 25]);
+      const pct = vaelg(rng, [2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30]);
       const fald = niveau >= 2 && rng() < 0.4;
       const a = fald ? (100 - pct) / 100 : (100 + pct) / 100;
       const b = vaelg(rng, [50, 100, 200, 500]);
@@ -489,8 +529,8 @@
         const v = (udtryk, nøgle, f) => ({ vis: math(mi("f′") + par(mi('x')) + mo('=') + udtryk), nøgle, fejl: f });
         return opgave(o, rng, v(frac(mn(k), mi('x')), 'ln:k/x'), [v(frac(mn(1), mi('x')), 'ln:1/x', 'Konstanten forsvundet'), v(mn(k) + mi('x'), 'ln:kx', 'Forvekslet med x'), v(mn(k) + mo('·') + mi('ln') + par(mi('x')), 'ln:same', 'Ingen ændring')]);
       }
-      const a = heltal(rng, 1, 6) * (niveau >= 2 && rng() < 0.3 ? -1 : 1);
-      const n = heltal(rng, 2, niveau >= 2 ? 6 : 4);
+      const a = heltal(rng, 1, 8) * (niveau >= 2 && rng() < 0.3 ? -1 : 1);
+      const n = heltal(rng, 2, 6);
       const fp = (ka, kn, f) => ({ vis: math(mi("f′") + par(mi('x')) + mo('=') + monom(ka, kn)), nøgle: 'p:' + ka + 'x^' + kn, fejl: f });
       const o = {
         emne: 'differential', type: 'afledt', niveau, noegle: 'afledt:' + a + 'x' + n, p: { t, a, n },
@@ -502,7 +542,7 @@
 
     // Tangentens hældning: f(x) = x², f′(x₀)
     tangent(niveau, rng) {
-      const a = heltal(rng, 1, 3), x0 = heltal(rng, -3, 4);
+      const a = heltal(rng, 1, 4), x0 = heltal(rng, -4, 5);
       const facit = 2 * a * x0;
       const o = {
         emne: 'differential', type: 'tangent', niveau, noegle: 'tangent:' + a + ':' + x0, p: { a, x0 },
@@ -514,8 +554,8 @@
 
     // Tangentens ligning: f(x) = a·x² i x₀ → y = 2a·x₀·x − a·x₀²
     tangentLigning(niveau, rng) {
-      const a = heltal(rng, 1, 3);
-      let x0 = heltal(rng, -3, 3);
+      const a = heltal(rng, 1, 5);
+      let x0 = heltal(rng, -4, 4);
       if (x0 === 0) x0 = 1;
       const hk = 2 * a * x0, q = -a * x0 * x0;
       const lin = (mm, qq, f) => ({ vis: math(mi('y') + mo('=') + monom(mm, 1) + plusLed(qq)), nøgle: 'y:' + mm + ',' + qq, fejl: f });
@@ -529,8 +569,8 @@
 
     // Monotoni: f′(x) = kx − m
     monotoni(niveau, rng) {
-      const k = vaelg(rng, [1, 2, 3]);
-      let r = heltal(rng, -4, 4);
+      const k = vaelg(rng, [1, 2, 3, 4]);
+      let r = heltal(rng, -6, 6);
       if (r === 0) r = 2;
       const m = k * r;
       const vis = (tekst, nøgle, f) => ({ vis: math(tekst), nøgle, fejl: f });
@@ -544,8 +584,8 @@
 
     // ===== 7. Integralregning =====
     stamfunktion(niveau, rng) {
-      const n = heltal(rng, 1, niveau >= 2 ? 5 : 3);
-      const a = (n + 1) * heltal(rng, 1, 3);
+      const n = heltal(rng, 1, niveau >= 2 ? 5 : 4);
+      const a = (n + 1) * heltal(rng, 1, niveau >= 2 ? 6 : 10) * (niveau >= 2 && rng() < 0.4 ? -1 : 1);
       const F = (ka, kn, f) => ({ vis: math(monom(ka, kn) + mo('+') + mi('k')), nøgle: 'F:' + ka + 'x^' + kn, fejl: f });
       const o = {
         emne: 'integral', type: 'stamfunktion', niveau, noegle: 'stam:' + a + 'x' + n, p: { a, n },
@@ -739,19 +779,20 @@
 
     // Isolér ved at bygge med brikker (tryk-tryk i stedet for at trække). Har også svarknapper (bruges i duellen).
     isolerBrik(niveau, rng) {
-      const formler = [
-        { navn: 'Ohms lov', f: math(mi('U') + mo('=') + mi('R') + mo('·') + mi('I')), x: 'I', svar: [['U', '÷', 'R']], fejl: [[['R', '÷', 'U'], 'Brøken vendt om'], [['U', '·', 'R'], 'Ganget i stedet for at dele']], ekstra: ['·', '−'] },
-        { navn: 'Ohms lov', f: math(mi('U') + mo('=') + mi('R') + mo('·') + mi('I')), x: 'R', svar: [['U', '÷', 'I']], fejl: [[['I', '÷', 'U'], 'Brøken vendt om'], [['U', '·', 'I'], 'Ganget i stedet for at dele']], ekstra: ['·', '+'] },
-        { navn: 'Effekt', f: math(mi('P') + mo('=') + mi('U') + mo('·') + mi('I')), x: 'U', svar: [['P', '÷', 'I']], fejl: [[['I', '÷', 'P'], 'Brøken vendt om'], [['P', '·', 'I'], 'Ganget i stedet for at dele']], ekstra: ['·', '−'] },
-        { navn: 'Fart', f: math(mi('v') + mo('=') + frac(mi('s'), mi('t'))), x: 's', svar: [['v', '·', 't'], ['t', '·', 'v']], fejl: [[['v', '÷', 't'], 'Delt i stedet for at gange'], [['t', '÷', 'v'], 'Delt i stedet for at gange']], ekstra: ['÷', '+'] },
-        { navn: 'Fart', f: math(mi('v') + mo('=') + frac(mi('s'), mi('t'))), x: 't', svar: [['s', '÷', 'v']], fejl: [[['v', '÷', 's'], 'Brøken vendt om'], [['s', '·', 'v'], 'Ganget i stedet for at dele']], ekstra: ['·', '−'] },
-        { navn: 'Massefylde', f: math(mi('ρ') + mo('=') + frac(mi('m'), mi('V'))), x: 'm', svar: [['ρ', '·', 'V'], ['V', '·', 'ρ']], fejl: [[['ρ', '÷', 'V'], 'Delt i stedet for at gange'], [['V', '÷', 'ρ'], 'Delt i stedet for at gange']], ekstra: ['÷', '+'] },
-        { navn: 'Lineær funktion', f: math(mi('y') + mo('=') + mi('a') + mi('x') + mo('+') + mi('b')), x: 'x', svar: [['(', 'y', '−', 'b', ')', '÷', 'a']], fejl: [[['y', '÷', 'a', '−', 'b'], 'Delt før der blev trukket fra'], [['(', 'y', '+', 'b', ')', '÷', 'a'], 'Fortegnsfejl'], [['y', '−', 'b', '÷', 'a'], 'Glemt parentesen: kun b bliver delt med a']], ekstra: ['+', '·'] },
-        { navn: 'Trekantens areal', f: math(mi('A') + mo('=') + frac(mn(1), mn(2)) + mo('·') + mi('g') + mo('·') + mi('h')), x: 'h', svar: [['2', '·', 'A', '÷', 'g'], ['(', '2', '·', 'A', ')', '÷', 'g']], fejl: [[['A', '÷', 'g'], 'Glemt ½'], [['A', '÷', '(', '2', '·', 'g', ')'], 'Halvdelen havnet forkert']], ekstra: ['(', ')'] },
-      ];
-      const nr = heltal(rng, 0, niveau >= 3 ? formler.length - 1 : 5);
+      // De 20 enkle formler på alle niveauer (fase 1, 19-10-2026: før 6–8), og to med flere led på niveau 3
+      const enkle = isolerEnkle().map((e) => {
+        const anden = e.isoleret === 'a' ? e.b : e.a;
+        if (e.art === 'gange') return { id: e.id, navn: e.navn, f: e.f, x: e.x, svar: [[e.z, '÷', anden]], fejl: [[[anden, '÷', e.z], 'Brøken vendt om'], [[e.z, '·', anden], 'Ganget i stedet for at dele']], ekstra: ['·', '−'] };
+        if (e.isoleret === 'a') return { id: e.id, navn: e.navn, f: e.f, x: e.x, svar: [[e.z, '·', e.b], [e.b, '·', e.z]], fejl: [[[e.z, '÷', e.b], 'Delt i stedet for at gange'], [[e.b, '÷', e.z], 'Delt i stedet for at gange']], ekstra: ['÷', '+'] };
+        return { id: e.id, navn: e.navn, f: e.f, x: e.x, svar: [[e.a, '÷', e.z]], fejl: [[[e.z, '÷', e.a], 'Brøken vendt om'], [[e.a, '·', e.z], 'Ganget i stedet for at dele']], ekstra: ['·', '−'] };
+      });
+      const formler = enkle.concat(niveau >= 3 ? [
+        { id: 'lin-x', navn: 'Lineær funktion', f: math(mi('y') + mo('=') + mi('a') + mi('x') + mo('+') + mi('b')), x: 'x', svar: [['(', 'y', '−', 'b', ')', '÷', 'a']], fejl: [[['y', '÷', 'a', '−', 'b'], 'Delt før der blev trukket fra'], [['(', 'y', '+', 'b', ')', '÷', 'a'], 'Fortegnsfejl'], [['y', '−', 'b', '÷', 'a'], 'Glemt parentesen: kun b bliver delt med a']], ekstra: ['+', '·'] },
+        { id: 'trekant-h', navn: 'Trekantens areal', f: math(mi('A') + mo('=') + frac(mn(1), mn(2)) + mo('·') + mi('g') + mo('·') + mi('h')), x: 'h', svar: [['2', '·', 'A', '÷', 'g'], ['(', '2', '·', 'A', ')', '÷', 'g']], fejl: [[['A', '÷', 'g'], 'Glemt ½'], [['A', '÷', '(', '2', '·', 'g', ')'], 'Halvdelen havnet forkert']], ekstra: ['(', ')'] },
+      ] : []);
+      const nr = heltal(rng, 0, formler.length - 1);
       const F = formler[nr];
-      const id = ['ohm-I', 'ohm-R', 'effekt-U', 'fart-s', 'fart-t', 'rho-m', 'lin-x', 'trekant-h'][nr];
+      const id = F.id;
       // Brikkerne: dem i det rigtige svar + et par forkerte regnetegn, blandet
       const brikker = bland(rng, F.svar[0].concat(F.ekstra));
       // Svarknapperne (til duellen): det rigtige udtryk og de typiske fejl, skrevet som MathML
@@ -805,7 +846,9 @@
 
     // Rente: et beløb vokser med r % om året i to år (rentes rente)
     rente(niveau, rng) {
-      const [K, r] = vaelg(rng, [[1000, 10], [2000, 10], [5000, 10], [1000, 20], [2000, 20], [2000, 5], [4000, 5], [10000, 5], [5000, 2], [10000, 2]]);
+      // Fase 1 (19-10-2026): 21 par (før 10) — alle giver hele kroner efter 1 og 2 år
+      const [K, r] = vaelg(rng, [[1000, 10], [2000, 10], [3000, 10], [4000, 10], [5000, 10], [800, 10], [1000, 20], [1500, 20], [2000, 20], [3000, 20],
+        [1200, 5], [2000, 5], [4000, 5], [8000, 5], [10000, 5], [2500, 2], [5000, 2], [10000, 2], [2500, 4], [10000, 4], [10000, 3]]);
       const aar1 = K * (100 + r) / 100, aar2 = K * (100 + r) * (100 + r) / 10000, simpel = K + 2 * K * r / 100, aar3 = K * Math.pow(100 + r, 3) / 1000000;
       const o = {
         emne: 'funktioner', type: 'rente', niveau, noegle: 'rente:' + K + ',' + r, p: { K, r },
@@ -1012,7 +1055,7 @@
         return opgave(o, rng, bv(p, q), [bv(p, k * q, 'Kun tælleren er delt'), bv(q, p, 'Brøken er vendt om'), bv(k * p, q, 'Kun nævneren er delt'), bv(p + 1, q)]);
       }
       const x = mi('x');
-      const a = heltal(rng, 1, 9);
+      const a = heltal(rng, 1, 12);
       const lin = (s, f) => udv(x + plusLed(s), 'lin:1,' + s, f);
       const andre = [lin(-a, 'Fortegnsfejl'), udv(sup(x, mn(2)) + plusLed(-a), 'x2:' + -a, 'Forkortet med et led i stedet for en faktor'), udv(frac(mn(1), x + mo('+') + mn(a)), 'inv:' + a, 'Brøken er vendt om')];
       if (rng() < 0.5) {
@@ -1050,14 +1093,16 @@
       const o = { emne: 'broeker', type: 'broekGangeDele', niveau, noegle: 'broekGD:' + (gange ? 'g' : 'd') + [a, b, c, d].join(','), p: { a, b, c, d, gange },
         spoerg: 'Udregn ' + math(gange ? A + mo('·') + C : dobbelt ? frac(A, C) : A + mo(':') + C),
         forklaring: gange ? 'Tæller gange tæller og nævner gange nævner: ' + math(frac(mn(a * c), mn(b * d)) + mo('=') + broek(a * c, b * d)) : 'Gang med den omvendte brøk: ' + math(A + mo('·') + frac(mn(d), mn(c)) + mo('=') + broek(a * d, b * c)) };
-      if (gange) return opgave(o, rng, bv(a * c, b * d), [bv(a * d, b * c, 'Ganget over kors'), bv(a + c, b + d, 'Lagt tællere og nævnere sammen'), bv(a * c, b + d), bv(a * c + 1, b * d)]);
+      // De sidste to er reserver: de forkerte svar kan forkortes til facit eller til hinanden (1/2 · 2/2), og
+      // (ac+1)/bd, ac/(bd+1) og (ac+2)/bd er altid forskellige fra facit og hinanden — så er der altid 4 (review F3)
+      if (gange) return opgave(o, rng, bv(a * c, b * d), [bv(a * d, b * c, 'Ganget over kors'), bv(a + c, b + d, 'Lagt tællere og nævnere sammen'), bv(a * c, b + d), bv(a * c + 1, b * d), bv(a * c, b * d + 1), bv(a * c + 2, b * d)]);
       return opgave(o, rng, bv(a * d, b * c), [bv(a * c, b * d, 'Glemt at vende den anden brøk'), bv(b * c, a * d, 'Vendt den forkerte brøk'), bv(a * d + 1, b * c), bv(a * d, b * c + 1)]);
     },
 
     // ===== I.4d Addere og subtrahere brøker =====
     broekMinus(niveau, rng) {
       let a, b, c, d;
-      const nv = niveau >= 2 ? [2, 3, 4, 5, 6] : [2, 3, 4];
+      const nv = niveau >= 2 ? [2, 3, 4, 5, 6] : [2, 3, 4, 5];
       do { b = vaelg(rng, nv); d = vaelg(rng, nv); a = heltal(rng, 1, b - 1); c = heltal(rng, 1, d - 1); } while (b === d || a * d <= c * b);
       const o = { emne: 'broeker', type: 'broekMinus', niveau, noegle: 'broekMinus:' + [a, b, c, d].join(','), p: { a, b, c, d },
         spoerg: 'Udregn ' + math(frac(mn(a), mn(b)) + mo('−') + frac(mn(c), mn(d))),
@@ -1176,17 +1221,19 @@
           forklaring: math(mi('d') + mo('=') + mn(d)) + (d > 0 ? ' > 0: to løsninger.' : d === 0 ? ' = 0: én løsning.' : ' < 0: ingen løsninger.') };
         return opgave(o, rng, tal(antal), [0, 1, 2].filter((v) => v !== antal).map((v) => tal(v, 'd > 0: to, d = 0: én, d < 0: ingen')), 3);
       }
-      if (niveau === 2) {
+      // Niveau 3 (fase 1, 19-10-2026): halvdelen er «løs med formlen» som på niveau 2 — før kun 5 forskellige k-opgaver
+      if (niveau === 2 || rng() < 0.5) {
         const a = vaelg(rng, [1, 2, -1]);
         let r1, r2;
         do { r1 = heltal(rng, -5, 5); r2 = heltal(rng, -5, 5); } while (r1 === r2 || r1 === -r2);
         const B = -a * (r1 + r2), C = a * r1 * r2;
-        const o = { emne: 'ligninger', type: 'diskriminant', niveau, noegle: 'disk:l' + [a, r1, r2].sort().join(','), p: { t: 'l', a, r1, r2 },
+        // Nøglen: a for sig og rødderne sorteret som tal (før blev a sorteret med rødderne — to ligninger, én nøgle; review F5)
+        const o = { emne: 'ligninger', type: 'diskriminant', niveau, noegle: 'disk:l' + a + ':' + [r1, r2].sort((u, v) => u - v).join(','), p: { t: 'l', a, r1, r2 },
           spoerg: 'Løs ' + math(lign(poly([a, B, C]), mn(0))),
           forklaring: math(mi('d') + mo('=') + mn(B * B - 4 * a * C)) + ', så ' + math(mi('x') + mo('=') + frac(mn(-B) + mo('±') + sqrt(mn(B * B - 4 * a * C)), mn(2 * a))) + ': ' + math(mi('x') + mo('=') + mn(Math.min(r1, r2)) + mo('∨') + mi('x') + mo('=') + mn(Math.max(r1, r2))) };
         return opgave(o, rng, loesning([r1, r2]), [loesning([-r1, -r2], 'Fortegnet på b glemt (−b)'), loesning([2 * r1, 2 * r2], 'Glemt 2-tallet i 2a'), { vis: math(x + mo('=') + mn(r1)), nøgle: 'x:' + r1, fejl: 'Kun den ene løsning' }]);
       }
-      const m = heltal(rng, 2, 6);
+      const m = heltal(rng, 2, 9);
       const kv = (vis, nøgle, f) => udv(mi('k') + mo('=') + vis, 'k:' + nøgle, f);
       const o = { emne: 'ligninger', type: 'diskriminant', niveau, noegle: 'disk:k' + m, p: { t: 'k', m },
         spoerg: 'For hvilke k har ' + math(lign(sup(x, mn(2)) + mo('+') + mi('k') + x + mo('+') + mn(m * m), mn(0))) + ' netop én løsning?',
@@ -1211,14 +1258,14 @@
       const x = mi('x');
       const t = vaelg(rng, niveau >= 3 ? ['exp', 'ln', 'pot'] : ['exp', 'ln']);
       if (t === 'exp') {
-        const a = heltal(rng, 2, 9);
+        const a = heltal(rng, 2, 15);
         const o = { emne: 'ligninger', type: 'omvendtFunktion', niveau, noegle: 'omv:e' + a, p: { t, a },
           spoerg: 'Løs ' + math(lign(sup(mi('e'), x), mn(a))),
           forklaring: 'ln er den omvendte funktion til e: ' + math(x + mo('=') + mi('ln') + mn(a)) };
         return opgave(o, rng, udv(x + mo('=') + mi('ln') + mn(a), 'ln' + a), [udv(x + mo('=') + sup(mi('e'), mn(a)), 'e' + a, 'Brugt e i stedet for ln'), udv(x + mo('=') + frac(mn(a), mi('e')), 'a/e', 'Delt med e'), udv(x + mo('=') + mi('log') + mn(a), 'log' + a, 'Brugt log i stedet for ln')]);
       }
       if (t === 'ln') {
-        const k = heltal(rng, 2, 5);
+        const k = heltal(rng, 2, 9);
         const o = { emne: 'ligninger', type: 'omvendtFunktion', niveau, noegle: 'omv:l' + k, p: { t, k },
           spoerg: 'Løs ' + math(lign(mi('ln') + x, mn(k))),
           forklaring: 'e er den omvendte funktion til ln: ' + math(x + mo('=') + sup(mi('e'), mn(k))) };
@@ -1411,7 +1458,7 @@
         return opgave(o, rng, fp(poly([3 * a, 2 * b, c]), polyN([3 * a, 2 * b, c])), [fp(poly([3 * a, 2 * b, c + d]), polyN([3 * a, 2 * b, c + d]), 'Konstanten er ikke forsvundet'), fp(poly([3 * a, 2 * b, 0]), polyN([3 * a, 2 * b, 0]), 'Glemt (cx)′ = c'), fp(poly([3 * a, 2 * b, 0, c]), polyN([3 * a, 2 * b, 0, c]), 'Eksponenterne er ikke talt ned')]);
       }
       if (niveau === 2) {
-        const k = 2 * heltal(rng, 1, 4);
+        const k = 2 * heltal(rng, 1, 10);   // fase 1 (19-10-2026): 20 forskellige (før 8)
         if (rng() < 0.5) {
           const o = { emne: 'differential', type: 'afledtMere', niveau, noegle: 'afl:rod' + k, p: { t: 'rod', k },
             spoerg: 'Find ' + math(mi("f′") + par(x)) + ' når ' + math(mi('f') + par(x) + mo('=') + mn(k) + sqrt(x)),
@@ -1533,8 +1580,9 @@
     bestemtAB(niveau, rng) {
       const x = mi('x');
       const int = (a, b, f) => '<msubsup><mo>∫</mo>' + row(mn(a)) + row(mn(b)) + '</msubsup>' + f + mi('d') + x;
-      if (niveau <= 2) {
-        const a = heltal(rng, 1, 3), b = heltal(rng, a + 1, 4);
+      // Niveau 3 (fase 1, 19-10-2026): halvdelen er grænse-opgaven fra niveau 2 — før kun areal-opgaven
+      if (niveau <= 2 || rng() < 0.5) {
+        const a = heltal(rng, 1, 3), b = heltal(rng, a + 1, 5);
         const t = vaelg(rng, niveau === 1 ? ['konst', 'lin'] : ['lin', 'kvad']);
         const c = t === 'lin' ? 2 * heltal(rng, 1, 3) : heltal(rng, 1, 3);
         const F = (v) => t === 'konst' ? c * v : t === 'lin' ? (c / 2) * v * v : c * v * v * v;
@@ -1547,11 +1595,12 @@
         if (t !== 'konst') fl.push(tal(f(b) - f(a), 'Brugt f i stedet for stamfunktionen'));
         return opgave(o, rng, tal(F(b) - F(a)), fl.concat(naboer(rng, F(b) - F(a), []).map((v) => tal(v))));
       }
-      const p = vaelg(rng, [3, 6]);
-      const o = { emne: 'integral', type: 'bestemtAB', niveau, noegle: 'bestAB:areal' + p, p: { t: 'areal', p },
-        spoerg: 'Find arealet mellem x-aksen og grafen for ' + math(mi('f') + par(x) + mo('=') + poly([-1, p, 0])) + '.',
-        forklaring: 'Nulpunkterne er 0 og ' + p + ': ' + math(int(0, p, par(poly([-1, p, 0]))) + mo('=') + broek(p * p * p, 6)) };
-      return opgave(o, rng, bv(p * p * p, 6), [bv(-p * p * p, 6, 'Fortegnsfejl — et areal er positivt'), bv(-p * p * p, 2, 'Glemt at dele x³ med 3'), bv(3 * p - 2, 6, 'Brugt 0 og 1 som grænser')]);
+      // Fase 1 (19-10-2026): f(x) = c·(−x² + p·x) med p 2–10 og c 1–4 (før kun p = 3 eller 6) — arealet er c·p³/6
+      const p = heltal(rng, 2, 10), c = heltal(rng, 1, 4);
+      const o = { emne: 'integral', type: 'bestemtAB', niveau, noegle: 'bestAB:areal' + p + (c > 1 ? 'c' + c : ''), p: { t: 'areal', p, c },
+        spoerg: 'Find arealet mellem x-aksen og grafen for ' + math(mi('f') + par(x) + mo('=') + poly([-c, c * p, 0])) + '.',
+        forklaring: 'Nulpunkterne er 0 og ' + p + ': ' + math(int(0, p, par(poly([-c, c * p, 0]))) + mo('=') + broek(c * p * p * p, 6)) };
+      return opgave(o, rng, bv(c * p * p * p, 6), [bv(-c * p * p * p, 6, 'Fortegnsfejl — et areal er positivt'), bv(-c * p * p * p, 2, 'Glemt at dele x³ med 3'), bv(c * (3 * p - 2), 6, 'Brugt 0 og 1 som grænser')]);
     },
 
     // ===== VI.3 Integral og areal =====
@@ -1741,7 +1790,18 @@
           forklaring: 'Sæt lig hinanden: ' + math(lign(poly([1, -m, p - k]), mn(0))) + ', ' + math(mi('d') + mo('=') + mn(d)) + '.' };
         return opgave(o, rng, tal(antal), [0, 1, 2].filter((v) => v !== antal).map((v) => tal(v, 'd > 0: to, d = 0: ét, d < 0: ingen')), 3);
       }
-      const L = vaelg(rng, [{ m: 1, k: 1, p: [[3, 4], [-4, -3]] }, { m: 1, k: -1, p: [[4, 3], [-3, -4]] }, { m: -1, k: 7, p: [[3, 4], [4, 3]] }, { m: -1, k: -1, p: [[3, -4], [-4, 3]] }]);
+      // Niveau 3 (fase 1, 19-10-2026): alle linjer gennem to gitterpunkter på cirklen med hældning ±1, ±2 eller ±3 (28, før 4)
+      const gitter = [];
+      for (let a = -5; a <= 5; a++) for (let b = -5; b <= 5; b++) if (a * a + b * b === 25) gitter.push([a, b]);
+      const linjer = [];
+      for (let i = 0; i < gitter.length; i++) {
+        for (let j = i + 1; j < gitter.length; j++) {
+          const [P, Q] = [gitter[i], gitter[j]], dx = Q[0] - P[0], dy = Q[1] - P[1];
+          if (dx === 0 || dy === 0 || dy % dx !== 0 || Math.abs(dy / dx) > 3) continue;
+          linjer.push({ m: dy / dx, k: P[1] - (dy / dx) * P[0], p: [P, Q] });
+        }
+      }
+      const L = vaelg(rng, linjer);
       const o = { emne: 'abonus', type: 'skaering', niveau, noegle: 'skaer:c' + L.m + ',' + L.k, p: { t: 'c', m: L.m, k: L.k },
         spoerg: 'Find skæringspunkterne mellem cirklen ' + math(sup(x, mn(2)) + mo('+') + sup(y, mn(2)) + mo('=') + mn(25)) + ' og linjen ' + math(y + mo('=') + monom(L.m, 1) + plusLed(L.k)) + '.',
         forklaring: 'Sæt y ind i cirklens ligning og løs andengradsligningen; find så y af linjens ligning.' };
@@ -1796,15 +1856,41 @@
   const mover = (t) => '<mover>' + row(mi(t)) + row(mo('→')) + '</mover>';
   Object.assign(V, L);
 
+  // Puljerne til Dagens dosis og prøven. De gamle typer står forrest; bagefter Lær-generatorerne på de niveauer,
+  // docs/VOKSEN-LAER.md angiver (fase 1, 19-10-2026: før lå de 41 kun i Lær, og trekanter havde 2 typer).
   const VOKSEN_EMNER = {
-    regnetricks: { navn: 'Regnetricks', e: '🧠', maxNiveau: 3, typer: { 1: ['hierarki', 'kvadratTrick', 'fortegn'], 2: ['kvadratTrick', 'fortegn', 'hierarki', 'findFejlen'], 3: ['kvadratTrick', 'fortegn', 'findFejlen'] } },
-    broeker: { navn: 'Brøker og potenser', e: '🍰', maxNiveau: 3, typer: { 1: ['broekPlus', 'potensGange', 'nulPotens'], 2: ['broekPlus', 'potensGange', 'nulPotens', 'forkort'], 3: ['broekPlus', 'potensGange', 'nulPotens', 'forkort'] } },
-    ligninger: { navn: 'Ligninger', e: '⚖️', maxNiveau: 3, typer: { 1: ['lineaer', 'isoler', 'erLoesning'], 2: ['lineaer', 'nulreglen', 'isoler', 'erLoesning', 'ohm', 'isolerBrik'], 3: ['andengrad', 'nulreglen', 'isolerBrik', 'lineaer', 'omvendtAndengrad', 'ohm'] } },
-    trekanter: { navn: 'Trekanter', e: '📐', maxNiveau: 3, typer: { 1: ['pythagoras', 'ensvinklede'], 2: ['pythagoras', 'ensvinklede'], 3: ['pythagoras', 'ensvinklede'] } },
-    funktioner: { navn: 'Funktioner', e: '📈', maxNiveau: 3, typer: { 1: ['haeldning', 'matchGraf', 'parabel', 'interval', 'linModel'], 2: ['haeldning', 'matchGraf', 'vaekst', 'parabel', 'lnRegler', 'fordobling', 'interval', 'linModel', 'rente'], 3: ['vaekst', 'matchGraf', 'haeldning', 'lnRegler', 'fordobling', 'rente'] } },
-    differential: { navn: 'Differentialregning', e: '📉', maxNiveau: 3, typer: { 1: ['afledt', 'tangent'], 2: ['afledt', 'tangent', 'monotoni'], 3: ['afledt', 'monotoni', 'tangentLigning'] } },
-    integral: { navn: 'Integralregning', e: '∫', maxNiveau: 3, typer: { 1: ['stamfunktion', 'bestemt'], 2: ['stamfunktion', 'bestemt'], 3: ['stamfunktion', 'bestemt'] } },
-    abonus: { navn: 'A-bonus', e: '🧭', maxNiveau: 3, typer: { 1: ['prikprodukt', 'ortogonal'], 2: ['prikprodukt', 'ortogonal', 'cirkel', 'determinant', 'parallel'], 3: ['cirkel', 'prikprodukt', 'ortogonal', 'determinant', 'parallel', 'difflign'] } },
+    regnetricks: { navn: 'Regnetricks', e: '🧠', maxNiveau: 3, typer: {
+      1: ['hierarki', 'kvadratTrick', 'fortegn', 'regneord', 'reducer', 'parentes', 'kvadratsaetning'],
+      2: ['kvadratTrick', 'fortegn', 'hierarki', 'findFejlen', 'reducer', 'parentes', 'kvadratsaetning'],
+      3: ['kvadratTrick', 'fortegn', 'findFejlen', 'reducer', 'parentes', 'kvadratsaetning'] } },
+    broeker: { navn: 'Brøker og potenser', e: '🍰', maxNiveau: 3, typer: {
+      1: ['broekPlus', 'potensGange', 'nulPotens', 'forkortBroek', 'broekTal', 'broekGangeDele', 'broekMinus', 'potensRegler'],
+      2: ['broekPlus', 'potensGange', 'nulPotens', 'forkort', 'forkortBroek', 'broekTal', 'broekGangeDele', 'broekMinus', 'potensRegler', 'titalsform'],
+      3: ['broekPlus', 'potensGange', 'nulPotens', 'forkort', 'forkortBroek', 'broekGangeDele', 'broekMinus', 'potensRegler'] } },
+    ligninger: { navn: 'Ligninger', e: '⚖️', maxNiveau: 3, typer: {
+      1: ['lineaer', 'isoler', 'erLoesning', 'krydsGange', 'diskriminant'],
+      2: ['lineaer', 'nulreglen', 'isoler', 'erLoesning', 'ohm', 'isolerBrik', 'krydsGange', 'loesningsantal', 'diskriminant', 'udenForParentes', 'omvendtFunktion'],
+      3: ['andengrad', 'nulreglen', 'isolerBrik', 'lineaer', 'omvendtAndengrad', 'ohm', 'diskriminant', 'omvendtFunktion'] } },
+    trekanter: { navn: 'Trekanter', e: '📐', maxNiveau: 3, typer: {
+      1: ['pythagoras', 'ensvinklede', 'erEnsvinklede'],
+      2: ['pythagoras', 'ensvinklede', 'erEnsvinklede', 'pythagorasRod'],
+      3: ['pythagoras', 'ensvinklede', 'erEnsvinklede', 'pythagorasRod'] } },
+    funktioner: { navn: 'Funktioner', e: '📈', maxNiveau: 3, typer: {
+      1: ['haeldning', 'matchGraf', 'parabel', 'interval', 'linModel', 'funktionsvaerdi', 'proportional', 'parabelFortegn'],
+      2: ['haeldning', 'matchGraf', 'vaekst', 'parabel', 'lnRegler', 'fordobling', 'interval', 'linModel', 'rente', 'funktionsvaerdi', 'proportional', 'linjeToPunkter', 'eksponentielToPunkter', 'toppunkt', 'parabelFortegn'],
+      3: ['vaekst', 'matchGraf', 'haeldning', 'lnRegler', 'fordobling', 'rente', 'linjeToPunkter', 'eksponentielToPunkter', 'toppunkt', 'parabelFortegn'] } },
+    differential: { navn: 'Differentialregning', e: '📉', maxNiveau: 3, typer: {
+      1: ['afledt', 'tangent', 'afledtMere', 'vaeksthastighed'],
+      2: ['afledt', 'tangent', 'monotoni', 'afledtMere', 'tangentLnE', 'vaeksthastighed', 'monotoniTo'],
+      3: ['afledt', 'monotoni', 'tangentLigning', 'afledtMere', 'tangentLnE', 'monotoniTo'] } },
+    integral: { navn: 'Integralregning', e: '∫', maxNiveau: 3, typer: {
+      1: ['stamfunktion', 'bestemt', 'stamfunktionMere', 'bestemtAB'],
+      2: ['stamfunktion', 'bestemt', 'stamfunktionMere', 'bestemtAB'],
+      3: ['stamfunktion', 'bestemt', 'stamfunktionMere', 'bestemtAB'] } },
+    abonus: { navn: 'A-bonus', e: '🧭', maxNiveau: 3, typer: {
+      1: ['prikprodukt', 'ortogonal', 'skaering'],
+      2: ['prikprodukt', 'ortogonal', 'cirkel', 'determinant', 'parallel', 'cirkelOmskriv', 'vektorK', 'parallelogramAreal', 'parameterLinje', 'linjeLigning', 'skaering', 'difflignMere'],
+      3: ['cirkel', 'prikprodukt', 'ortogonal', 'determinant', 'parallel', 'difflign', 'cirkelOmskriv', 'vektorK', 'parallelogramAreal', 'projektion', 'parameterLinje', 'linjeLigning', 'distFormel', 'skaering', 'difflignMere', 'difflignTangent'] } },
   };
 
   // Vækststigen (forslag B, 15-10-2026): den voksne står på ét af 15 trin, og Codex' ven vokser med trinet (grafik.js
@@ -1848,34 +1934,74 @@
     const niveau = Math.min(3, Math.max(1, Number.isInteger(p.niveau) ? p.niveau : 1));
     const o = V[p.type](niveau, lavRng(p.froe >>> 0));
     o.froe = p.froe >>> 0;
+    if (p.fast === true) o.fast = true; // stillet på en Let-, Normal- eller Svær-dag (se gentagParametre)
     return o;
   }
-  // Det, der gemmes, når en opgave skal komme igen
-  const gentagParametre = (o, dato) => ({ type: o.type, niveau: o.niveau, froe: o.froe, emne: o.emne, noegle: o.noegle, dato: dato });
+  // Det, der gemmes, når en opgave skal komme igen. fast (review af fase 2, F1): opgaven blev stillet på en Let-, Normal-
+  // eller Svær-dag (eller kom derfra) — så rykker den kun emnet, når den er på emnets eget niveau, også når den kommer
+  // igen på en Auto-dag. Feltet gemmes kun som true, så gentagelser fra Auto og fra før fase 2 er som før.
+  function gentagParametre(o, dato, svaerhed) {
+    const p = { type: o.type, niveau: o.niveau, froe: o.froe, emne: o.emne, noegle: o.noegle, dato: dato };
+    if (fastNiveau(svaerhed) || o.fast === true) p.fast = true;
+    return p;
+  }
 
-  // Dagens dosis: 5 opgaver — 3 fra den valgte verden, 2 til repetition (fejlede opgaver eller andre åbne verdener)
-  function lavDosis(valgt, niveauer, rng, gentag) {
-    const ud = [];
-    const brugt = {};
-    const tilfoej = (o) => { if (o && !brugt[o.noegle]) { brugt[o.noegle] = true; ud.push(o); return true; } return false; };
+  // Sværhedsgrad (fase 2, 19-10-2026): én dagsform for dagens dosis, valgt på «Vælg verden» (traening.svaerhed).
+  // Auto = hver verden på sit eget niveau (som før); Let/Normal/Svær = niveau 1/2/3 for alle nye opgaver (højst
+  // verdenens maxNiveau). Gentagelser bygges stadig på det niveau, de blev stillet på. gem.js har de samme id'er.
+  // Prøven kører altid på Auto (voksen.js startProeve).
+  const SVAERHEDER = [
+    { id: 'auto', navn: 'Auto', niveau: 0 },
+    { id: 'let', navn: 'Let', niveau: 1 },
+    { id: 'normal', navn: 'Normal', niveau: 2 },
+    { id: 'svaer', navn: 'Svær', niveau: 3 },
+  ];
+  const fastNiveau = (svaerhed) => { const s = SVAERHEDER.find((x) => x.id === svaerhed); return s ? s.niveau : 0; }; // 0 = Auto
+  const klemNiveau = (emne, n) => Math.min(VOKSEN_EMNER[emne] ? VOKSEN_EMNER[emne].maxNiveau : 3, Math.max(1, Number.isInteger(n) ? n : 1));
+  // Niveauet for nye opgaver i emnet, når emnet selv står på «eget»
+  const dosisNiveau = (emne, eget, svaerhed) => klemNiveau(emne, fastNiveau(svaerhed) || eget);
+  // niveauer: emne → eget niveau (som voksen.js traeningNiveauer) → emne → niveau for dagens nye opgaver
+  function dosisNiveauer(niveauer, svaerhed) {
+    const ud = {};
+    for (const k of Object.keys(niveauer || {})) ud[k] = dosisNiveau(k, niveauer[k], svaerhed);
+    return ud;
+  }
+  // Rykker svaret emnet op eller ned (O.opdaterNiveau)? På Auto: altid, som før. På Let/Normal/Svær kun, når opgaven er
+  // på emnets eget niveau — en let dag koster ingen fremgang, og en svær dag kan ikke løfte niveauet på et par gæt.
+  // Det samme gælder en gentagelse fra en Let-, Normal- eller Svær-dag (o.fast), når den kommer igen på en Auto-dag.
+  const taellerINiveau = (o, eget, svaerhed) => (!fastNiveau(svaerhed) && !(o && o.fast === true)) || (!!o && o.niveau === klemNiveau(o.emne, eget));
+
+  // Dagens dosis: 5 opgaver — 3 fra den valgte verden, 2 til repetition (fejlede opgaver eller andre åbne verdener).
+  // Fase 1 (19-10-2026): nylige = nøglerne på de senest viste opgaver (traening.nylige). De undgås, og der er højst
+  // 2 af samme type i dosen — så længe det kan lade sig gøre (efter 50 forsøg tages, hvad der kommer).
+  function lavDosis(valgt, niveauer, rng, gentag, nylige) {
+    const nyligt = new Set(Array.isArray(nylige) ? nylige : []);
+    // Højst 2 gentagelser — dem, der ikke kan bygges (ukendt type), springes over, så de ikke blokerer køen.
+    // De bygges først, så de valgte opgaver kan holde sig fra deres nøgle og type.
+    const igen = [];
+    for (const p of gentag || []) {
+      if (igen.length >= 2) break;
+      const o = genskab(p);
+      if (o && !igen.some((x) => x.noegle === o.noegle)) { o.gentaget = true; igen.push(o); }
+    }
+    const valgte = [], andre = [];
+    const tilfoej = (liste, o, streng) => {
+      if (!o) return false;
+      const alle = valgte.concat(igen, andre);
+      if (alle.some((x) => x.noegle === o.noegle)) return false;
+      if (streng && (nyligt.has(o.noegle) || alle.filter((x) => x.type === o.type).length >= 2)) return false;
+      liste.push(o);
+      return true;
+    };
     const fra = (emne) => {
       const E = VOKSEN_EMNER[emne];
       const n = Math.min(E.maxNiveau, Math.max(1, niveauer[emne] || 1));
       return lavVoksenOpgave(vaelg(rng, E.typer[n]), n, rng);
     };
-    let f = 0;
-    while (ud.length < 3 && f++ < 50) tilfoej(fra(valgt));
-    // Højst 2 gentagelser — dem, der ikke kan bygges (ukendt type), springes over, så de ikke blokerer køen
-    let gentaget = 0;
-    for (const p of gentag || []) {
-      if (gentaget >= 2 || ud.length >= 5) break;
-      const o = genskab(p);
-      if (o) { o.gentaget = true; if (tilfoej(o)) gentaget++; }
-    }
-    const andre = Object.keys(niveauer).filter((e) => e !== valgt && VOKSEN_EMNER[e]);
-    f = 0;
-    while (ud.length < 5 && f++ < 50) tilfoej(fra(andre.length ? vaelg(rng, andre) : valgt));
-    return ud;
+    for (let f = 0; valgte.length < 3 && f < 100; f++) tilfoej(valgte, fra(valgt), f < 50);
+    const andreEmner = Object.keys(niveauer).filter((e) => e !== valgt && VOKSEN_EMNER[e]);
+    for (let f = 0; valgte.length + igen.length + andre.length < 5 && f < 100; f++) tilfoej(andre, fra(andreEmner.length ? vaelg(rng, andreEmner) : valgt), f < 50);
+    return valgte.concat(igen, andre);
   }
 
   // ---------- Huskekort: de vigtigste regler pr. verden (vises før dagens dosis, kan slås fra) ----------
@@ -2038,16 +2164,20 @@
   }
 
   // Prøve: 8 forskellige opgaver fra én verden på det niveau, den voksne har nået
-  function lavProeve(emne, niveau, rng) {
+  // nylige (fase 1, 19-10-2026): som i lavDosis — de senest viste opgaver undgås de første 100 forsøg
+  function lavProeve(emne, niveau, rng, nylige) {
     const E = VOKSEN_EMNER[emne];
     const n = Math.min(E.maxNiveau, Math.max(1, niveau || 1));
+    const nyligt = new Set(Array.isArray(nylige) ? nylige : []);
     const ud = [];
     const brugt = {};
-    for (let f = 0; ud.length < 8 && f < 200; f++) {
-      // Skiftevis alle typer på niveauet, så prøven dækker hele verdenen
-      const type = E.typer[n][ud.length % E.typer[n].length];
-      const o = lavVoksenOpgave(f < 100 ? type : vaelg(rng, E.typer[n]), n, rng);
-      if (!brugt[o.noegle]) { brugt[o.noegle] = true; ud.push(o); }
+    // Skiftevis typerne i en blandet rækkefølge: puljer med højst 8 typer er alle med i hver prøve, og i større puljer
+    // (op til 16) kommer alle typer med på skift (før kom kun de første 8 nogensinde med — review af fase 1, F1)
+    const typer = bland(rng, E.typer[n]);
+    for (let f = 0; ud.length < 8 && f < 300; f++) {
+      const type = typer[ud.length % typer.length];
+      const o = lavVoksenOpgave(f < 200 ? type : vaelg(rng, typer), n, rng);
+      if (!brugt[o.noegle] && (f >= 100 || !nyligt.has(o.noegle))) { brugt[o.noegle] = true; ud.push(o); }
     }
     return ud;
   }
@@ -2183,7 +2313,7 @@
     return ud;
   }
 
-  const VoksenOpgaver = { KAPITLER, AFSNIT, lavLaerOpgaver, V, VOKSEN_EMNER, VOKSEN_TRIN, beregnTrin, opdaterTrin, HUSKEKORT, TVILLINGER, lavTvilling, tjekBrikker, kanTastes, tjekTastet, facitTekst, noegleVaerdi, lavVoksenOpgave, genskab, gentagParametre, lavDosis, lavProeve, gcd, broek, math };
+  const VoksenOpgaver = { KAPITLER, AFSNIT, lavLaerOpgaver, V, VOKSEN_EMNER, VOKSEN_TRIN, beregnTrin, opdaterTrin, HUSKEKORT, TVILLINGER, lavTvilling, tjekBrikker, kanTastes, tjekTastet, facitTekst, noegleVaerdi, lavVoksenOpgave, genskab, gentagParametre, lavDosis, lavProeve, SVAERHEDER, dosisNiveau, dosisNiveauer, taellerINiveau, gcd, broek, math };
   if (typeof module !== 'undefined' && module.exports) module.exports = VoksenOpgaver;
   else root.VoksenOpgaver = VoksenOpgaver;
 })(typeof self !== 'undefined' ? self : this);

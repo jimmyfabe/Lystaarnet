@@ -358,13 +358,45 @@
     }
 
     // tilstand: 'dosis' (dagens dosis, med huskekort først, hvis det er slået til) eller 'proeve' (8 opgaver)
+    // Fase 2 (19-10-2026): sværhedsgraden (Auto · Let · Normal · Svær) står kun over dagens dosis og huskes
+    // (traening.svaerhed); prøven kører altid på Auto (Fables forslag C, review af fase 2 F2). Stjernerne er stadig emnets
+    // egen fremgang; linjen under dem er niveauet for de nye opgaver (på prøven altid emnets eget).
     function visVerdensvalg(tilstand) {
       tilstand = tilstand === 'proeve' ? 'proeve' : 'dosis';
       const T = voksen.traening;
+      const dosis = tilstand === 'dosis';
+      const niveauer = traeningNiveauer();
+      const valgtSvaerhed = () => VO.SVAERHEDER.find((s) => s.id === T.svaerhed) || VO.SVAERHEDER[0];
+      const niveauLinje = (k) => {
+        const n = VO.dosisNiveau(k, niveauer[k], dosis ? T.svaerhed : 'auto'), eget = VO.dosisNiveau(k, niveauer[k], 'auto');
+        return 'Niveau ' + n + (n !== eget ? ' · dit er ' + eget : '');
+      };
+      const tekstFor = (s) => (s.niveau
+        ? 'Nye opgaver på niveau ' + s.niveau + '. Kun opgaver på dit eget niveau kan rykke dig op eller ned.'
+        : 'Opgaverne følger dit niveau i hver verden.');
+      const svaerhedTekst = () => tekstFor(valgtSvaerhed());
+      const linjer = {};
+      const forklaring = h('p', { class: 'svaerhed-tekst', 'aria-live': 'polite' }, svaerhedTekst());
+      // Den længste forklaring ligger usynligt i samme felt, så feltet altid er lige højt, og kortene ikke hopper, når man
+      // skifter mellem Auto (kort tekst) og Let/Normal/Svær — uanset skærmbredde og skrift (review af fase 2, S2)
+      const forklaringFelt = h('div', { class: 'svaerhed-felt' }, forklaring,
+        h('p', { class: 'svaerhed-plads', 'aria-hidden': 'true' }, VO.SVAERHEDER.map(tekstFor).reduce((a, b) => (b.length > a.length ? b : a))));
+      // Opdateres på stedet (ikke en ny skærm), så fokus bliver på knappen, og det næste tryk ikke sluges
+      const svaerKnapper = VO.SVAERHEDER.map((s) => h('button', {
+        class: 'svaerhed-knap', type: 'button', 'data-svaerhed': s.id, 'aria-pressed': valgtSvaerhed().id === s.id ? 'true' : 'false',
+        onclick: () => {
+          Lyd.init(); Lyd.tryk();
+          T.svaerhed = s.id; gemV();
+          svaerKnapper.forEach((k, i) => k.setAttribute('aria-pressed', VO.SVAERHEDER[i].id === s.id ? 'true' : 'false'));
+          forklaring.textContent = svaerhedTekst();
+          for (const k of Object.keys(linjer)) linjer[k].textContent = niveauLinje(k);
+        },
+      }, s.navn));
       const knapper = Object.keys(VO.VOKSEN_EMNER).map((k, i) => {
         const E = VO.VOKSEN_EMNER[k];
         const e = T.emner[k];
         const stj = e ? (e.mestret ? 3 : Math.min(2, e.niveau - 1)) : 0;
+        linjer[k] = h('small', { class: 'verden-niveau' }, niveauLinje(k));
         return h('button', {
           class: 'verden-kort' + (T.valgt === k ? ' valgt' : ''), type: 'button',
           onclick: () => {
@@ -374,13 +406,16 @@
             else startDosis(k);
           },
         }, h('span', { class: 'verden-nr' }, String(i + 1)), h('span', { class: 'menu-ikon', 'aria-hidden': 'true' }, E.e), h('b', null, E.navn),
-        h('span', { class: 'station-stjerner statisk', 'aria-label': stj + (stj === 1 ? ' stjerne' : ' stjerner') }, [0, 1, 2].map((n) => h('i', { class: n < stj ? 'fuld' : '' }, '★'))));
+        h('span', { class: 'station-stjerner statisk', 'aria-label': stj + (stj === 1 ? ' stjerne' : ' stjerner') }, [0, 1, 2].map((n) => h('i', { class: n < stj ? 'fuld' : '' }, '★'))),
+        linjer[k]);
       });
-      skift(h('div', { class: 'skaerm voksen' },
+      skift(h('div', { class: ['skaerm', 'voksen', 'verdensvalg'].join(' ') }, // join: test-tale læser en streng med mellemrum som tale
         topbar(tilstand === 'proeve' ? 'Vælg verden — prøve' : 'Vælg verden — dagens dosis', visMenu),
         h('p', { class: 'voksen-hjaelp' }, tilstand === 'proeve'
           ? 'Otte opgaver fra den verden, du vælger, på dit niveau. Ingen lommeregner.' + (T.proeveUr !== false ? ' Et ur viser tiden (kan slås fra under Indstillinger).' : '')
           : 'Tre opgaver fra den verden, du vælger, og to til repetition. Ingen lommeregner.'),
+        dosis ? h('div', { class: 'svaerhed', role: 'group', 'aria-label': 'Sværhedsgrad' }, svaerKnapper) : null,
+        dosis ? forklaringFelt : null,
         h('div', { class: 'menu-gitter verdener' }, knapper)));
     }
 
@@ -399,10 +434,11 @@
       (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); start.click(); } });
     }
 
-    // Prøve: 8 opgaver fra én verden, evt. med et ur, der tæller op (kun for den voksne)
+    // Prøve: 8 opgaver fra én verden, evt. med et ur, der tæller op (kun for den voksne). Altid på Auto — emnets eget
+    // niveau — også når dosen har en anden sværhedsgrad (Fables forslag C, review af fase 2 F2)
     function startProeve(valgt) {
       const n = voksen.traening.emner[valgt] ? voksen.traening.emner[valgt].niveau : 1;
-      visVoksenOpgave({ opgaver: VO.lavProeve(valgt, n, rng()), i: 0, rigtige: 0, proeve: true, start: Date.now() });
+      visVoksenOpgave({ opgaver: VO.lavProeve(valgt, n, rng(), voksen.traening.nylige), i: 0, rigtige: 0, proeve: true, start: Date.now() });
     }
     const minSek = (ms) => { const sek = Math.max(0, Math.round(ms / 1000)); return Math.floor(sek / 60) + ':' + String(sek % 60).padStart(2, '0'); };
 
@@ -411,8 +447,8 @@
       const dato = G.idag();
       // Repetition: fejlede opgaver fra tidligere dage
       const gentag = T.gentag.filter((o) => o.dato !== dato);
-      const opgaver = VO.lavDosis(valgt, traeningNiveauer(), rng(), gentag);
-      visVoksenOpgave({ opgaver, i: 0, rigtige: 0 });
+      const opgaver = VO.lavDosis(valgt, VO.dosisNiveauer(traeningNiveauer(), T.svaerhed), rng(), gentag, T.nylige);
+      visVoksenOpgave({ opgaver, i: 0, rigtige: 0, svaerhed: T.svaerhed });
     }
 
     function visVoksenOpgave(d) {
@@ -433,7 +469,7 @@
         svaret = true;
         Lyd.init();
         if (rigtig) { Lyd.rigtig(); d.rigtige++; } else Lyd.blid();
-        registrerTraening(o, rigtig, dato);
+        registrerTraening(o, rigtig, dato, d.svaerhed);
         forklaring.innerHTML = (rigtig ? '<b>Rigtigt.</b> ' : (fejl ? '<b>Typisk fejl:</b> ' + fejl + '. ' : '<b>Ikke helt.</b> ')) +
           ((tastes || o.brikker) && !rigtig ? '<b>Facit:</b> ' + facitVis + '. ' : '') + o.forklaring;
         forklaring.classList.remove('skjult');
@@ -558,13 +594,16 @@
       });
     }
 
-    function registrerTraening(o, rigtig, dato) {
+    // svaerhed: dosens sværhedsgrad (fase 2); prøven, Lær og Familieduel giver ingen = Auto
+    function registrerTraening(o, rigtig, dato, svaerhed) {
       const T = voksen.traening;
       const E = VO.VOKSEN_EMNER[o.emne];
       const ed = G.normaliserEmne(T.emner[o.emne]);
       ed.ialt++;
       if (rigtig) ed.rigtige++;
-      T.emner[o.emne] = O.opdaterNiveau(ed, rigtig, E.maxNiveau).data;
+      // En opgave under eller over emnets eget niveau (Let/Normal/Svær) tæller i ialt, rigtige, dage og «kommer igen»,
+      // men rykker ikke emnet op eller ned (og gør det ikke mestret)
+      T.emner[o.emne] = VO.taellerINiveau(o, ed.niveau, svaerhed) ? O.opdaterNiveau(ed, rigtig, E.maxNiveau).data : ed;
       T.trin = VO.opdaterTrin(T);
       const dg = T.dage[dato] || (T.dage[dato] = { opgaver: 0, rigtige: 0 });
       dg.opgaver++;
@@ -572,8 +611,10 @@
       // Spaced repetition: fejlede opgaver kommer igen en anden dag; klarede gentagelser fjernes
       // Samme opgave = samme type og frø (nøglen kan være tom for gentagelser fra før 04-10-2026)
       T.gentag = T.gentag.filter((x) => !(x.type === o.type && x.froe === o.froe) && (!x.noegle || x.noegle !== o.noegle));
-      if (!rigtig) T.gentag.push(VO.gentagParametre(o, dato)); // kun parametre — opgaven bygges igen af koden
+      if (!rigtig) T.gentag.push(VO.gentagParametre(o, dato, svaerhed)); // kun parametre — opgaven bygges igen af koden
       T.gentag = T.gentag.slice(-10);
+      // De senest viste opgaver (fase 1, 19-10-2026): dosis og prøve undgår dem de næste dage
+      if (typeof o.noegle === 'string' && o.noegle) T.nylige = (Array.isArray(T.nylige) ? T.nylige : []).filter((k) => k !== o.noegle).concat([o.noegle]).slice(-G.MAX_NYLIGE);
       gemV();
     }
 

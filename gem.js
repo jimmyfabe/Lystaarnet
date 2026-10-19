@@ -12,6 +12,8 @@
   const VOKSEN_MAX_TRIN = 15;  // vækststigen i voksendelen (voksen-opgaver.js VOKSEN_TRIN)
   const MAX_DAGE = 180;       // dagsstatistik gemmes et halvt år tilbage
   const MAX_GENTAG = 6;       // højst så mange «kommer igen»-opgaver pr. emne
+  const MAX_NYLIGE = 60;      // voksendelen husker nøglerne på så mange senest viste opgaver (traening.nylige)
+  const SVAERHEDER = ['auto', 'let', 'normal', 'svaer']; // traening.svaerhed (voksen-opgaver.js SVAERHEDER)
 
   function idag(d) {
     d = d || new Date();
@@ -602,7 +604,9 @@
     // tastatur: tal-svar tastes på eget taltastatur i stedet for at vælges (slået fra som standard)
     // laer (B7): afsnitsId → { faerdig, rigtige, ialt, dato } — hvor langt den voksne er nået i «📘 Lær»
     // trin (forslag B, 15-10-2026): det højeste trin på vækststigen (1–15); voksen.js regner det af emnerne ved start
-    return { valgt: 'regnetricks', emner: {}, gentag: [], dage: {}, huskekort: true, proeveUr: true, tastatur: false, laer: {}, trin: 1 };
+    // nylige (fase 1, 19-10-2026): nøglerne på de senest viste opgaver, ældste først — dosis og prøve undgår dem
+    // svaerhed (fase 2, 19-10-2026): dagsformen for dosis og prøve — 'auto' (emnets eget niveau), 'let', 'normal' eller 'svaer'
+    return { valgt: 'regnetricks', emner: {}, gentag: [], dage: {}, huskekort: true, proeveUr: true, tastatur: false, laer: {}, trin: 1, nylige: [], svaerhed: 'auto' };
   }
 
   function normaliserVoksen(d) {
@@ -637,6 +641,10 @@
     ud.traening.emner = {};
     if (erObjekt(t.emner)) for (const k in t.emner) ud.traening.emner[k] = normaliserEmne(t.emner[k]);
     ud.traening.gentag = Array.isArray(t.gentag) ? t.gentag.map(voksenGentag).filter(Boolean).slice(-10) : [];
+    // Kun korte, ikke-tomme tekster (nøgler er højst ca. 25 tegn); data fra før fase 1 har ingen liste
+    ud.traening.nylige = Array.isArray(t.nylige) ? t.nylige.filter((k) => typeof k === 'string' && k && k.length <= 100).slice(-MAX_NYLIGE) : [];
+    // Kun de fire valg på «Vælg verden»; alt andet (og data fra før fase 2) er Auto
+    ud.traening.svaerhed = SVAERHEDER.indexOf(t.svaerhed) >= 0 ? t.svaerhed : 'auto';
     ud.traening.dage = {};
     if (erObjekt(t.dage)) {
       Object.keys(t.dage).filter((k) => /^\d{4}-\d{2}-\d{2}$/.test(k)).sort().slice(-MAX_DAGE).forEach((k) => {
@@ -695,7 +703,7 @@
       froe = 0;
       for (let i = 0; i < n.length; i++) froe = (Math.imul(froe, 31) + n.charCodeAt(i)) >>> 0;
     }
-    return {
+    const ud = {
       type: o.type,
       niveau: Number.isInteger(o.niveau) && o.niveau >= 1 && o.niveau <= 3 ? o.niveau : 1,
       froe: froe >>> 0,
@@ -703,6 +711,10 @@
       noegle: !migreret && typeof o.noegle === 'string' ? o.noegle : '', // en migreret opgave får en ny nøgle, når den bygges
       dato: typeof o.dato === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(o.dato) ? o.dato : '',
     };
+    // fast (fase 2, review F1): stillet på en Let-, Normal- eller Svær-dag (voksen-opgaver.js gentagParametre).
+    // Kun true gemmes — gentagelser uden feltet (Auto, og alle fra før fase 2) er uændrede.
+    if (o.fast === true) ud.fast = true;
+    return ud;
   }
 
   // Indlæs voksendata. Ulæselige data kopieres først; mislykkes kopien, er voksendata skrivebeskyttede
@@ -777,7 +789,7 @@
   }
 
   const Gem = {
-    VERSION, VOKSEN_VERSION, VOKSEN_MAX_TRIN, MAX_DAGE, MAX_GENTAG, MIGRERINGER,
+    VERSION, VOKSEN_VERSION, VOKSEN_MAX_TRIN, MAX_DAGE, MAX_GENTAG, MAX_NYLIGE, SVAERHEDER, MIGRERINGER,
     idag, standardBarn, standardEmne, standardDag, standardHistorie, normaliserHistorie, standardVoksen, standardTraening,
     GAMLE_NOEGLER, HOVEDNOEGLER, migrerNoegler, nyNoegle,
     migrer, normaliserBarn, normaliserEmne, normaliserVoksen, normaliserPauset, voksenGentag, rens,
