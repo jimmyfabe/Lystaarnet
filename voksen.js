@@ -718,7 +718,10 @@
           h('td', null, !j ? 'Ikke prøvet endnu' : 'Trin ' + j.niveau + ' af 3'), h('td', null, j ? j.runder + (j.runder === 1 ? ' runde' : ' runder') : ''),
           h('td', null, pct === null ? '' : pct + ' % rigtige i første forsøg')));
       }
-      const beskriv = (n) => (D && D.beskrivNoegle(n)) || O.beskrivNoegle(n);
+      // Natur (natur-opgaver.js indlæses ikke her): «naturLort:raev» → «Gæt en lort: ræv» — id'erne staver æ/å som ae/aa
+      // (test-natur tjekker det for hvert dyr)
+      const beskrivNatur = (n) => (/^naturLort:[a-z]+$/.test(n) ? 'Gæt en lort: ' + n.slice(10).replace(/ae/g, 'æ').replace(/aa/g, 'å').replace(/oe/g, 'ø') : null);
+      const beskriv = (n) => beskrivNatur(n) || (D && D.beskrivNoegle(n)) || O.beskrivNoegle(n);
       // Det driller (flest fejl, seneste først)
       const driller = [];
       for (const emne in d.fejl) for (const n in d.fejl[emne]) driller.push({ emne, n, antal: d.fejl[emne][n] });

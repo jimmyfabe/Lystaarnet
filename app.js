@@ -9,6 +9,7 @@
   const G = window.Gem;
   const D = window.Dansk; // den danske del (dansk-opgaver.js) — kun på børnenes og voksnes sider
   const E = window.Engelsk; // engelsk for begyndere (engelsk-opgaver.js) — kun på børnenes sider
+  const N = window.Natur; // natur (natur-opgaver.js) — kun på børnenes sider
 
   // ---------- Fælles indhold ----------
   // Rejsevenner. Skallerne vælger hvilke fire, der vises (TEMA.figurer). De gemte id'er (data.figur) ændres aldrig —
@@ -70,11 +71,18 @@
     { id: 'engSig', fag: 'engelsk', e: '💬', navn: 'Sig efter mig', emne: 'engSig', tale: 'Sig efter mig. Sig det, du hører på engelsk.' },
   ];
 
-  // Fagene på fagvalget i tastaturets rækkefølge (1, 2, 3). Engelsk kun, når engelsk-opgaver.js er indlæst.
+  // Natur (pilot 20-10-2026, natur-opgaver.js): se lorten og sporet → tryk på dyret. Åben fra start; fremskridtet gemmes
+  // som engelsk i data.dansk[emne] (gem.js kender emnet).
+  const NATUR_VERDENER = [
+    { id: 'naturLort', fag: 'natur', e: '💩', navn: 'Gæt en lort', emne: 'naturLort', tale: 'Gæt en lort. Hvem har lavet den?' },
+  ];
+
+  // Fagene på fagvalget i tastaturets rækkefølge (1, 2, 3, 4). Engelsk og natur kun, når deres opgavefil er indlæst.
   const FAG = [
     { id: 'matematik', e: '🔢', navn: 'Matematik', label: 'Matematik — tal', tale: 'Matematik.' },
     { id: 'dansk', e: '🔤', navn: 'Dansk', label: 'Dansk — bogstaver', tale: 'Dansk.' },
     { id: 'engelsk', e: '🇬🇧', navn: 'Engelsk', label: 'Engelsk — ord', tale: 'Engelsk.' },
+    { id: 'natur', e: '🌿', navn: 'Natur', label: 'Natur — dyr', tale: 'Natur.' },
   ];
 
   // Lektion: vises første gang, en verden åbnes (og kan høres igen med 📖). 2–4 korte sætninger, der læses op,
@@ -98,6 +106,7 @@
     smaaord: 'Nogle små ord ser vi så tit, at vi kender dem med det samme. Og, er og jeg er små ord.',
     jagt: 'I Bogstavjagten flyver der bobler med bogstaver. Lyt til lyden, og stryg gennem det bogstav, du hører — med fingeren eller pennen.',
     historiebog: 'I Historiebogen er der små historier. Tryk på et ord, så hører du det. Læs historien, tegn den, og skriv et ord fra den.',
+    naturLort: 'Alle dyr laver lort, og den ser forskellig ud. Se på lorten og på sporet. Tryk så på det dyr, der har lavet den.',
   };
 
   // «Vælg selv» (🎒): fagets emner som store ikoner, delt i afsnit (Jimmy 18-10-2026: «når man vælger dansk er det det
@@ -115,6 +124,7 @@
     { fag: 'engelsk', e: '🌱', navn: 'De første ord', tale: 'De første ord. Farver, tal, dyr og figurer på engelsk.', verdener: ['engFarver', 'engTal', 'engDyr', 'engFormer'] },
     { fag: 'engelsk', e: '🧺', navn: 'Hverdagens ting', tale: 'Hverdagens ting. Køkkenet, hjemmet og legepladsen på engelsk.', verdener: ['engKoekken', 'engHjemme', 'engLegeplads'] },
     { fag: 'engelsk', e: '🗣️', navn: 'Sig det selv', tale: 'Sig det selv. Sig det, du hører på engelsk.', verdener: ['engSig'] },
+    { fag: 'natur', e: '🔍', navn: 'Dyrenes spor', tale: 'Dyrenes spor. Hvem har været her?', verdener: ['naturLort'] },
   ];
 
   // Skolens ord bruges i oplæsningen (tælle videre, tage væk, forskel, 10'er-venner …)
@@ -1030,7 +1040,7 @@
     gentagTale: '',    // det 🔊-knappen læser op
     oplaes: 0,         // tælles op ved svar og ny oplæsning: en gammel opgaveoplæsning (sigOpgave) holder op
     runde: null,
-    afbrudt: { pauset: null, pausetDansk: null, pausetEngelsk: null }, // afbrudte runder pr. fag (▶ fortsætter dem) — se PAUSET_FELTER
+    afbrudt: { pauset: null, pausetDansk: null, pausetEngelsk: null, pausetNatur: null }, // afbrudte runder pr. fag (▶ fortsætter dem) — se PAUSET_FELTER
     ur: null,          // Historiebogens og Bogstavjagtens fælles ur (se startUr)
     forlad: null,      // ryddes op, når skærmen skiftes (fx «Sig dit navn»: mikrofonen slukkes)
   };
@@ -1185,9 +1195,32 @@
         voksenKort('voksen', T.voksenSide, 'Voksen', GR ? tegning(BOG, 'bog-tegning') : null, '📘'),
         voksenKort('indstillinger', T.voksenSide + '#indstillinger', 'Indstillinger', GR ? tegning(LAAS, 'laas-tegning') : null, '🔐')));
     }
+    const version = h('div', { class: 'index-version', 'aria-hidden': 'true' });
     skift(h('div', { class: 'skaerm index' },
+      version,
       h('h1', { class: 'index-titel' }, fyrtaarn('', 4), h('span', null, 'Lystårnet')),
       h('div', { class: 'spiller-liste' }, kort)));
+    visVersion(version);
+  }
+
+  // Versionsnummeret i forsidens hjørne (Jimmy 20-10-2026: «så jeg kan se den nyeste version»). Tallet kommer fra den
+  // service worker, der leverede siden (sw.js svarer med sin VERSION) — den udgave, der faktisk kører. Uden service
+  // worker eller uden svar står hjørnet tomt: intet tal er bedre end et forkert. Kun textContent
+  const versionsTekst = (v) => { const m = typeof v === 'string' && /-v(\d{1,4})$/.exec(v); return m ? 'v' + m[1] : ''; };
+  function visVersion(el) {
+    const sw = navigator.serviceWorker;
+    if (!sw || !/^https?:$/.test(location.protocol) || typeof MessageChannel !== 'function') return;
+    const spoerg = (w) => {
+      if (!w) return;
+      const kanal = new MessageChannel();
+      kanal.port1.onmessage = (e) => { el.textContent = versionsTekst(e.data); };
+      w.postMessage('version', [kanal.port2]);
+    };
+    // Ingen controller (første besøg, hård genindlæsning): siden kom fra nettet, og først den service worker, der så
+    // overtager (clients.claim), passer til koden. Overtager en ny midt i et besøg med en gammel, vises intet nyt tal:
+    // koden er stadig den gamle, til appen åbnes igen (code-review 20-10-2026: reg.active kunne vise en anden udgave)
+    if (sw.controller) spoerg(sw.controller);
+    else sw.addEventListener('controllerchange', () => spoerg(sw.controller), { once: true });
   }
 
   // =====================================================================
@@ -1727,12 +1760,15 @@
   }
 
   // ---------- Verdenskort ----------
-  // Tre kort: matematik (VERDENER), dansk (DANSK_VERDENER) og engelsk (ENGELSK_VERDENER). data.fag husker det sidste valg.
-  const fagNu = () => (D && data && data.fag === 'dansk' ? 'dansk' : E && data && data.fag === 'engelsk' ? 'engelsk' : 'matematik');
-  const verdenerFor = (fag) => (fag === 'dansk' ? DANSK_VERDENER : fag === 'engelsk' ? ENGELSK_VERDENER : VERDENER);
-  const alleVerdener = () => VERDENER.concat(DANSK_VERDENER, E ? ENGELSK_VERDENER : []);
+  // Fire kort: matematik (VERDENER), dansk (DANSK_VERDENER), engelsk (ENGELSK_VERDENER) og natur (NATUR_VERDENER).
+  // data.fag husker det sidste valg.
+  const fagNu = () => (D && data && data.fag === 'dansk' ? 'dansk' : E && data && data.fag === 'engelsk' ? 'engelsk'
+    : N && data && data.fag === 'natur' ? 'natur' : 'matematik');
+  const verdenerFor = (fag) => (fag === 'dansk' ? DANSK_VERDENER : fag === 'engelsk' ? ENGELSK_VERDENER : fag === 'natur' ? NATUR_VERDENER : VERDENER);
+  const alleVerdener = () => VERDENER.concat(DANSK_VERDENER, E ? ENGELSK_VERDENER : [], N ? NATUR_VERDENER : []);
   const erDanskEmne = (emne) => !!(D && (D.EMNER[emne] || emne === 'historie' || emne === 'jagt'));
   const erEngelskEmne = (emne) => !!(E && E.EMNER[emne]);
+  const erNaturEmne = (emne) => !!(N && N.EMNER[emne]);
   // Det engelske ord høres kun fra den engelske stemmes fil (Tale.sigEn — aldrig enhedens stemme). Uden oplæsning eller
   // uden filen er engelsk gætteleg: svaret tæller ikke (registrer), runden tæller ikke med i emnet (afslutRunde), og
   // fagkortet og verdenerne får et 🔇-mærke, så den voksne ser, at der skal lyd til (review 14-10-2026, fund 3)
@@ -1742,10 +1778,10 @@
     if (!E || (emne ? emneHoeres(emne) : Object.keys(E.EMNER).some(emneHoeres))) return null;
     return h('span', { class: 'uden-lyd-maerke', 'aria-hidden': 'true' }, '🔇');
   }
-  const emneDef = (emne) => O.EMNER[emne] || (D && D.EMNER[emne]) || (E && E.EMNER[emne]) || null;
-  // Dansk-emnerne gemmes for sig (data.dansk) med samme form som matematikkens (data.emner) — engelsk også dér
-  // (emne-id'erne engFarver, engTal … engLegeplads), så de gemte data ikke får nye felter
-  const emneLager = (emne) => (erDanskEmne(emne) || erEngelskEmne(emne) ? data.dansk : data.emner);
+  const emneDef = (emne) => O.EMNER[emne] || (D && D.EMNER[emne]) || (E && E.EMNER[emne]) || (N && N.EMNER[emne]) || null;
+  // Dansk-emnerne gemmes for sig (data.dansk) med samme form som matematikkens (data.emner) — engelsk og natur også dér
+  // (emne-id'erne engFarver, engTal … engLegeplads, naturLort), så de gemte data ikke får nye felter
+  const emneLager = (emne) => (erDanskEmne(emne) || erEngelskEmne(emne) || erNaturEmne(emne) ? data.dansk : data.emner);
   const emneData = (emne) => emneLager(emne)[emne];
 
   function verdenAaben(i, fag) {
@@ -1753,6 +1789,7 @@
     const liste = verdenerFor(fag);
     const v = liste[i];
     if (fag === 'engelsk') return erEngelskEmne(v.emne); // alle er åbne fra start
+    if (fag === 'natur') return erNaturEmne(v.emne); // også åben fra start
     if (fag === 'dansk') {
       if (!v.emne) return false;
       if (v.emne === 'historie' || v.emne === 'jagt') return true; // Historiebogen (B5) og Bogstavjagt (B10) er åbne fra start
@@ -1815,13 +1852,13 @@
     return h('span', { class: 'station-groede', 'aria-hidden': 'true' }, tegn);
   }
 
-  // Matematik, dansk eller engelsk? Store kort (tast 1, 2, 3). Vises ved hver start (Jimmy 18-10-2026): det sidste valg
+  // Matematik, dansk, engelsk eller natur? Store kort (tast 1–4). Vises ved hver start (Jimmy 18-10-2026): det sidste valg
   // (data.fag) lyser, og Enter vælger det — som «Eventyr eller Vælg selv?». Man kan også skifte fra kortet.
   // Fra Vælg selv (tilVaelgSelv) går et fag direkte til det fags Vælg selv — «Eventyr eller Vælg selv?» springes over
   // (Jimmy 18-10-2026: «når man vælger dansk er det det man kommer ind på»)
   function visFagValg(hilsen, tilVaelgSelv) {
     S.runde = null;
-    const fagene = FAG.filter((f) => f.id !== 'engelsk' || E);
+    const fagene = FAG.filter((f) => (f.id !== 'engelsk' || E) && (f.id !== 'natur' || N));
     const vaelg = (f) => {
       Lyd.init(); Lyd.rigtig();
       data.fag = f.id;
@@ -1832,9 +1869,10 @@
     const kort = (f) => h('button', {
       class: 'fag-kort ' + f.id + (data.fag === f.id ? ' sidst' : ''), type: 'button', 'aria-label': f.label, 'data-fag': f.id,
       onclick: () => vaelg(f),
-    }, h('span', { class: 'fag-ikon', 'aria-hidden': 'true' }, f.e), h('span', { class: 'fag-navn' }, f.navn),
+    }, h('span', { class: 'fag-ikon', 'aria-hidden': 'true' }, fagTegning(f) || f.e), h('span', { class: 'fag-navn' }, f.navn),
     f.id === 'engelsk' ? udenLydMaerke() : null); // 🔇: engelsk kan ikke høres (fund 3)
-    S.gentagTale = fagene.length > 2 ? 'Vil du lege med tal, bogstaver eller engelsk?' : 'Vil du lege med tal eller med bogstaver?';
+    S.gentagTale = fagene.length > 3 ? 'Vil du lege med tal, bogstaver, engelsk eller natur?'
+      : fagene.length > 2 ? 'Vil du lege med tal, bogstaver eller engelsk?' : 'Vil du lege med tal eller med bogstaver?';
     skift(h('div', { class: 'skaerm fagvalg' },
       h('div', { class: 'topbar' },
         h('a', { class: 'ikon-knap', href: 'index.html', 'aria-label': 'Skift spiller', title: 'Skift spiller' }, '🏠'),
@@ -1852,11 +1890,15 @@
     sigHilsen(hilsen, S.gentagTale);
   }
 
-  // Skift fag (i topbarerne): åbner fagvalget. Ikonet er et andet fag end det, barnet er i (🔢 eller 🔤) — i engelsk
-  // et neutralt 📚 (der er to andre fag, og 🔢 lovede matematik, men åbnede fagvalget)
+  // Naturkortet får ræven fra grafik.js (de andre fag har deres emoji); mangler tegningen, bruges emojien (🌿)
+  const fagTegning = (f) => (f.id === 'natur' && GR && GR.natur ? tegning(GR.natur['dyr-raev'], 'fag-tegning') : null);
+
+  // Skift fag (i topbarerne): åbner fagvalget. Ikonet er et andet fag end det, barnet er i (🔢 eller 🔤) — i engelsk og
+  // natur et neutralt 📚 (der er flere andre fag, og 🔢 lovede matematik, men åbnede fagvalget)
   function fagSkiftKnap(fag, tilVaelgSelv) {
-    const label = fag === 'dansk' ? 'Skift til matematik' : fag === 'engelsk' ? 'Skift fag' : 'Skift til dansk';
-    return ikonKnap(fag === 'matematik' ? '🔤' : fag === 'engelsk' ? '📚' : '🔢', label, () => visFagValg(undefined, tilVaelgSelv), 'fag-knap');
+    const neutral = fag === 'engelsk' || fag === 'natur';
+    const label = fag === 'dansk' ? 'Skift til matematik' : neutral ? 'Skift fag' : 'Skift til dansk';
+    return ikonKnap(fag === 'matematik' ? '🔤' : neutral ? '📚' : '🔢', label, () => visFagValg(undefined, tilVaelgSelv), 'fag-knap');
   }
 
   // B10: Eventyr eller Vælg selv? To store kort efter fagvalget — vises hver gang (ét tryk); det sidste valg lyser
@@ -1868,7 +1910,8 @@
       data.tilstand = t;
       gem();
       if (t === 'frit') visVaelgSelv('Vælg selv. Tryk på det, du vil lege med.');
-      else visKort(fag === 'dansk' ? 'Eventyr. Tryk på den store knap, så leger vi med bogstaver.' : fag === 'engelsk' ? 'Eventyr. Tryk på den store knap, så leger vi med engelsk.' : 'Eventyr. Tryk på den store knap, så leger vi med tal.');
+      else visKort(fag === 'dansk' ? 'Eventyr. Tryk på den store knap, så leger vi med bogstaver.' : fag === 'engelsk' ? 'Eventyr. Tryk på den store knap, så leger vi med engelsk.'
+        : fag === 'natur' ? 'Eventyr. Tryk på den store knap, så leger vi med naturen.' : 'Eventyr. Tryk på den store knap, så leger vi med tal.');
     };
     const kort = (t, ikon, navn, label) => h('button', {
       class: 'fag-kort tilstand-kort ' + t + (data.tilstand === t ? ' sidst' : ''), type: 'button', 'aria-label': label, 'data-tilstand': t,
@@ -1998,6 +2041,8 @@
       const halvNavn = (i) => { const st = stationer[i], nv = st && st.querySelector('.station-navn'); return Math.max((st && st.offsetWidth || 80) / 2, nv ? nv.offsetWidth / 2 : 0); };
       // trang: højkant uden navneskilte (.trangt) — så skal der ikke være plads til navnet under den næstsidste station
       const beregn = (trang) => {
+        // Én verden (natur, 20-10-2026): stationen står midt på kortet — ikke alene oppe i hjørnet ved 🎒
+        if (n === 1) return [{ x: w / 2, y: hh * 0.45 }];
         // Den sidste station står altid i øverste række (liggende) / til venstre (højkant), så ▶ nederst til højre ikke dækker den.
         // ▶ har sin egen plads nederst til højre: kun rækken/søjlen med ▶ skal stoppe før den — den anden må gå
         // næsten helt ud til kanten. Så får stationerne mere plads (B6: 11 verdener).
@@ -2125,6 +2170,13 @@
   // og ⬅️ fører tilbage til 🎒. opts.lektionSet: lektionen er vist (første gang i verdenen).
   // B10: opgaver pr. runde og pause efter så mange runder — den voksne vælger under Indstillinger
   const antalOpgaver = () => ([5, 8, 10].indexOf(voksen.opgaverPrRunde) >= 0 ? voksen.opgaverPrRunde : 8);
+  // Natur husker de senest viste dyr, mens siden er åben (S.naturNylige), så næste runde begynder med dyr, barnet ikke
+  // lige har set (runde 2, 20-10-2026). Ikke i de gemte data: et nyt felt ville kræve en migrering
+  function naturRunde(emne, niveau, rng, gentag) {
+    const opgaver = N.lavRunde(emne, niveau, rng, { gentag: gentag, antal: antalOpgaver(), nylige: S.naturNylige || [] });
+    S.naturNylige = (S.naturNylige || []).concat(opgaver.map((o) => o.svar)).slice(-40);
+    return opgaver;
+  }
   const pauseEfter = () => ([2, 3, 4].indexOf(voksen.pauseEfter) >= 0 ? voksen.pauseEfter : 3);
 
   function startRunde(verden, opts) {
@@ -2184,6 +2236,10 @@
       // ikke (registrer/afslutRunde), og kortene viser 🔇 (udenLydMaerke)
       ed.niveau = Math.min(E.EMNER[emne].maxNiveau, Math.max(1, ed.niveau || 1));
       opgaver = E.lavRunde(emne, ed.niveau, rng, { gentag: (data.gentag[emne] || []).filter(opgaveKendt), antal: antalOpgaver() });
+    } else if (verden.fag === 'natur') {
+      // Natur: se lorten (og sporet) → tryk på dyret. Billederne bærer opgaven, så den kan også spilles uden lyd
+      ed.niveau = Math.min(N.EMNER[emne].maxNiveau, Math.max(1, ed.niveau || 1));
+      opgaver = naturRunde(emne, ed.niveau, rng, (data.gentag[emne] || []).filter(opgaveKendt));
     } else {
       ed.niveau = O.klemNiveau(emne, ed.niveau);
       opgaver = O.lavRunde(emne, ed.niveau, rng, { ting: T.ting, gentag: (data.gentag[emne] || []).filter(opgaveKendt), udenLyt: udenLyt, antal: antalOpgaver() });
@@ -2204,13 +2260,14 @@
   // dansk i det valgfrie felt data.pausetDansk. En runde i det ene fag rører aldrig det andet fags mission.
   // En mission, der er hentet fra et felt, bliver i det felt (r.pausetFelt) — også en dansk mission, der fra
   // før lå i pauset (den flyttes ikke). Historiebogen, Bogstavjagt og 🤔 rører ingen af dem.
-  // Engelsk (13-10-2026) husker sin afbrudte mission kun, mens siden er åben (S.afbrudt.pausetEngelsk): et nyt felt i de
-  // gemte data ville kræve en migrering. saetPauset gemmer den derfor aldrig.
-  const PAUSET_FELTER = ['pauset', 'pausetDansk', 'pausetEngelsk'];
-  const fagFelt = (verden) => (verden && verden.fag === 'dansk' ? 'pausetDansk' : verden && verden.fag === 'engelsk' ? 'pausetEngelsk' : 'pauset');
+  // Engelsk (13-10-2026) og natur (20-10-2026) husker deres afbrudte mission kun, mens siden er åben
+  // (S.afbrudt.pausetEngelsk/pausetNatur): et nyt felt i de gemte data ville kræve en migrering. saetPauset gemmer dem aldrig.
+  const PAUSET_FELTER = ['pauset', 'pausetDansk', 'pausetEngelsk', 'pausetNatur'];
+  const fagFelt = (verden) => (verden && verden.fag === 'dansk' ? 'pausetDansk' : verden && verden.fag === 'engelsk' ? 'pausetEngelsk'
+    : verden && verden.fag === 'natur' ? 'pausetNatur' : 'pauset');
   const rundeFelt = (r) => r.pausetFelt || fagFelt(r.verden);
   function saetPauset(felt, p) {
-    if (felt === 'pausetEngelsk') return; // kun i hukommelsen
+    if (felt === 'pausetEngelsk' || felt === 'pausetNatur') return; // kun i hukommelsen
     if (felt === 'pauset') data.pauset = p || null;
     else if (p) data[felt] = p;
     else delete data[felt]; // valgfrit felt: ingen afbrudt dansk mission = intet felt
@@ -2228,6 +2285,7 @@
   const KENDTE_VISNINGER = ['ting', 'terning', 'terninger', 'klodser', 'streger', 'fingre', 'haand', 'kugleramme', 'par', 'flest', 'forskel', 'lyt', 'talstreg', 'plus', 'regnestykke', 'mangler', 'stoerst', 'minus', 'raekke', 'staenger', 'form', 'formScene', 'ur', 'moenter', 'koeb', 'moenster', 'soembraet', 'lineal', 'linealTegn', 'maalKlodser', 'scene', 'rute', 'kurv'];
   const KENDTE_DANSK = ['ordBillede', 'lyt', 'lytLyd', 'bogstav', 'stortBogstav', 'alfabet', 'lydering', 'skrevetOrd', 'bygOrd', 'saetning', 'bygSaetning', 'scene', 'tryktBogstav', 'retOrd', 'bygAlfabet', 'ikkeSkilt', 'lydTog', 'sand'];
   function opgaveKendt(o) {
+    if (o && o.fag === 'natur') return !!(N && N.opgaveKendt(o));
     if (o && o.fag === 'engelsk' && o.valgArt === 'sig') return !!(E && E.EMNER[o.emne] && E.GEN[o.type] && o.vis && o.vis.art === 'engelskSig' && E.SIG[o.vis.saetning] && o.svar === 'sagt');
     if (o && o.fag === 'engelsk') return !!(E && E.EMNER[o.emne] && E.GEN[o.type] && o.vis && o.vis.art === 'engelskLyt' && E.ORD[o.svar] && Array.isArray(o.valg) && o.valg.every((v) => E.ORD[v]));
     if (o && o.fag === 'dansk') return !!(D && D.EMNER[o.emne] && D.GEN[o.type] && o.vis && KENDTE_DANSK.indexOf(o.vis.art) >= 0);
@@ -2239,12 +2297,15 @@
   function hentMission() {
     const pulje = O.MAERKER[T.samling] || O.MAERKER.jungle;
     for (const felt of PAUSET_FELTER) {
-      // Den engelske mission findes kun i hukommelsen (saetPauset gemmer den aldrig): et felt i data læses ikke, og en
-      // storage-hændelse (hentMission igen) beholder missionen i S.afbrudt
-      if (felt === 'pausetEngelsk') continue;
+      // Den engelske mission og naturmissionen findes kun i hukommelsen (saetPauset gemmer dem aldrig): et felt i data
+      // læses ikke, og en storage-hændelse (hentMission igen) beholder missionen i S.afbrudt
+      if (felt === 'pausetEngelsk' || felt === 'pausetNatur') continue;
       const p = data[felt];
       const verden = p && alleVerdener().find((v) => v.id === p.verden);
-      if (!verden || !Array.isArray(p.opgaver) || !p.opgaver.every(opgaveKendt)) { S.afbrudt[felt] = null; saetPauset(felt, null); continue; }
+      // En engelsk mission eller en naturmission i et andet felt kan kun komme fra en håndrettet fil: den hentes ikke
+      // (sikkerhedsreview 20-10-2026)
+      const kunHukommelse = verden && (verden.fag === 'engelsk' || verden.fag === 'natur');
+      if (!verden || kunHukommelse || !Array.isArray(p.opgaver) || !p.opgaver.every(opgaveKendt)) { S.afbrudt[felt] = null; saetPauset(felt, null); continue; }
       S.afbrudt[felt] = {
         verden: verden, emne: verden.emne, opgaver: p.opgaver, i: p.i, forsoeg: 0, pausetFelt: felt,
         sidstAktiv: Date.now(), aktivMs: 0, niveauOp: p.niveauOp, registreret: p.registreret, frit: p.frit === true,
@@ -2348,6 +2409,7 @@
     r.dom.krop.classList.toggle('ur-opgave', !!opg.vis && opg.vis.art === 'ur');
     r.dom.krop.classList.toggle('dansk-opgave', opg.fag === 'dansk');
     r.dom.krop.classList.toggle('engelsk-opgave', opg.fag === 'engelsk');
+    r.dom.krop.classList.toggle('natur-opgave', opg.fag === 'natur');
     r.dom.krop.classList.toggle('sig-opgave', opg.valgArt === 'sig'); // vennen står i opgaven — ikke også i hjørnet
     r.dom.svar.append(opg.valg ? valgKnapper(opg) : opg.byg ? (opg.byg.trinvis ? trinvisPanel(opg) : bygPanel(opg)) : opg.interaktiv ? interaktivPanel(opg) : taltastatur(opg));
     fjernKopier();
@@ -2358,7 +2420,8 @@
     // Piper: næste opgaves sætninger og svaret på denne hentes og afkodes nu, så talen starter uden ventetid
     const naeste = r.opgaver[r.i + 1];
     if (naeste) Piper.forhent(naeste.tale);
-    if (opg.svar != null && typeof opg.svar !== 'object') Piper.forhent('Ja, det er ' + opg.svar + '!');
+    if (opg.fag === 'natur') Piper.forhent(opg.ros + ' ' + opg.fakta); // natur: rosen og dyrets fakta efter det rigtige svar
+    else if (opg.svar != null && typeof opg.svar !== 'object') Piper.forhent('Ja, det er ' + opg.svar + '!');
     // Dansk: teksten, så de indtalte lyde (eller reserverne) — 🔊 gentager det hele
     S.gentagFn = r.trinvis ? r.trinvis.gentag : opg.lyd ? () => sigOpgave(opg) : null;
     // Engelsk: 🔊 (og 👂) siger kun det engelske ord igen. Ordet til denne og næste opgave hentes nu.
@@ -2383,6 +2446,7 @@
   function tegnVisning(opg) {
     if (opg.fag === 'dansk') return tegnDanskVisning(opg);
     if (opg.fag === 'engelsk') return engelskVisning(opg);
+    if (opg.fag === 'natur') return naturVisning(opg);
     const v = opg.vis;
     switch (v.art) {
       case 'ting': return tingGruppe(v.antal, O.TING[v.ting].e);
@@ -3580,6 +3644,27 @@
     return h('span', { class: ['eng-billede', 'eng-' + (b ? b.art : 'ukendt')].join(' '), 'aria-hidden': 'true' }, indhold);
   }
 
+  // ---------- Natur (pilot 20-10-2026): «Gæt en lort» — se lorten (og sporet), tryk på dyret. Ingen læsetekst. ----------
+  // Lorten står stort på en stribe skovbund, sporet ved siden af. På niveau 3 er sporet skjult, til hjælpen viser det
+  // (naturSpor). Kun spillets egne tegninger (grafik.js natur); mangler en, står emojien — uglens «spor» er dens træ.
+  const naturTegning = (navn, klasse) => (GR && GR.natur ? tegning(GR.natur[navn], klasse) : null);
+  function naturVisning(opg) {
+    const id = opg.vis.dyr;
+    const d = N && N.DYR_ID[id];
+    const lort = h('div', { class: 'natur-lort' }, naturTegning('lort-' + id, 'natur-tegning') || h('span', { class: 'natur-e' }, '💩'));
+    const spor = h('div', { class: opg.vis.spor ? 'natur-spor' : ['natur-spor', 'skjult'].join(' ') }, // uden mellemrum i strengen (tale-tekster.js)
+      naturTegning('spor-' + id, 'natur-tegning') || h('span', { class: 'natur-e' }, d && d.sporOrd ? '🌳' : '🐾'));
+    return h('div', { class: 'natur-scene', 'aria-hidden': 'true' },
+      h('div', { class: 'natur-fund' }, lort, spor),
+      h('div', { class: 'natur-jord' }));
+  }
+  // Dyret på svarkortet (og i lektionen)
+  function naturDyrBillede(id) {
+    const d = N && N.DYR_ID[id];
+    return h('span', { class: 'natur-dyr', 'aria-hidden': 'true' },
+      naturTegning('dyr-' + id, 'natur-dyr-tegning') || h('span', { class: 'natur-dyr-e' }, d ? d.e : '?'));
+  }
+
   function tegnDanskVisning(opg) {
     const v = opg.vis;
     switch (v.art) {
@@ -3762,6 +3847,7 @@
     // «Sig efter mig»: én stor, grøn knap — barnet har sagt sætningen (ingen mikrofon, intet kan være forkert)
     if (opg.valgArt === 'sig') return [h('span', { class: 'sig-ikon', 'aria-hidden': 'true' }, '🗣️'), h('span', { class: 'sig-tekst' }, 'Jeg sagde det')];
     if (opg.fag === 'engelsk') return engelskBillede(x);
+    if (opg.fag === 'natur') return naturDyrBillede(x);
     const v = opg.vis;
     if (opg.valgArt === 'form') return formSvg(x, ['cirkel', 'trekant', 'firkant', 'kvadrat', 'rektangel', 'femkant', 'sekskant'].indexOf(x), 0, false);
     if (opg.valgArt === 'gruppe') return tingGruppe(x === 'a' ? v.a : v.b, O.TING[v.ting].e, x, 'knap');
@@ -3784,7 +3870,8 @@
       const k = h('button', {
         class: 'valg-knap', type: 'button', 'data-v': x, 'aria-pressed': placer ? 'false' : null,
         disabled: opg.valgArt === 'sig' ? true : null, // «Jeg sagde det» åbner, når sætningen er sagt (sigOgAabn)
-        'aria-label': opg.valgArt === 'gruppe' ? (x === 'a' ? 'Venstre gruppe' : 'Højre gruppe') : opg.valgArt === 'scene' ? opg.kort[x].navn : opg.valgArt === 'sig' ? 'Jeg sagde det' : opg.fag === 'engelsk' && E && E.ORD[x] ? E.ORD[x].da : String(x),
+        'aria-label': opg.valgArt === 'gruppe' ? (x === 'a' ? 'Venstre gruppe' : 'Højre gruppe') : opg.valgArt === 'scene' ? opg.kort[x].navn : opg.valgArt === 'sig' ? 'Jeg sagde det' : opg.fag === 'engelsk' && E && E.ORD[x] ? E.ORD[x].da
+          : opg.fag === 'natur' && N && N.DYR_ID[x] ? stort(N.DYR_ID[x].navn) : String(x),
         onclick: (e) => { Lyd.init(); if (placer) loeftKort(x, e.currentTarget); else svar(x, e.currentTarget); },
       }, indhold(x));
       if (placer) traekbar(k, x);
@@ -4015,6 +4102,8 @@
     // «Sig efter mig»: lyden → ros på dansk («Godt sagt!»), og vennen i boblen jubler
     const fb = opg.valgArt === 'sig' ? Forloeb.run({ lyd: 'rigtig', tekst: opg.ros })
       : opg.fag === 'engelsk' ? Forloeb.run({ lyd: 'rigtig', en: opg.ordEn, tekst: opg.ordDa })
+      // natur: «Ja! Det er ræven.» og én sand sætning — efter hjælpen kun «Ja!», for hjælpen har lige sagt dyrets navn
+      : opg.fag === 'natur' ? Forloeb.run({ lyd: 'rigtig', tekst: (r.forsoeg > 0 ? 'Ja!' : opg.ros) + ' ' + opg.fakta })
       : Forloeb.run({ lyd: O.taellerMed(opg) ? 'rigtig' : 'boblePop', tekst });
     if (opg.valgArt === 'sig') saetUdtryk(r.dom.visning, 'jubler');
     // Ret bogstavet (D1): det rigtige bogstav kommer på plads i ordet
@@ -4110,7 +4199,8 @@
     // Den blide lyd først, så indledningen. Animationen går i gang med det samme, så barnet ser
     // noget ske; dens tal og pauser venter, til indledningen er sagt færdig (Tale.sigFoerst).
     // r.hjaelpIntro (C): opgaven har selv sagt, hvad der gik galt («Der er 7 frø i kurven …») — det er indledningen
-    const introTekst = r.hjaelpIntro || (plusVidere ? 'Lad os tælle videre fra det største tal.' : (HJAELP_TALE[trin.art] || 'Lad os se.'));
+    // Natur: trinnet har sin egen sætning («Se sporet. Dyret har pigge på ryggen.»)
+    const introTekst = r.hjaelpIntro || (opg.fag === 'natur' && trin.tale ? trin.tale : plusVidere ? 'Lad os tælle videre fra det største tal.' : (HJAELP_TALE[trin.art] || 'Lad os se.'));
     r.hjaelpIntro = null;
     const intro = Tale.sigFoerst(introTekst, 250 * TEMPO);
     // Tællehjælpen («Lad os tælle …»): vennen tænker først, og tæller med (taeller), fra indledningen er sagt, til hjælpen er færdig
@@ -4709,6 +4799,22 @@
     }
 
     // ---- Engelsk: det rigtige billede vises, og ordet siges på engelsk og så på dansk (to ytringer) ----
+    // ---- Natur: sporet kommer frem og lyser (stemmen siger en ledetråd), så lyser det rigtige dyr ----
+    // Indledningen er trinnets egen sætning (visHjaelp); vent() venter, til den er sagt
+    if (art === 'naturSpor') {
+      const spor = vis.querySelector('.natur-spor');
+      if (spor) { spor.classList.remove('skjult'); spor.classList.add('lyser'); hop(spor, 'pop'); }
+      await vent(700);
+      if (spor) spor.classList.remove('lyser');
+      return;
+    }
+    if (art === 'visNatur') {
+      const kort = [...r.dom.svar.querySelectorAll('.valg-knap')].find((k) => k.getAttribute('data-v') === opg.svar);
+      if (kort) kort.classList.add('lytter'); // fuld styrke og guldkant; de andre kort hviler (app.css .natur-opgave)
+      await vent(500);
+      if (kort) kort.classList.remove('lytter');
+      return;
+    }
     if (art === 'visEngelsk') {
       hjaelpeFelt(h('div', { class: 'eng-hjaelp' }, engelskBillede(opg.svar)));
       // Det rigtige svarkort lyser med fuld styrke og guldkant, mens ordet siges (som de danske kort, der læses op);
@@ -6078,9 +6184,12 @@
     let tekst = opg.valgArt ? 'Det er ' + navn + '. Tryk på den, der lyser.' : 'Det er ' + opg.svar + '. Tryk på ' + opg.svar + '.';
     // Et bogstav-svar siges ikke som bogstavets navn (det er lyden, der menes)
     if (opg.fag === 'engelsk') tekst = 'Det er den, der lyser. Tryk på den.'; // aldrig det engelske ord med den danske stemme
+    if (opg.fag === 'natur' && N && N.DYR_ID[opg.svar]) tekst = 'Det er ' + N.DYR_ID[opg.svar].bestemt + '. Tryk på den, der lyser.';
     if (opg.fag === 'dansk') tekst = opg.valgArt === 'bogstav' ? 'Det er den, der lyser. Tryk på den.' : opg.valgArt === 'scene' ? stort(navn) + ' Tryk på den, der lyser.' : opg.valgArt ? 'Det er ' + opg.svar + '. Tryk på den, der lyser.' : 'Det er ' + opg.svar + '. Tryk på det.';
     S.gentagFn = null;
     S.gentagTale = tekst;
+    // Natur: hjælpens sidste trin (visNatur) har lige sagt den samme sætning — den siges ikke to gange i træk
+    if (opg.fag === 'natur' && (opg.hjaelp[r.forsoeg - 1] || {}).art === 'visNatur') return;
     Tale.sig(tekst);
   }
 
@@ -6429,6 +6538,8 @@
       case 'lydering': return [h('span', { class: 'lektion-emoji' }, '🐭'), h('span', { class: 'lektion-ord' }, 'm · u · s')];
       case 'smaaord': return ['og', 'er', 'jeg'].map((o) => h('span', { class: 'lektion-ord' }, o));
       case 'historiebog': return ['📖', '🖍️', '✏️'].map((e) => h('span', { class: 'lektion-emoji' }, e));
+      // Natur: lorten, sporet og dyret, der har lavet dem (ræven) — tegningerne fra grafik.js, ellers emojien
+      case 'naturLort': return [['lort-raev', '💩'], ['spor-raev', '🐾'], ['dyr-raev', '🦊']].map(([navn, e]) => naturTegning(navn, 'natur-lektion') || h('span', { class: 'lektion-emoji' }, e));
       case 'jagt': return [h('span', { class: 'lektion-emoji' }, '🫧'), h('span', { class: 'bogstav-kort lektion-bogstav' }, h('span', { class: 'bogstav-stort' }, 'S'), h('span', { class: 'bogstav-lille' }, 's'))];
       default: return fyrtaarn();
     }
@@ -7272,6 +7383,7 @@
     _pause: { BEVAEGELSER, PAUSE_INTRO, SPRING_EFTER, pauseOevelser, vis: () => visBevaegelse(() => visKort(false)) },
     DANSK_VERDENER,
     ENGELSK_VERDENER,
+    NATUR_VERDENER,
     _visHistorie(nr) { visHistorieSide(nr, true); },
     _startVerden(id, frit) { startRunde(alleVerdener().find((v) => v.id === id), { frit: !!frit }); },
     _piper: Piper, // test-e2e «piper»: listen er hentet

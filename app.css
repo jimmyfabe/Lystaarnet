@@ -168,6 +168,21 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
 }
 /* Ét stillestående tårn, fuldt tændt — to gange skriftens højde, så det er tårnet, man ser først */
 .index-titel .fyrtaarn.med-tegning { width: 2em; height: 2em; flex-shrink: 0; }
+/* Versionsnummeret (til den voksne): lille og roligt i hjørnet, kan ikke trykkes på og skubber ikke til noget.
+   .skaerm ligger oven i #app's safe-area-polstring (viewport-fit=cover): uden env() kom tallet under iPhonens
+   statuslinje på højkant og under notchen på langs (code-review 20-10-2026) */
+.index-version {
+  position: absolute;
+  top: calc(8px + env(safe-area-inset-top, 0px));
+  right: calc(12px + env(safe-area-inset-right, 0px));
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--voksen-2);
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
 .spiller-liste {
   --kort-b: clamp(200px, 30vmin, 300px);   /* børnenes kort (3:4) */
   --voksen-b: clamp(160px, 22vmin, 230px); /* den voksnes to kort */
@@ -2998,3 +3013,69 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
   .valg-sig .valg-knap { flex-direction: row; gap: 12px; }
   .sig-ikon { font-size: 26px; }
 }
+
+/* ---------- Natur (pilot 20-10-2026): «Gæt en lort» — lorten og sporet på skovbunden, svaret er dyret ----------
+   Faste naturfarver (ikke temaets, som engelsk): Natur er sit eget fag og skal ikke ligne Matematik-kortet.
+   Mørk tekst (--tekst) på --natur: 7,1:1 (Dino) og 7,2:1 (Enhjørning). */
+:root {
+  --natur: #a6d672; --natur-lys: #e3f5c4; --natur-moerk: #6f9a3e;
+  --natur-graes: #7fb24a; --natur-jord: #9a6b43; --natur-jord-moerk: #7a5232;
+}
+.fag-kort.natur { color: var(--tekst); background: radial-gradient(circle at 35% 22%, var(--natur-lys), var(--natur) 42%); box-shadow: 0 9px 0 var(--natur-moerk), 0 16px 30px var(--skygge); }
+.fag-kort.natur .fag-navn { text-shadow: none; }
+/* Ræven fylder kun ca. 0,75 af sin tegning: skaleret 1,4 er den lige så høj som de andre fags emoji (ca. 1,13em) */
+.fag-tegning { display: block; width: 1em; height: 1em; overflow: visible; transform: scale(1.4); }
+/* Fire fagkort: én række på langs (iPad i tastaturcover), 2 × 2 på højkant. Bredden deles, så de fire altid er der —
+   minus notchens safe-area: .skaerm (absolute, inset 0) ligger oven i #app's safe-area-polstring */
+.fagvalg-liste.fag-4 { display: grid; grid-template-columns: repeat(4, auto); justify-content: center; align-content: center; gap: 4vmin; }
+.fagvalg-liste.fag-4 .fag-kort { width: min(clamp(170px, 32vmin, 300px), calc((100vw - 32px - 12vmin - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)) / 4)); }
+.fagvalg-liste.fag-4 .fag-navn { font-size: clamp(22px, 4.2vmin, 38px); }
+@media (orientation: portrait) {
+  .fagvalg-liste.fag-4 { grid-template-columns: repeat(2, auto); }
+  .fagvalg-liste.fag-4 .fag-kort { width: min(clamp(150px, 34vmin, 320px), calc((100vw - 32px - 4vmin) / 2), 30vh); }
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  .fagvalg-liste.fag-4 .fag-kort { width: min(240px, 56vh, calc((100vw - 32px - 12vmin - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)) / 4)); }
+}
+
+/* Opgaven: lorten stort og sporet ved siden af, begge på en stribe skovbund. Størrelserne følger feltet (cqw/cqh).
+   Lorte-tegningerne (96 × 96) fylder kun y ≈ 24–85: den tomme top og bund trækkes ind med negative margener, så
+   lorten står på jorden, og scenen ser midtstillet ud. */
+.natur-scene {
+  --natur-l: clamp(150px, 32vmin, 320px); --natur-s: clamp(96px, 19vmin, 190px); --natur-jord-b: calc(var(--natur-l) + var(--natur-s) + 140px);
+  display: flex; flex-direction: column; align-items: center; max-width: 100%;
+}
+.natur-fund { position: relative; z-index: 1; display: flex; align-items: flex-end; justify-content: center; gap: clamp(16px, 4vmin, 56px); margin-bottom: calc(var(--natur-l) * -0.06); }
+/* cqw/cqh er .visning's indholdsboks (feltet minus 16 px polstring). Mellemrummet er mindst sporets glød (ring 6 + glød 24 px),
+   så gløden ikke rører lorten; lort + mellemrum + spor ≤ 93cqw, så gløden ved feltets kant står i polstringen */
+@supports (width: 1cqw) {
+  .natur-scene { --natur-l: min(480px, 58cqw, 80cqh); --natur-s: min(260px, 30cqw, 50cqh); } /* lorten bruger kun ca. 0,76 af sin højde */
+  .natur-fund { gap: clamp(32px, 5cqw, 56px); }
+  /* Højt felt (telefon og iPad på højkant): sporet står over lorten, så lorten kan få hele bredden */
+  @container (max-aspect-ratio: 1/1) {
+    .natur-scene { --natur-l: min(480px, 88cqw, 56cqh); --natur-s: min(260px, 46cqw, 30cqh); --natur-jord-b: calc(var(--natur-l) + 60px); }
+    .natur-fund { flex-direction: column-reverse; align-items: center; gap: 30px; }
+  }
+}
+.natur-lort, .natur-spor { display: grid; place-items: end center; }
+.natur-lort { width: var(--natur-l); height: var(--natur-l); margin: calc(var(--natur-l) * -0.22) 0 calc(var(--natur-l) * -0.08); }
+.natur-spor { width: var(--natur-s); height: var(--natur-s); border-radius: 28px; transition: box-shadow 0.3s, background 0.3s; }
+.natur-tegning { display: block; width: 100%; height: 100%; overflow: visible; }
+.natur-e { line-height: 1; font-size: calc(var(--natur-l) * 0.78); }
+.natur-spor .natur-e { font-size: calc(var(--natur-s) * 0.72); }
+/* Hjælpens første trin: sporet kommer frem og lyser i guld, mens stemmen siger ledetråden */
+.natur-spor.lyser { background: rgba(255, 200, 61, 0.28); box-shadow: 0 0 0 6px var(--guld), 0 0 24px var(--guld); }
+@media (prefers-reduced-motion: reduce) { .natur-spor { transition: none; } }
+.natur-jord {
+  width: min(100%, var(--natur-jord-b)); height: max(22px, calc(var(--natur-l) * 0.12));
+  border-radius: 999px; box-shadow: 0 6px 14px var(--skygge);
+  background: linear-gradient(to bottom, var(--natur-graes) 0 34%, var(--natur-jord) 34% 78%, var(--natur-jord-moerk) 78%);
+}
+/* Svarkortene: dyret i samme størrelse som engelsks billeder (--eng-b, også på en telefon på langs) */
+.natur-dyr { display: inline-flex; align-items: center; justify-content: center; }
+.natur-dyr-tegning { display: block; width: var(--eng-b); height: var(--eng-b); overflow: visible; }
+.natur-dyr-e { font-size: calc(var(--eng-b) * 0.8); line-height: 1; }
+/* Mens hjælpen viser det rigtige dyr, lyser kortet (.lytter); kun de andre kort hviler */
+.runde-krop.natur-opgave .svar-panel.venter { opacity: 1; }
+.runde-krop.natur-opgave .svar-panel.venter .valg-knap:not(.forkert):not(.lytter) { opacity: 0.55; }
+.lektion-tegning .natur-lektion { width: clamp(80px, 15vmin, 140px); height: clamp(80px, 15vmin, 140px); }

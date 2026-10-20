@@ -1,8 +1,8 @@
 /* sw.js — service worker, så spillet virker uden net.
    Ved hver ny udgave: tæl VERSION op. Filerne hentes med cache: 'reload',
    så GitHub Pages' HTTP-cache ikke giver en blanding af gamle og nye filer. */
-const VERSION = 'mat-2026-10-19-v186';
-// FILER-HASH: c204019591e3697c mat-2026-10-19-v186 — opdateres med: node test/test-sw.js --opdater
+const VERSION = 'mat-2026-10-20-v196';
+// FILER-HASH: 99bf3e6adba21361 mat-2026-10-20-v196 — opdateres med: node test/test-sw.js --opdater
 const FILER = [
   './',
   'index.html',
@@ -25,6 +25,7 @@ const FILER = [
   'feedback-forloeb.js',
   'dansk-opgaver.js',
   'engelsk-opgaver.js', // engelsk for begyndere (13-10-2026): ordlisterne og opgaverne
+  'natur-opgaver.js', // natur (20-10-2026): Gæt en lort — dyrene, fakta og opgaverne
   'grafik.js', // tegningerne (fase A): venner, verdener, tårnet, kortet og samledyrene
   'lyd/liste.json', // listen over indtalte klip i lyd/ (tom: Jimmys optagelser er fjernet 12-10; læg hver ny .wav på FILER-listen)
   'manifest.json',
@@ -125,6 +126,12 @@ self.addEventListener('activate', (e) => {
     await Promise.all(navne.filter((n) => n.startsWith('mat-') && n !== VERSION).map((n) => caches.delete(n)));
     await self.clients.claim();
   })());
+});
+
+// Forsiden spørger, hvilken udgave der kører (versionsnummeret i hjørnet, Jimmy 20-10-2026): svaret er VERSION,
+// så tallet altid er den udgave, enheden har gemt — ikke en konstant i app.js, der kan være en anden
+self.addEventListener('message', (e) => {
+  if (e.data === 'version' && e.ports && e.ports[0]) e.ports[0].postMessage(VERSION);
 });
 
 // Cache først (hurtigt og offline), ellers nettet — og gem det, der hentes
