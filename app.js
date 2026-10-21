@@ -67,6 +67,9 @@
     { id: 'engKoekken', fag: 'engelsk', e: '🍴', navn: 'Køkken', emne: 'engKoekken', tale: 'Køkken. Lyt til tingene i køkkenet på engelsk.' },
     { id: 'engHjemme', fag: 'engelsk', e: '🏠', navn: 'Hjemme', emne: 'engHjemme', tale: 'Hjemme. Lyt til tingene derhjemme på engelsk.' },
     { id: 'engLegeplads', fag: 'engelsk', e: '⚽', navn: 'Legeplads', emne: 'engLegeplads', tale: 'Legeplads. Lyt til tingene på legepladsen på engelsk.' },
+    // Mad og tøj (20-10-2026)
+    { id: 'engMad', fag: 'engelsk', e: '🍎', navn: 'Mad', emne: 'engMad', tale: 'Mad. Lyt til maden på engelsk.' },
+    { id: 'engToej', fag: 'engelsk', e: '👕', navn: 'Tøj', emne: 'engToej', tale: 'Tøj. Lyt til tøjet på engelsk.' },
     // «Sig efter mig» (18-10-2026): barnet hører en kort sætning og siger den selv (engelsk-opgaver.js SIG)
     { id: 'engSig', fag: 'engelsk', e: '💬', navn: 'Sig efter mig', emne: 'engSig', tale: 'Sig efter mig. Sig det, du hører på engelsk.' },
   ];
@@ -112,7 +115,9 @@
   // «Vælg selv» (🎒): fagets emner som store ikoner, delt i afsnit (Jimmy 18-10-2026: «når man vælger dansk er det det
   // man kommer ind på»). Hver verden står i præcis ét afsnit af sit fag; overskriften læses op ved tryk (tale).
   // Overskriftens ikon må ikke stå på et kort eller en knap på samme skærm (UI-review 18-10: 📖 lignede lektionsknappen).
-  // Dansk følger læsningens vej: lytte → bogstaverne → læse. Engelsk: de første ord → hverdagens ting → selv sige det.
+  // Dansk følger læsningens vej: lytte → bogstaverne → læse. Engelsk: de første ord og selv sige det øverst, hverdagens ting
+  // og mad og tøj nedenunder — så de 10 kort står på to rækker på iPad liggende (med «Sig det selv» sidst blev det tre
+  // rækker, og 69 px skulle rulles; e2e tjekAlleKortSynlige, 21-10-2026). Eventyrets rækkefølge er ENGELSK_VERDENER.
   const VAELG_GRUPPER = [
     { fag: 'matematik', e: '🔢', navn: 'Tal', tale: 'Tal. Her tæller og regner vi.', verdener: ['taelle', 'plus10', 'venner', 'minus', 'tiere', 'tierbro', 'moenstre'] },
     { fag: 'matematik', e: '📐', navn: 'Former', tale: 'Former. Her leger vi med figurer.', verdener: ['former', 'tegne'] },
@@ -122,8 +127,9 @@
     { fag: 'dansk', e: '🅰️', navn: 'Bogstaver', tale: 'Bogstaver. Her leger vi med bogstaverne.', verdener: ['alfabet', 'jagt'] },
     { fag: 'dansk', e: '📝', navn: 'Læse og skrive', tale: 'Læse og skrive. Her læser vi ord og historier.', verdener: ['lydering', 'smaaord', 'historiebog'] },
     { fag: 'engelsk', e: '🌱', navn: 'De første ord', tale: 'De første ord. Farver, tal, dyr og figurer på engelsk.', verdener: ['engFarver', 'engTal', 'engDyr', 'engFormer'] },
-    { fag: 'engelsk', e: '🧺', navn: 'Hverdagens ting', tale: 'Hverdagens ting. Køkkenet, hjemmet og legepladsen på engelsk.', verdener: ['engKoekken', 'engHjemme', 'engLegeplads'] },
     { fag: 'engelsk', e: '🗣️', navn: 'Sig det selv', tale: 'Sig det selv. Sig det, du hører på engelsk.', verdener: ['engSig'] },
+    { fag: 'engelsk', e: '🧺', navn: 'Hverdagens ting', tale: 'Hverdagens ting. Køkkenet, hjemmet og legepladsen på engelsk.', verdener: ['engKoekken', 'engHjemme', 'engLegeplads'] },
+    { fag: 'engelsk', e: '🛒', navn: 'Mad og tøj', tale: 'Mad og tøj. Lyt til maden og tøjet på engelsk.', verdener: ['engMad', 'engToej'] },
     { fag: 'natur', e: '🔍', navn: 'Dyrenes spor', tale: 'Dyrenes spor. Hvem har været her?', verdener: ['naturLort'] },
   ];
 
@@ -201,6 +207,21 @@
         const t = i * 2 * Math.PI / 48, sn = Math.sin(t);
         return [50 + 2.85 * 16 * sn * sn * sn, 47 - 2.85 * (13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t))];
       }),
+      // Engelsk (20-10-2026): flere figurer — ovalen på højkant (aldrig en cirkel), romben højere end bred (aldrig et
+      // drejet kvadrat), halvcirklen med den flade side nedad, pilen mod højre, korset som et plus og ottekanten med
+      // en flad top som et stopskilt
+      oval: Array.from({ length: 48 }, (_, i) => {
+        const a = i * 2 * Math.PI / 48;
+        return [50 + 31 * Math.cos(a), 50 + 46 * Math.sin(a)];
+      }),
+      rombe: [[50, 4], [84, 50], [50, 96], [16, 50]],
+      halvcirkel: Array.from({ length: 25 }, (_, i) => {
+        const a = Math.PI + i * Math.PI / 24;
+        return [50 + 47 * Math.cos(a), 74 + 47 * Math.sin(a)];
+      }),
+      pil: [[4, 36], [54, 36], [54, 12], [96, 50], [54, 88], [54, 64], [4, 64]],
+      kors: [[36, 6], [64, 6], [64, 36], [94, 36], [94, 64], [64, 64], [64, 94], [36, 94], [36, 64], [6, 64], [6, 36], [36, 36]],
+      ottekant: polygon(8, 47, -Math.PI / 2 + Math.PI / 8),
     };
   })();
   function formSvg(form, farve, drej, medHjoerner) {
@@ -3592,12 +3613,14 @@
     return h('div', { class: 'dansk-billede' }, lyt);
   }
   // «Sig efter mig» (18-10-2026): rejsevennen siger sætningen — 👂 i taleboblen siger den igen. Ved klokken står uret
-  // i boblen (hele timer). Ingen læsetekst: barnet hører sætningen og siger den, og den grønne knap er svaret.
+  // i boblen (hele timer), ved farven og dyret (20-10-2026) ordets billede. Ingen læsetekst: barnet hører sætningen og
+  // siger den, og den grønne knap er svaret.
   function sigVisning(opg, lyt) {
     const v = opg.vis;
-    return h('div', { class: ['sig-efter'].concat(v.klokke ? ['med-ur'] : []).join(' ') }, // uden mellemrum i strengen: tale-tekster.js tager strenge med mellemrum for sætninger
+    const ekstra = v.klokke ? ['med-ur'] : v.billede ? ['med-billede'] : [];
+    return h('div', { class: ['sig-efter'].concat(ekstra).join(' ') }, // uden mellemrum i strengen: tale-tekster.js tager strenge med mellemrum for sætninger
       h('span', { class: 'sig-ven', 'aria-hidden': 'true' }, venTegning(minFigur().id, v.udtryk)),
-      h('div', { class: 'sig-boble' }, v.klokke ? urSvg(v.klokke, false) : null, lyt));
+      h('div', { class: 'sig-boble' }, v.klokke ? urSvg(v.klokke, false) : null, v.billede ? engelskBillede(v.billede) : null, lyt));
   }
   // Farveklatten: en blød, skæv klat (9 buler med forskudte vinkler, glat kurve) i ordets faste farve (--eng-<farve> i
   // app.css) med kontur. Regelmæssige buler lignede en sekskant.
@@ -3619,11 +3642,11 @@
     svg.append(svgEl('path', { d: KLAT, class: 'eng-klat-flade' }), svgEl('circle', { cx: 88, cy: 84, r: 6, class: 'eng-klat-flade' }));
     return svg;
   }
-  // Tallet med terningøjne under: 1–6 på én terning, 7–10 som fem og resten (som terningbillederne i matematik).
-  // Eget navn: hed den talBillede, overskrev den danske talBillede (samme scope — den sidste erklæring vinder)
+  // Tallet med terningøjne under: 1–6 på én terning, 7–11 som fem og resten (som terningbillederne i matematik), 12 som
+  // to seksere. Eget navn: hed den talBillede, overskrev den danske talBillede (samme scope — den sidste erklæring vinder)
   const OEJNE = { 1: [5], 2: [1, 9], 3: [1, 5, 9], 4: [1, 3, 7, 9], 5: [1, 3, 5, 7, 9], 6: [1, 3, 4, 6, 7, 9] };
   function engTalBillede(n) {
-    const sider = n <= 6 ? [n] : [5, n - 5];
+    const sider = n <= 6 ? [n] : n <= 11 ? [5, n - 5] : [6, n - 6];
     const svg = svgEl('svg', { viewBox: '-2 -2 ' + (sider.length * 38 - 2) + ' 38', class: 'eng-terninger', 'aria-hidden': 'true', focusable: 'false' });
     sider.forEach((antal, i) => {
       svg.append(svgEl('rect', { x: i * 38, y: 0, width: 34, height: 34, rx: 8, class: 'eng-terning' }));

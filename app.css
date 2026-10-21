@@ -2893,6 +2893,7 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
   /* «Farver»: ordets egen farve, ens i begge temaer (som --form-0 …) — rød er altid rød */
   --eng-red: #e0302f; --eng-blue: #2f6fe0; --eng-green: #2e9e48; --eng-yellow: #f7d117; --eng-black: #232323;
   --eng-white: #ffffff; --eng-orange: #f5891f; --eng-pink: #f491c1; --eng-purple: #8a4fc4; --eng-brown: #8b5a2b;
+  --eng-grey: #8d959b; --eng-turquoise: #1fb5ad;
   --himmel-moerk: #3d8fc7;
   --himmel-lys: #b9e3ff; /* glansen på Engelsk-kortet: lys himmel, ikke hvid (hvid ligner det kort, der lyser) */
   --eng-b: clamp(64px, 15vmin, 140px); /* billedets side på svarkortene */
@@ -2977,11 +2978,14 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
 }
 .sig-boble .lyt-knap { position: relative; width: clamp(110px, 20vmin, 170px); height: clamp(110px, 20vmin, 170px); font-size: clamp(60px, 11vmin, 96px); }
 .sig-boble .ur-svg { position: relative; width: clamp(150px, 24vmin, 220px); }
+/* Farven eller dyret (20-10-2026): ordets billede i boblen, som uret — 👂 bliver lidt mindre ved siden af */
+.sig-boble .eng-billede { position: relative; --eng-b: clamp(110px, 20vmin, 180px); }
 @supports (width: 1cqw) {
   .sig-ven { font-size: min(220px, 34cqw, 70cqh); }
   .sig-boble .lyt-knap { width: min(170px, 28cqw, 50cqh); height: min(170px, 28cqw, 50cqh); font-size: min(96px, 16cqw, 28cqh); }
-  .sig-efter.med-ur .lyt-knap { width: min(120px, 18cqw, 36cqh); height: min(120px, 18cqw, 36cqh); font-size: min(68px, 10cqw, 20cqh); }
+  .sig-efter.med-ur .lyt-knap, .sig-efter.med-billede .lyt-knap { width: min(120px, 18cqw, 36cqh); height: min(120px, 18cqw, 36cqh); font-size: min(68px, 10cqw, 20cqh); }
   .sig-boble .ur-svg { width: min(220px, 30cqw, 62cqh); min-width: 142px; }
+  .sig-boble .eng-billede { --eng-b: min(180px, 26cqw, 56cqh); }
 }
 @container (orientation: portrait) {
   .sig-efter { flex-direction: column; }
@@ -2989,8 +2993,9 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
   .sig-boble { margin: 10px 0 0; }
   .sig-boble::before { left: 50%; top: -16px; margin: 0 0 0 -14px; transform: rotate(135deg); }
   .sig-boble .lyt-knap { width: min(170px, 46cqw, 30cqh); height: min(170px, 46cqw, 30cqh); font-size: min(96px, 26cqw, 17cqh); }
-  .sig-efter.med-ur .lyt-knap { width: min(120px, 26cqw, 30cqh); height: min(120px, 26cqw, 30cqh); font-size: min(68px, 15cqw, 17cqh); }
+  .sig-efter.med-ur .lyt-knap, .sig-efter.med-billede .lyt-knap { width: min(120px, 26cqw, 30cqh); height: min(120px, 26cqw, 30cqh); font-size: min(68px, 15cqw, 17cqh); }
   .sig-boble .ur-svg { width: min(220px, 50cqw, 30cqh); }
+  .sig-boble .eng-billede { --eng-b: min(180px, 40cqw, 28cqh); }
 }
 /* Svaret: den grønne knap (som ✔ på taltastaturet) — tegnet for at tale og teksten.
    Den hvide tekst står kun på --rigtig eller mørkere (4,7:1); lyset på knappen kommer fra den hvide cirkel om 🗣️ */
