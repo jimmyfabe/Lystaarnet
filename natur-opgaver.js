@@ -118,6 +118,31 @@
     kanin: 'lille', mus: 'lille', regnorm: 'lille', kaalorm: 'lille', bi: 'lille', vildsvin: 'mellem', krondyr: 'lille',
     rotte: 'lille', ulv: 'mellem', odder: 'mellem', baever: 'lille', skovmaar: 'lille', flagermus: 'lille',
   };
+  // Fodsporene (trin 0, 21-10-2026: «Hvem har gået her?»): kun de 20 dyr med et kildebelagt fodspor (uden sporOrd). naer =
+  // sporene ligner hinanden på tegningerne (klove, poter med fire tæer, fem tæer, hop to og to, fugle); symmetrisk (test).
+  // fakta siges efter det rigtige svar og står ordret i docs/NATUR-FAKTA.md under «Spillet siger (spor)».
+  const SPOR = {
+    ko: { naer: ['hest', 'faar', 'raadyr', 'krondyr', 'vildsvin'], fakta: 'Koen har to klove på hver fod, så sporet er to store halvdele.' },
+    hest: { naer: ['ko'], fakta: 'Hesten har én stor hov på hver fod, så sporet er ét helt aftryk.' },
+    hare: { naer: ['egern', 'mus', 'skovmaar'], fakta: 'Haren hopper, og de lange bagfødder lander foran de små forfødder.' },
+    pindsvin: { naer: ['rotte', 'graevling', 'skovmaar'], fakta: 'Pindsvinets forfod har fem tæer og ligner en lille hånd.' },
+    hund: { naer: ['kat', 'raev', 'ulv'], fakta: 'Hunden har fire tæer med kløer, og den løber kors og tværs.' },
+    kat: { naer: ['hund', 'raev', 'ulv'], fakta: 'Kattens spor er rundt med fire tæer og ingen kløer.' },
+    hoene: { naer: ['gaas'], fakta: 'Hønen har tre tæer fremad og én lille tå bagud.' },
+    faar: { naer: ['ko', 'raadyr', 'krondyr', 'vildsvin'], fakta: 'Fåret har to klove, og den ene er lidt større end den anden.' },
+    egern: { naer: ['hare', 'mus', 'skovmaar'], fakta: 'Egernet har fire tæer på forfoden og fem på bagfoden.' },
+    raev: { naer: ['hund', 'kat', 'ulv'], fakta: 'Rævens spor er smalt, og sporene ligger på en næsten lige linje.' },
+    raadyr: { naer: ['ko', 'faar', 'krondyr', 'vildsvin'], fakta: 'Rådyret har to smalle, spidse klove, som et hjerte på hovedet.' },
+    graevling: { naer: ['pindsvin', 'odder', 'skovmaar'], fakta: 'Grævlingen har fem tæer på en lige linje og lange kløer.' },
+    gaas: { naer: ['hoene'], fakta: 'Gåsen har svømmehud mellem de tre tæer, der peger frem.' },
+    mus: { naer: ['hare', 'egern', 'rotte'], fakta: 'Musen hopper, og i sne ses tit en streg fra halen.' },
+    vildsvin: { naer: ['ko', 'faar', 'raadyr', 'krondyr'], fakta: 'Vildsvinet har to runde klove og to små klove langt ude til siderne.' },
+    krondyr: { naer: ['ko', 'faar', 'raadyr', 'vildsvin'], fakta: 'Krondyrets to klove er større end rådyrets.' },
+    rotte: { naer: ['pindsvin', 'mus'], fakta: 'Rottens bagfod er lang og har fem tæer.' },
+    ulv: { naer: ['hund', 'kat', 'raev'], fakta: 'Ulvens spor ligner en stor hunds, og ulven traver i en næsten lige række.' },
+    odder: { naer: ['graevling', 'skovmaar'], fakta: 'Odderen har svømmehud mellem sine fem tæer.' },
+    skovmaar: { naer: ['hare', 'pindsvin', 'egern', 'graevling', 'odder'], fakta: 'Skovmåren hopper, så dens spor ligger to og to.' },
+  };
   const KERNE = 10;
   const MELLEM = 20;
   const DYR_ID = {};
@@ -126,55 +151,72 @@
   const erDyr = (id) => typeof id === 'string' && Object.prototype.hasOwnProperty.call(DYR_ID, id);
   const stort = (t) => t.charAt(0).toUpperCase() + t.slice(1);
 
-  // ---------- Verdenen (én i piloten; «Hvem spiser hvad?» og «Hvor bor dyret?» kan komme som de næste) ----------
+  // ---------- Verdenerne: «Gæt en lort» (pilot 20-10) og «Hvem har gået her?» (trin 0, 21-10: kun sporet) ----------
   const VERDENER = {
     naturLort: {
       navn: 'Gæt en lort', type: 'naturLort', ikon: '💩', kerne: KERNE,
       spoerg: 'Hvem har lavet den?', tekst: 'Hvem har lavet den?',
       dyr: DYR.map((d) => d.id),
     },
+    naturSpor: {
+      navn: 'Hvem har gået her?', type: 'naturSpor', ikon: '🐾',
+      spoerg: 'Hvem har gået her?', tekst: 'Hvem har gået her?',
+      dyr: DYR.filter((d) => SPOR[d.id]).map((d) => d.id),
+    },
   };
+  // Dyrene, der ligner svaret: lorten (naturLort) eller sporet (naturSpor)
+  const naerFor = (emne, id) => (emne === 'naturSpor' ? SPOR[id].naer : DYR_ID[id].naer);
 
   // ---------- Opgaven: se lorten (og sporet) → tryk på dyret ----------
   // Niveau 1: to valg blandt de første KERNE dyr, sporet ses · 2: tre valg blandt de første MELLEM, sporet ses · 3: tre
   // valg blandt alle, hvoraf ét er «nært», og sporet kommer først med hjælpen (på niveau 1–2 aldrig et dyr, der ligner
-  // svaret, blandt valgene).
+  // svaret, blandt valgene). «Hvem har gået her?» bruger de samme niveauer, men kun dyrene med et fodspor (9 · 14 · 20).
   const antalValg = (niveau) => (niveau <= 1 ? 2 : 3);
-  const puljeFor = (niveau) => DYR.slice(0, niveau <= 1 ? KERNE : niveau === 2 ? MELLEM : DYR.length).map((d) => d.id);
+  const puljeFor = (niveau, emne) => {
+    const dyr = VERDENER[emne || 'naturLort'].dyr;
+    return DYR.slice(0, niveau <= 1 ? KERNE : niveau === 2 ? MELLEM : DYR.length).map((d) => d.id).filter((id) => dyr.indexOf(id) >= 0);
+  };
   const ros = (d) => 'Ja! Det er ' + d.bestemt + '.';
   const visDyret = (d) => 'Det er ' + d.bestemt + '. Tryk på den, der lyser.';
   const seSporet = (d) => 'Se ' + (d.sporOrd || 'sporet') + '. ' + d.ledetraad;
   function gaetLort(niveau, rng) { return opgaveFor(niveau, vaelg(rng, puljeFor(niveau)), rng); }
+  function hvemGik(niveau, rng) { return opgaveFor(niveau, vaelg(rng, puljeFor(niveau, 'naturSpor')), rng, 'naturSpor'); }
   // Opgaven med et bestemt dyr (runden vælger selv dyrene): valgene er andre dyr fra niveauets pulje
-  function opgaveFor(niveau, id, rng) {
-    const pulje = puljeFor(niveau);
-    const d = DYR_ID[id];
-    const andre = pulje.filter((x) => x !== id);
-    const fjerne = bland(rng, andre.filter((x) => d.naer.indexOf(x) < 0));
-    const naere = bland(rng, andre.filter((x) => d.naer.indexOf(x) >= 0));
+  function opgaveFor(niveau, id, rng, emne) {
+    emne = emne || 'naturLort';
+    const naer = naerFor(emne, id);
+    const andre = puljeFor(niveau, emne).filter((x) => x !== id);
+    const fjerne = bland(rng, andre.filter((x) => naer.indexOf(x) < 0));
+    const naere = bland(rng, andre.filter((x) => naer.indexOf(x) >= 0));
     const forkerte = (niveau >= 3 ? naere.slice(0, 1) : []).concat(fjerne).slice(0, antalValg(niveau) - 1);
-    return bygOpgave(niveau, id, bland(rng, forkerte.concat([id])));
+    return bygOpgave(niveau, id, bland(rng, forkerte.concat([id])), emne);
   }
   // Opgaven ud fra dyret og valgene. Al tekst kommer herfra — også i en gentagelse fra de gemte data (lavRunde)
-  function bygOpgave(niveau, id, valg) {
-    const V = VERDENER.naturLort;
+  function bygOpgave(niveau, id, valg, emne) {
+    emne = emne || 'naturLort';
+    const V = VERDENER[emne];
     const d = DYR_ID[id];
+    const sporAlene = emne === 'naturSpor';
     return {
-      fag: 'natur', emne: 'naturLort', type: V.type, niveau: niveau, noegle: V.type + ':' + id, ikon: V.ikon,
+      fag: 'natur', emne: emne, type: V.type, niveau: niveau, noegle: V.type + ':' + id, ikon: V.ikon,
       tale: V.spoerg,
       tekst: V.tekst,
-      vis: { art: 'naturLort', dyr: id, spor: niveau < 3 },
+      // «Hvem har gået her?» viser kun sporet, stort; «Gæt en lort» lorten og (på niveau 1–2) sporet ved siden af
+      vis: sporAlene ? { art: 'naturSpor', dyr: id } : { art: 'naturLort', dyr: id, spor: niveau < 3 },
       svar: id, valg: valg, valgArt: 'billede',
       ros: ros(d),                      // efter det rigtige svar: «Ja! Det er ræven.» …
-      fakta: d.fakta,                   // … og så én sand sætning om dyret
-      // Fejl straffes aldrig: først sporet og en ledetråd, så lyser det rigtige dyr
+      fakta: sporAlene ? SPOR[id].fakta : d.fakta, // … og så én sand sætning om dyret (dets lort eller dets spor)
+      // Fejl straffes aldrig: først sporet (det lyser) og en ledetråd, så lyser det rigtige dyr
       hjaelp: [{ art: 'naturSpor', tale: seSporet(d) }, { art: 'visNatur', tale: visDyret(d) }],
     };
   }
-  const GEN = { naturLort: gaetLort };
+  const GEN = { naturLort: gaetLort, naturSpor: hvemGik };
 
   // Emner (verdener) og niveauer — samme form som opgaver.js/dansk-opgaver.js, så rundemotoren og gem.js kan bruge dem
-  const EMNER = { naturLort: { navn: VERDENER.naturLort.navn, maxNiveau: 3, niveauer: { 1: ['naturLort'], 2: ['naturLort'], 3: ['naturLort'] } } };
+  const EMNER = {
+    naturLort: { navn: VERDENER.naturLort.navn, maxNiveau: 3, niveauer: { 1: ['naturLort'], 2: ['naturLort'], 3: ['naturLort'] } },
+    naturSpor: { navn: VERDENER.naturSpor.navn, maxNiveau: 3, niveauer: { 1: ['naturSpor'], 2: ['naturSpor'], 3: ['naturSpor'] } },
+  };
 
   // Ingen fast pulje som i opgaver.js: stemmens sætninger afhænger kun af dyret (saetninger), og runden vælger selv dyrene
   function lavOpgave(type, niveau, rng) { return GEN[type](niveau, rng); }
@@ -182,16 +224,18 @@
   // En gentagelse passer kun til en runde på samme niveau: samme antal valg, valgene fra niveauets dyr og et «nært» dyr
   // kun på niveau 3 — og sporet vises som på rundens niveau
   function passerTilNiveau(o, niveau) {
-    const pulje = puljeFor(niveau);
+    if (!o || !Object.prototype.hasOwnProperty.call(VERDENER, o.emne)) return false;
+    const pulje = puljeFor(niveau, o.emne);
     if (!Array.isArray(o.valg) || o.valg.length !== antalValg(niveau) || pulje.indexOf(o.svar) < 0) return false;
     if (new Set(o.valg).size !== o.valg.length || o.valg.indexOf(o.svar) < 0 || !o.valg.every((v) => pulje.indexOf(v) >= 0)) return false;
-    if (!o.vis || o.vis.spor !== (niveau < 3)) return false;
-    return niveau >= 3 || !o.valg.some((v) => DYR_ID[o.svar].naer.indexOf(v) >= 0);
+    if (o.emne === 'naturLort' && (!o.vis || o.vis.spor !== (niveau < 3))) return false;
+    return niveau >= 3 || !o.valg.some((v) => naerFor(o.emne, o.svar).indexOf(v) >= 0);
   }
   // En gemt opgave (afbrudt mission, «kommer igen») kan stamme fra en anden udgave: kun hvis dyrene stadig findes
   function opgaveKendt(o) {
-    return !!(o && o.fag === 'natur' && EMNER[o.emne] && GEN[o.type] && o.vis && o.vis.art === 'naturLort' && erDyr(o.svar) &&
-      o.vis.dyr === o.svar && Array.isArray(o.valg) && o.valg.every(erDyr) && Array.isArray(o.hjaelp));
+    const V = o && Object.prototype.hasOwnProperty.call(VERDENER, o.emne) ? VERDENER[o.emne] : null;
+    return !!(V && o.fag === 'natur' && o.type === V.type && o.vis && o.vis.art === V.type && erDyr(o.svar) &&
+      V.dyr.indexOf(o.svar) >= 0 && o.vis.dyr === o.svar && Array.isArray(o.valg) && o.valg.every(erDyr) && Array.isArray(o.hjaelp));
   }
 
   // En runde: forskellige dyr, så længe der er nok, og aldrig samme dyr to gange i træk. Svære dyr fra sidst (gentag) får
@@ -203,7 +247,7 @@
     opts = opts || {};
     const antal = opts.antal || 5;
     niveau = Math.min(EMNER[emneId].maxNiveau, Math.max(1, Math.round(Number(niveau)) || 1));
-    const pulje = puljeFor(niveau);
+    const pulje = puljeFor(niveau, emneId);
     const brugt = Object.create(null); // dyr → gange i denne runde
     const plads = {};
     const nylige = (Array.isArray(opts.nylige) ? opts.nylige : []).filter(erDyr);
@@ -218,7 +262,7 @@
       .forEach((o, i) => {
         const p = Math.min(antal - 1, 2 + i);
         if (plads[p]) return;
-        plads[p] = Object.assign(bygOpgave(niveau, o.svar, o.valg.slice()), { gentaget: true });
+        plads[p] = Object.assign(bygOpgave(niveau, o.svar, o.valg.slice(), emneId), { gentaget: true });
         brugt[o.svar] = 1;
       });
     const runde = [];
@@ -232,19 +276,20 @@
         .filter((x) => !(forrige && forrige.svar === x) && !(naeste && naeste.svar === x))
         .sort((a, b) => ((brugt[a] || 0) - (brugt[b] || 0)) || (trin(a) - trin(b)))[0];
       brugt[id] = (brugt[id] || 0) + 1;
-      runde.push(opgaveFor(niveau, id, rng));
+      runde.push(opgaveFor(niveau, id, rng, emneId));
     }
     return runde;
   }
 
   // Alle sætninger, stemmen kan sige i natur (vaerktoej/tale-tekster.js laver Piper-filerne ud fra dem)
   function saetninger() {
-    const ud = [VERDENER.naturLort.spoerg];
+    const ud = [VERDENER.naturLort.spoerg, VERDENER.naturSpor.spoerg];
     for (const d of DYR) ud.push(ros(d), d.fakta, seSporet(d), visDyret(d), stort(d.navn) + '.');
+    for (const id of VERDENER.naturSpor.dyr) ud.push(SPOR[id].fakta);
     return ud;
   }
 
-  const Natur = { DYR, DYR_ID, STOERRELSER, KERNE, MELLEM, VERDENER, EMNER, GEN, antalValg, lavOpgave, opgaveFor, lavRunde, passerTilNiveau, opgaveKendt, saetninger, lavRng };
+  const Natur = { DYR, DYR_ID, SPOR, STOERRELSER, KERNE, MELLEM, VERDENER, EMNER, GEN, antalValg, puljeFor, lavOpgave, opgaveFor, lavRunde, passerTilNiveau, opgaveKendt, saetninger, lavRng };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Natur;
   else root.Natur = Natur;

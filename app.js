@@ -74,10 +74,12 @@
     { id: 'engSig', fag: 'engelsk', e: '💬', navn: 'Sig efter mig', emne: 'engSig', tale: 'Sig efter mig. Sig det, du hører på engelsk.' },
   ];
 
-  // Natur (pilot 20-10-2026, natur-opgaver.js): se lorten og sporet → tryk på dyret. Åben fra start; fremskridtet gemmes
-  // som engelsk i data.dansk[emne] (gem.js kender emnet).
+  // Natur (pilot 20-10-2026, natur-opgaver.js): se lorten og sporet → tryk på dyret; «Hvem har gået her?» (trin 0,
+  // 21-10-2026): kun sporet. Åbne fra start; fremskridtet gemmes som engelsk i data.dansk[emne] (gem.js kender emnet).
+  // hvad: voksnes overblik (voksen.js indlæser ikke natur-opgaver.js).
   const NATUR_VERDENER = [
-    { id: 'naturLort', fag: 'natur', e: '💩', navn: 'Gæt en lort', emne: 'naturLort', tale: 'Gæt en lort. Hvem har lavet den?' },
+    { id: 'naturLort', fag: 'natur', e: '💩', navn: 'Gæt en lort', emne: 'naturLort', hvad: 'Lort og spor → dyr', tale: 'Gæt en lort. Hvem har lavet den?' },
+    { id: 'naturSpor', fag: 'natur', e: '🐾', navn: 'Hvem har gået her?', emne: 'naturSpor', hvad: 'Spor → dyr', tale: 'Hvem har gået her? Se sporet, og tryk på dyret.' },
   ];
 
   // Fagene på fagvalget i tastaturets rækkefølge (1, 2, 3, 4). Engelsk og natur kun, når deres opgavefil er indlæst.
@@ -110,6 +112,7 @@
     jagt: 'I Bogstavjagten flyver der bobler med bogstaver. Lyt til lyden, og stryg gennem det bogstav, du hører — med fingeren eller pennen.',
     historiebog: 'I Historiebogen er der små historier. Tryk på et ord, så hører du det. Læs historien, tegn den, og skriv et ord fra den.',
     naturLort: 'Alle dyr laver lort, og den ser forskellig ud. Se på lorten og på sporet. Tryk så på det dyr, der har lavet den.',
+    naturSpor: 'Når et dyr går i mudder eller sne, sætter det spor. Se på sporet. Tryk så på det dyr, der har gået her.',
   };
 
   // «Vælg selv» (🎒): fagets emner som store ikoner, delt i afsnit (Jimmy 18-10-2026: «når man vælger dansk er det det
@@ -130,7 +133,7 @@
     { fag: 'engelsk', e: '🗣️', navn: 'Sig det selv', tale: 'Sig det selv. Sig det, du hører på engelsk.', verdener: ['engSig'] },
     { fag: 'engelsk', e: '🧺', navn: 'Hverdagens ting', tale: 'Hverdagens ting. Køkkenet, hjemmet og legepladsen på engelsk.', verdener: ['engKoekken', 'engHjemme', 'engLegeplads'] },
     { fag: 'engelsk', e: '🛒', navn: 'Mad og tøj', tale: 'Mad og tøj. Lyt til maden og tøjet på engelsk.', verdener: ['engMad', 'engToej'] },
-    { fag: 'natur', e: '🔍', navn: 'Dyrenes spor', tale: 'Dyrenes spor. Hvem har været her?', verdener: ['naturLort'] },
+    { fag: 'natur', e: '🔍', navn: 'Dyrenes spor', tale: 'Dyrenes spor. Hvem har været her?', verdener: ['naturLort', 'naturSpor'] },
   ];
 
   // Skolens ord bruges i oplæsningen (tælle videre, tage væk, forskel, 10'er-venner …)
@@ -2292,7 +2295,7 @@
       maerke: O.maerkeForRunde(T.samling, data.runderIalt, minFigur().e, data.maerker), // dyret, vi hjælper — kendt fra start
       navnMaa: navnTur(), // barnets navn må siges én gang i denne runde (hver anden runde)
     };
-    visRundeSkaerm(false, opts.frit ? verden.navn + '.' : '');
+    visRundeSkaerm(false, opts.frit ? fritIntro(verden, opgaver) : '');
   }
 
   // Hvert fag husker sin egen afbrudte mission (fund 5, Jimmy 11-10-2026): matematik i data.pauset (som altid),
@@ -3695,12 +3698,20 @@
   }
 
   // ---------- Natur (pilot 20-10-2026): «Gæt en lort» — se lorten (og sporet), tryk på dyret. Ingen læsetekst. ----------
+  // «Hvem har gået her?» (trin 0, 21-10-2026, vis.art 'naturSpor'): kun sporet, stort, på samme skovbund.
   // Lorten står stort på en stribe skovbund, sporet ved siden af. På niveau 3 er sporet skjult, til hjælpen viser det
   // (naturSpor). Kun spillets egne tegninger (grafik.js natur); mangler en, står emojien — uglens «spor» er dens træ.
   const naturTegning = (navn, klasse) => (GR && GR.natur ? tegning(GR.natur[navn], klasse) : null);
   function naturVisning(opg) {
     const id = opg.vis.dyr;
     const d = N && N.DYR_ID[id];
+    if (opg.vis.art === 'naturSpor') {
+      // Sporet har klassen natur-spor, så hjælpens første trin (naturSpor) får det til at lyse
+      return h('div', { class: ['natur-scene', 'spor-alene'].join(' '), 'aria-hidden': 'true' },
+        h('div', { class: 'natur-fund' }, h('div', { class: 'natur-spor' },
+          naturTegning('spor-' + id, 'natur-tegning') || h('span', { class: 'natur-e' }, '🐾'))),
+        h('div', { class: 'natur-jord' }));
+    }
     // Barnefingeren i lortens målestok (lille · mellem · stor, natur-opgaver.js STOERRELSER) peger ind fra venstre; hånden
     // tegnes langt ud over kassen, så feltets kant (overflow: hidden) klipper den — den kommer «udefra»
     const tegnet = naturTegning('lort-' + id, 'natur-tegning');
@@ -6596,9 +6607,21 @@
       case 'historiebog': return ['📖', '🖍️', '✏️'].map((e) => h('span', { class: 'lektion-emoji' }, e));
       // Natur: lorten, sporet og dyret, der har lavet dem (ræven) — tegningerne fra grafik.js, ellers emojien
       case 'naturLort': return [['lort-raev', '💩'], ['spor-raev', '🐾'], ['dyr-raev', '🦊']].map(([navn, e]) => naturTegning(navn, 'natur-lektion') || h('span', { class: 'lektion-emoji' }, e));
+      // «Hvem har gået her?»: sporet og dyret, der har sat det (hunden)
+      case 'naturSpor': return [['spor-hund', '🐾'], ['dyr-hund', '🐕']].map(([navn, e]) => naturTegning(navn, 'natur-lektion') || h('span', { class: 'lektion-emoji' }, e));
       case 'jagt': return [h('span', { class: 'lektion-emoji' }, '🫧'), h('span', { class: 'bogstav-kort lektion-bogstav' }, h('span', { class: 'bogstav-stort' }, 'S'), h('span', { class: 'bogstav-lille' }, 's'))];
       default: return fyrtaarn();
     }
+  }
+
+  // Verdens navn som én sætning: «Gæt en lort.» — et navn, der selv er et spørgsmål («Hvem har gået her?»), får intet
+  // punktum (ellers en sætning uden Piper-fil, som enhedens stemme læser)
+  function navnSaetning(v) {
+    return /[.?!]$/.test(v.navn) ? v.navn : v.navn + '.';
+  }
+  // Vælg selv siger verdens navn før rundens første spørgsmål — men ikke, når navnet er det spørgsmål
+  function fritIntro(verden, opgaver) {
+    return opgaver[0] && opgaver[0].tale === verden.navn ? '' : navnSaetning(verden);
   }
 
   function visLektion(verden, start, tilbage) {
@@ -6610,14 +6633,14 @@
     skift(h('div', { class: 'skaerm lektion' },
       h('div', { class: 'topbar' },
         ikonKnap('⬅️', 'Tilbage', () => tilbage()),
-        h('div', { class: 'topbar-titel' }, verdenIkonLille(verden, 'titel-ikon'), ' ' + verden.navn),
+        h('div', { class: ['topbar-titel'].concat(verden.navn.length > 16 ? ['lang'] : []).join(' ') }, verdenIkonLille(verden, 'titel-ikon'), ' ' + verden.navn),
         hoejttaler()),
       h('div', { class: 'lektion-midte' },
         h('div', { class: 'lektion-tegning', 'aria-hidden': 'true' }, lektionTegning(verden.id)),
         h('p', { class: 'lektion-tekst' }, tekst),
         knap)),
     (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); knap.click(); } else if (e.key === 'Escape') tilbage(); });
-    Tale.sig(verden.navn + '. ' + tekst);
+    Tale.sig(navnSaetning(verden) + ' ' + tekst);
   }
 
   // ---------- Samlebog ----------
@@ -6723,7 +6746,7 @@
       hentMission();
       visStart();
     } else if (T.side === 'voksen' && window.Voksen) {
-      window.Voksen.start({ h, G, O, D, lager, voksen, Lyd, Tale, Piper, Forloeb, KlipLager, lavOptager, skift, hop, vent, FIGURER, venTegning, vaekstTegning, VERDENER, DANSK_VERDENER, fyrtaarn, tegnVisning, valgIndhold, gemVoksen, lagerAdvarsel });
+      window.Voksen.start({ h, G, O, D, lager, voksen, Lyd, Tale, Piper, Forloeb, KlipLager, lavOptager, skift, hop, vent, FIGURER, venTegning, vaekstTegning, VERDENER, DANSK_VERDENER, NATUR_VERDENER, fyrtaarn, tegnVisning, valgIndhold, gemVoksen, lagerAdvarsel });
     } else {
       visIndex();
     }

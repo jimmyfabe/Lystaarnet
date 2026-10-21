@@ -21,6 +21,7 @@
     const { h, G, O, lager, voksen, Lyd, Tale, Forloeb, skift, hop, FIGURER, venTegning, VERDENER, tegnVisning, valgIndhold } = ctx;
     const D = ctx.D;
     const DANSK_VERDENER = (ctx.DANSK_VERDENER || []).filter((v) => v.emne && D && D.EMNER[v.emne]); // dansk med opgaver
+    const NATUR_VERDENER = ctx.NATUR_VERDENER || []; // natur-opgaver.js indlæses ikke her: navn og hvad står i app.js
     const VO = window.VoksenOpgaver;
     // Vækststigen (forslag B, 15-10-2026): trinet regnes af de gemte emner ved hver start — også for data fra før stigen,
     // så den voksne lander på det trin, emnerne allerede giver. Intet andet ændres; det gemmes med den næste ændring.
@@ -718,9 +719,11 @@
           h('td', null, !j ? 'Ikke prøvet endnu' : 'Trin ' + j.niveau + ' af 3'), h('td', null, j ? j.runder + (j.runder === 1 ? ' runde' : ' runder') : ''),
           h('td', null, pct === null ? '' : pct + ' % rigtige i første forsøg')));
       }
-      // Natur (natur-opgaver.js indlæses ikke her): «naturLort:raev» → «Gæt en lort: ræv» — id'erne staver æ/å som ae/aa
-      // (test-natur tjekker det for hvert dyr)
-      const beskrivNatur = (n) => (/^naturLort:[a-z]+$/.test(n) ? 'Gæt en lort: ' + n.slice(10).replace(/ae/g, 'æ').replace(/aa/g, 'å').replace(/oe/g, 'ø') : null);
+      // Natur (trin 0, 21-10-2026): sin egen række pr. verden — runder i alt og % rigtige i første forsøg (pilotens måling)
+      const naturRaekker = NATUR_VERDENER.map((v) => raekke(v, d.dansk[v.emne], v.hvad));
+      // Natur (natur-opgaver.js indlæses ikke her): «naturLort:raev» → «Gæt en lort: ræv», «naturSpor:raev» → «Spor: ræv»
+      // (kort, uden stationens «?» midt i linjen) — id'erne staver æ/å som ae/aa (test-natur tjekker det for hvert dyr)
+      const beskrivNatur = (n) => { const m = /^(naturLort|naturSpor):([a-z]+)$/.exec(n); return m ? (m[1] === 'naturLort' ? 'Gæt en lort: ' : 'Spor: ') + m[2].replace(/ae/g, 'æ').replace(/aa/g, 'å').replace(/oe/g, 'ø') : null; };
       const beskriv = (n) => beskrivNatur(n) || (D && D.beskrivNoegle(n)) || O.beskrivNoegle(n);
       // Det driller (flest fejl, seneste først)
       const driller = [];
@@ -734,6 +737,7 @@
           h('section', null, h('h2', null, 'Tid'), h('p', null, 'I dag: ' + idag.min + ' min' + (voksen.tidsgraense[b.id] ? ' (grænse ' + voksen.tidsgraense[b.id] + ' min)' : '') + ' · runder i alt: ' + d.runderIalt + ' · dyr i samlebogen: ' + antalDyr), soejler),
           h('section', null, h('h2', null, 'Matematik'), h('table', { class: 'overblik-tabel' }, verdener)),
           danskRaekker.length ? h('section', null, h('h2', null, 'Dansk'), h('table', { class: 'overblik-tabel' }, danskRaekker)) : null,
+          naturRaekker.length ? h('section', null, h('h2', null, 'Natur'), h('table', { class: 'overblik-tabel' }, naturRaekker)) : null,
           h('section', null, h('h2', null, 'Det driller lige nu'),
             driller.length ? h('ul', null, driller.slice(0, 5).map((x) => h('li', null, beskriv(x.n) + ' — ' + x.antal + (x.antal === 1 ? ' gang' : ' gange'))))
               : h('p', null, 'Ingen opgaver, der driller endnu.')),
