@@ -2171,7 +2171,169 @@
         hjaelp: [{ art: 'stilKvarter', fra: start, kvarterer: 2 }, { art: 'visUr', klokke: svar }],
       });
     },
+
+    // =====================================================================
+    //  Variation (20-10-2026): «Hvem passer ikke ind?» og «Hvad mangler?» — barnet løser dem med øjne, ører og
+    //  fingre. Hjælperne (udenforKort, udenforSumOpgave, manglerRaekke) står lige efter G.
+    // =====================================================================
+
+    // Tælleskoven: tre af fire kort har lige mange. Kortene er tegnet på fire måder (terning, to slags ting, klodser),
+    // så det ene kort kun kan findes ved at tælle — ikke ved at se, hvilket kort der ser anderledes ud
+    udenforAntal(niveau, rng, tingListe) {
+      const max = niveau >= 2 ? 10 : 6;
+      const n = heltal(rng, niveau >= 2 ? 4 : 2, niveau >= 2 ? 9 : 5);
+      const anden = vaelg(rng, [n - 1, n + 1].filter((x) => x >= 1 && x <= max));
+      const t1 = vaelgTing(rng, tingListe).ting;
+      // Den anden ting: helst fra temaet — har temaet ingen anden brugbar ting, så fra alle ting (som vaelgTing)
+      const andre = (liste) => liste.map((k) => TING[k]).filter((t) => t && t.e !== t1.e);
+      const fraTema = andre(tingListe && tingListe.length ? tingListe : Object.keys(TING));
+      const t2 = vaelg(rng, fraTema.length ? fraTema : andre(Object.keys(TING)));
+      // r: 0 terning · 1 temaets ting · 2 en anden ting (begge i rækker af 5 — én lang linje gjorde alle kort små) · 3 klodser (tal i fakta — de siges aldrig)
+      // 7–10 er to terninger side om side, fem og resten (som udenforSum): de to på én tegning blev det mindste kort, med
+      // øjne på 7–9 px på en iPhone (ui-review 21-10-2026)
+      const terning = (x) => ({ t: 'ting', e: terningTegn(x), n: 1, taelbar: false });
+      const kortAf = (r, k) => ({
+        dele: r === 0 ? (k > 6 ? [terning(5), terning(k - 5)] : [terning(k)]) : [r === 3 ? { t: 'klodser', a: k, b: 0 }
+          : { t: 'ting', e: (r === 1 ? t1 : t2).e, n: k }],
+        navn: r === 0 ? (k > 6 ? 'terningerne med ' : 'terningen med ') + k : r === 3 ? (k === 1 ? 'en klods' : k + ' klodser') : antalOrd(k, r === 1 ? t1 : t2),
+        fakta: { r: r, n: k },
+      });
+      const ulige = heltal(rng, 0, 3);
+      const u = udenforKort(rng, kortAf(ulige, anden), [0, 1, 2, 3].filter((r) => r !== ulige).map((r) => kortAf(r, n)), (k) => 'Her er ' + k.fakta.n + '.');
+      return {
+        emne: 'taelle', type: 'udenforAntal', niveau, noegle: 'udenforAntal:' + n + '|' + ulige + '>' + anden, ikon: '🔎',
+        tale: 'Tre af kortene har lige mange. Hvilket kort passer ikke ind?',
+        tekst: 'Hvem passer ikke ind?',
+        vis: { art: 'lyt', fakta: { ens: n, ulige: anden } },
+        svar: u.svar, valg: u.valg, kort: u.kort, valgArt: 'scene',
+        hjaelp: u.hjaelp,
+      };
+    },
+    // Plusbjerget: tre kort har lige mange i alt (trin 1: to bunker ting, i alt 4–5 · trin 2: to terninger, i alt 6–9)
+    udenforSum(niveau, rng, tingListe) {
+      return udenforSumOpgave(niveau, rng, tingListe, {
+        emne: 'plus10', type: 'udenforSum', fra: niveau >= 2 ? 6 : 4, til: niveau >= 2 ? 9 : 5, max: niveau >= 2 ? 10 : 5, terninger: niveau >= 2,
+        tale: 'Tre af kortene har lige mange i alt. Hvilket kort passer ikke ind?',
+      });
+    },
+    // Venneøen: tre kort er 5'er-venner (to terninger med 5 i alt) — det ene har kun 4
+    udenforVen(niveau, rng) {
+      return udenforSumOpgave(niveau, rng, null, {
+        emne: 'venner', type: 'udenforVen', fra: 5, til: 5, max: 5, terninger: true,
+        tale: "Tre af kortene er 5'er-venner. Hvilket kort passer ikke ind?",
+      });
+    },
+    // Tælleskoven: terninger, der går én op — hvilken terning mangler i hullet?
+    manglerOp(niveau, rng) {
+      return manglerRaekke(niveau, rng, { emne: 'taelle', type: 'manglerOp', trin: 1, max: 6, laengde: [4, 5], tale: 'Der kommer én mere hver gang. Hvilken terning mangler?' });
+    },
+    // Minusbjerget: terninger, der går én ned
+    manglerNed(niveau, rng) {
+      return manglerRaekke(niveau, rng, { emne: 'minus', type: 'manglerNed', trin: -1, max: 5, laengde: [3, 5], tale: 'Der bliver én mindre hver gang. Hvilken terning mangler?' });
+    },
+    // Formbyen: figurer i et mønster med et hul (aldrig i den første pakke — hjælpen viser den). Trin 1: AB (to figurer i
+    // to farver) · trin 2: også AAB, ABB og ABC, og et fejlkort med den rigtige figur i en anden farve. Farverne er rød,
+    // blå og gul — aldrig rød og grøn sammen
+    formRaekke(niveau, rng) {
+      const t = niveau >= 2 ? vaelg(rng, ['AB', 'AAB', 'ABB', 'ABC']) : 'AB';
+      const former = bland(rng, FORMER_PR_NIVEAU[niveau] || FORMER_PR_NIVEAU[2]).slice(0, 3);
+      const farver = bland(rng, [0, 1, 2]);
+      const enhed = t.split('').map((c) => ({ form: former['ABC'.indexOf(c)], farve: farver['ABC'.indexOf(c)] }));
+      const raekke = [].concat(enhed, enhed, enhed).slice(0, 6);
+      const hul = heltal(rng, enhed.length, raekke.length - 1);
+      const facit = raekke[hul];
+      const ens = (a, b) => a.form === b.form && a.farve === b.farve;
+      // «den røde cirkel» · «det røde kvadrat» (kønnet efter FORMER's ubestemte form)
+      const kortAf = (b) => {
+        const [kaen, ord] = FORMER[b.form].ubestemt.split(' ');
+        return { dele: [{ t: 'form', form: b.form, farve: b.farve }], navn: (kaen === 'et' ? 'det ' : 'den ') + FORM_FARVE_ORD[b.farve] + ' ' + ord, fakta: { form: b.form, farve: b.farve } };
+      };
+      // Fejl: en anden figur fra mønstret · (trin 2) den rigtige figur i en anden farve (helst en, mønstret ikke bruger)
+      const fejl = bland(rng, enhed.filter((b, i) => !ens(b, facit) && enhed.findIndex((x) => ens(x, b)) === i));
+      if (niveau >= 2) {
+        const fri = [0, 1, 2].filter((f) => f !== facit.farve && !enhed.some((b) => b.farve === f));
+        fejl.splice(1, 0, { form: facit.form, farve: fri.length ? fri[0] : vaelg(rng, [0, 1, 2].filter((f) => f !== facit.farve)) });
+      }
+      const kort = lavKort(rng, kortAf(facit), fejl.map(kortAf), antalValg(niveau));
+      return {
+        emne: 'former', type: 'formRaekke', niveau, noegle: 'formRaekke:' + enhed.map((b) => b.form + b.farve).join('-') + ':' + hul, ikon: '❔',
+        tale: 'Hvilken figur mangler i mønstret?',
+        tekst: 'Hvad mangler?',
+        // Hver gentagelse er én gruppe uden ramme: en smal skærm bryder kun rækken mellem gentagelserne (to og to skjulte
+        // et mønster på tre på en iPhone), og hjælpen lyser hele gentagelsen op. gentagelse: tæt inde i den og bred luft
+        // til den næste (app.css), så «■ ● ? ●» læses som to gentagelser
+        vis: { art: 'scene', fakta: { pakke: enhed.length, hul: hul }, dele: Array.from({ length: raekke.length / enhed.length }, (_, u) => ({
+          t: 'gruppe', id: 'u' + u, ramme: 'ingen', gentagelse: true, dele: enhed.map((_, j) => u * enhed.length + j).map((i) => (i === hul ? { t: 'tal', s: '?', id: 'hul' }
+            : { t: 'form', form: raekke[i].form, farve: raekke[i].farve })) })) },
+        svar: kort.svar, valg: kort.valg, kort: kort.kort, valgArt: 'scene',
+        // Andet trin lyser gentagelsen med hullet — ikke bare den næste (ui-review 21-10-2026: hullet i u2 lyste aldrig)
+        hjaelp: [{ art: 'lys', trin: [{ tale: 'Se på de første ' + enhed.length + '.', lys: ['u0'] }, { tale: 'Så kommer de samme igen.', lys: ['u' + Math.floor(hul / enhed.length)] }] }],
+      };
+    },
   };
+
+  // ---------- Variation (20-10-2026): hjælperne til «Hvem passer ikke ind?» og «Hvad mangler?» ----------
+  // De nye typer (test, tale-tekster.js) · de fire-kort-typer («Hvem passer ikke ind?» har altid fire kort)
+  const VARIATION_TYPER = ['udenforAntal', 'udenforSum', 'udenforVen', 'manglerOp', 'manglerNed', 'formRaekke'];
+  const UDENFOR_TYPER = ['udenforAntal', 'udenforSum', 'udenforVen'];
+  const FORM_FARVE_ORD = ['røde', 'blå', 'gule']; // --form-0, --form-1, --form-2 i app.css
+  // Et tal som tastetegn (5️⃣, 🔟): app.js tegner det som terningbilleder (talBillede) — også i ældre udgaver af spillet
+  function terningTegn(n) { return n === 10 ? String.fromCodePoint(0x1F51F) : String.fromCodePoint(48 + n, 0xFE0F, 0x20E3); }
+  // Fire kort (det ene + tre ens), blandet. Hvert korts indhold får en usynlig ramme med id'et k-<kort>, så hjælpen kan
+  // lyse kortene ét ad gangen og sige, hvad der er på dem (sig(kort) → sætningen)
+  function udenforKort(rng, ulige, ens, sig) {
+    const k = lavKort(rng, ulige, ens, 4);
+    k.valg.forEach((id) => { k.kort[id].dele = [{ t: 'gruppe', id: 'k-' + id, ramme: 'ingen', dele: k.kort[id].dele }]; });
+    return { kort: k.kort, valg: k.valg, svar: k.svar, hjaelp: [{ art: 'lys', trin: k.valg.map((id) => ({ tale: sig(k.kort[id]), lys: ['k-' + id] })) }] };
+  }
+  // Tre kort med samme sum (forskellige opdelinger), det ene med én for meget eller én for lidt — helst med en del, der også
+  // står på et af de andre kort (den typiske fejl: «der er jo også 3 på det»). s: emne, type, fra/til (summen), max (det
+  // største tal på trinnet), terninger (ellers to bunker af temaets ting) og tale.
+  function udenforSumOpgave(niveau, rng, tingListe, s) {
+    const sum = heltal(rng, s.fra, s.til);
+    const delMax = s.terninger ? 6 : 9;
+    const opdel = (x) => { const ud = []; for (let a = 1; a < x; a++) if (a <= delMax && x - a <= delMax) ud.push([a, x - a]); return ud; };
+    const ens = bland(rng, opdel(sum)).slice(0, 3);
+    const anden = vaelg(rng, [sum - 1, sum + 1].filter((x) => x >= 3 && x <= s.max));
+    const muligt = opdel(anden);
+    const naer = muligt.filter(([a, b]) => ens.some(([x, y]) => x === a || y === b));
+    const ulige = vaelg(rng, naer.length ? naer : muligt);
+    const { ting } = vaelgTing(rng, tingListe);
+    const bunke = (n) => (s.terninger ? { t: 'ting', e: terningTegn(n), n: 1, taelbar: false } : { t: 'ting', e: ting.e, n: n });
+    const kortAf = ([a, b]) => ({ dele: [bunke(a), { t: 'tegn', s: '+' }, bunke(b)], navn: a + ' og ' + b, fakta: { a: a, b: b } });
+    const u = udenforKort(rng, kortAf(ulige), ens.map(kortAf), (k) => k.fakta.a + ' og ' + k.fakta.b + ' er ' + (k.fakta.a + k.fakta.b) + '.');
+    return {
+      emne: s.emne, type: s.type, niveau, noegle: s.type + ':' + sum + '|' + ens.map((p) => p.join('+')).sort().join(',') + '>' + ulige.join('+'), ikon: '🔎',
+      tale: s.tale,
+      tekst: 'Hvem passer ikke ind?',
+      vis: { art: 'lyt', fakta: { sum: sum, ulige: anden } },
+      svar: u.svar, valg: u.valg, kort: u.kort, valgArt: 'scene',
+      hjaelp: u.hjaelp,
+    };
+  }
+  // «Hvad mangler?» i en række terninger, der går én op eller én ned. Hullet er aldrig det første (hjælpen tæller frem til
+  // hullet: «1. 2. Og så?»). Fejlkortene er naboerne — tal, der også står i rækken. s: emne, type, trin (+1/−1), max,
+  // laengde [fra, til] og tale.
+  function manglerRaekke(niveau, rng, s) {
+    const L = heltal(rng, s.laengde[0], s.laengde[1]);
+    const foerste = s.trin > 0 ? heltal(rng, 1, s.max - L + 1) : heltal(rng, L, s.max);
+    const tal = Array.from({ length: L }, (_, i) => foerste + i * s.trin);
+    const hul = heltal(rng, 1, L - 1);
+    const svar = tal[hul];
+    const terning = (n) => ({ t: 'ting', e: terningTegn(n), n: 1, taelbar: false });
+    const kortAf = (n) => ({ dele: [terning(n)], navn: 'terningen med ' + n, fakta: { n: n } });
+    const naboer = bland(rng, [svar - 1, svar + 1]).concat([svar + 2, svar - 2]).filter((n) => n >= 1 && n <= s.max);
+    const kort = lavKort(rng, kortAf(svar), naboer.map(kortAf), antalValg(niveau));
+    return {
+      emne: s.emne, type: s.type, niveau, noegle: s.type + ':' + tal.join('-') + ':' + hul, ikon: '❔',
+      tale: s.tale,
+      tekst: 'Hvad mangler?',
+      vis: { art: 'scene', fakta: { start: foerste, trin: s.trin, laengde: L, hul: hul },
+        dele: tal.map((n, i) => (i === hul ? { t: 'tal', s: '?', id: 'hul' } : Object.assign({ id: 't' + i }, terning(n)))) },
+      svar: kort.svar, valg: kort.valg, kort: kort.kort, valgArt: 'scene',
+      hjaelp: [{ art: 'lys', trin: tal.slice(0, hul).map((n, i) => ({ tale: n + '.', lys: ['t' + i] })).concat([{ tale: 'Og så?', lys: ['hul'] }]) }],
+    };
+  }
 
   // ---------- C · minispil: data og rene kontrolfunktioner (docs/MINISPIL.md) ----------
   // Frøposten: dyrene, der bestiller. billede = tegningen i grafik.js (Grafik.minispil), ellers emojien.
@@ -2257,16 +2419,16 @@
     taelle: {
       navn: 'Tal til 20', omraade: 'Tal og algebra', maxNiveau: 3,
       niveauer: {
-        1: ['antal', 'terning', 'flest', 'findTal', 'flytTing', 'froePost'],
-        2: ['antal', 'klodser', 'efter', 'findTal', 'ligeUlige', 'flest', 'flytTing', 'fordelBaer', 'froePost'],
+        1: ['antal', 'terning', 'flest', 'findTal', 'flytTing', 'udenforAntal', 'manglerOp', 'froePost'],
+        2: ['antal', 'klodser', 'efter', 'findTal', 'ligeUlige', 'flest', 'flytTing', 'fordelBaer', 'udenforAntal', 'froePost'],
         3: ['klodser', 'streger', 'efter', 'foer', 'findTal', 'ligeUlige', 'stoerst', 'koePlads', 'froePost'],
       },
     },
     former: {
       navn: 'Figurer', omraade: 'Geometri og måling', maxNiveau: 3,
       niveauer: {
-        1: ['findForm', 'formScene', 'brikPuslespil', 'skyggeAtelier'],
-        2: ['findForm', 'hjoerner', 'kanter', 'formScene', 'brikPuslespil', 'spejlBillede', 'skyggeAtelier'],
+        1: ['findForm', 'formScene', 'brikPuslespil', 'formRaekke', 'skyggeAtelier'],
+        2: ['findForm', 'hjoerner', 'kanter', 'formScene', 'brikPuslespil', 'spejlBillede', 'formRaekke', 'skyggeAtelier'],
         3: ['findForm', 'hjoerner', 'kanter', 'formScene', 'toRegler', 'skyggeAtelier'],
       },
     },
@@ -2281,15 +2443,15 @@
     plus10: {
       navn: 'Plus til 10', omraade: 'Tal og algebra', maxNiveau: 3,
       niveauer: {
-        1: ['plusTing', 'plusFingre', 'plusTerning', 'treKurve'],
-        2: ['plusTing', 'plusFingre', 'plusTerning', 'plusKlodser', 'plusTal', 'treKurve', 'sammeSum'],
+        1: ['plusTing', 'plusFingre', 'plusTerning', 'treKurve', 'udenforSum'],
+        2: ['plusTing', 'plusFingre', 'plusTerning', 'plusKlodser', 'plusTal', 'treKurve', 'sammeSum', 'udenforSum'],
         3: ['plusKlodser', 'plusTal', 'plusTalTast', 'plusMangler', 'regneHistorie'],
       },
     },
     venner: {
       navn: "5'er- og 10'er-venner", omraade: 'Tal og algebra', maxNiveau: 3,
       niveauer: {
-        1: ['venFingre', 'venTal', 'retVenner', 'skovBro'],
+        1: ['venFingre', 'venTal', 'retVenner', 'udenforVen', 'skovBro'],
         2: ['venKugle', 'venTal', 'retVenner', 'flytVen', 'skovBro'],
         3: ['venKugle', 'venTal', 'venTalTast', 'treVenner'],
       },
@@ -2297,7 +2459,7 @@
     minus: {
       navn: 'Minus og forskel', omraade: 'Tal og algebra', maxNiveau: 3,
       niveauer: {
-        1: ['minusTing', 'minusKlodser', 'hvorMangeVaek'],
+        1: ['minusTing', 'minusKlodser', 'hvorMangeVaek', 'manglerNed'],
         2: ['minusTing', 'minusKlodser', 'forskel', 'minusTal', 'hvorMangeVaek', 'sammeForskel'],
         3: ['minusKlodser', 'forskel', 'minusTal', 'minusTalTast', 'sammeRest'],
       },
@@ -2584,6 +2746,7 @@
   function beskrivNoegle(noegle) {
     const [art, rest] = String(noegle).split(/:(.*)/s);
     const r = rest || '';
+    const medHul = (x) => { const [tal, hul] = x.split(':'); return tal.split('-').map((n, i) => (i === Number(hul) ? '?' : n)).join(', '); };
     const tekster = {
       antal: () => 'Tælle ' + r + ' ting',
       tegnFigur: () => 'Tegne ' + (FORMER[r.split(':')[0]] ? FORMER[r.split(':')[0]].ubestemt : 'en figur') + ' på sømbrættet',
@@ -2663,6 +2826,14 @@
       skovBro: () => 'Skovbroen: ' + r.replace('+', ' + ').replace('=', ' = '),
       skyggeAtelier: () => 'Skyggeatelieret: ' + (/^halv-/.test(r) ? 'to trekanter bliver et kvadrat' : (FORMER[r.split('@')[0]] ? FORMER[r.split('@')[0]].ubestemt : r) + (r.indexOf('@') >= 0 ? ', drejet' : '')),
       urVaerksted: () => 'Urværkstedet: ' + (/\+30$/.test(r) ? 'en halv time efter ' + klokkeNavn(r.replace('+30', '')) : 'stille uret på ' + klokkeNavn(r)),
+      // Variation (20-10-2026)
+      udenforAntal: () => 'Hvem passer ikke ind: tre kort med ' + r.split('|')[0] + ', ét med ' + r.split('>')[1],
+      udenforSum: () => 'Hvem passer ikke ind: tre kort med ' + r.split('|')[0] + ' i alt, ét med ' + (r.split('>')[1] || '').replace('+', ' + '),
+      udenforVen: () => "Hvem passer ikke ind: 5'er-venner og " + (r.split('>')[1] || '').replace('+', ' + '),
+      // Rækken, som barnet ser den: hullet er ?, ikke facit (nøglen er «tal-tal-…:hul»)
+      manglerOp: () => 'Hvad mangler: ' + medHul(r) + ' (én mere hver gang)',
+      manglerNed: () => 'Hvad mangler: ' + medHul(r) + ' (én mindre hver gang)',
+      formRaekke: () => 'Hvad mangler i et mønster af figurer',
     };
     return tekster[art] ? tekster[art]() : String(noegle);
   }
@@ -2694,6 +2865,7 @@
     // C · minispil
     MINISPIL, FROE_DYR, KURV_MAX, froeTryk, froePasser, broPasser, HJOERNE_DREJ, MODSAT_HJOERNE, SYMMETRI,
     skyggeDaekker, halvdelePasser, urVinkler, taellerMed, TAL_ORD, TIME_ORD,
+    VARIATION_TYPER, UDENFOR_TYPER, terningTegn, // Variation (20-10-2026)
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Opgaver;

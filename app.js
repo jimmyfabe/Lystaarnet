@@ -2425,6 +2425,8 @@
     r.dom.krop.classList.toggle('gruppe-opgave', opg.valgArt === 'gruppe');
     r.dom.krop.classList.toggle('stil-opgave', opg.valgArt === 'stil'); // uret med målene ER svaret — det får pladsen
     r.dom.krop.classList.toggle('scene-opgave', opg.valgArt === 'scene'); // svarkort med små scener
+    // Variation («Hvem passer ikke ind?»): de fire kort ER opgaven — øret i opgavefeltet siger spørgsmålet igen
+    r.dom.krop.classList.toggle('kort-opgave', opg.valgArt === 'scene' && opg.vis.art === 'lyt');
     r.dom.krop.classList.remove('kort-store', 'kort-halv'); // tilpasScener vælger kortenes opstilling igen
     // Uret er opgaven: på en telefon på langs står hjælpen ved siden af uret, så uret ikke skrumper
     r.dom.krop.classList.toggle('ur-opgave', !!opg.vis && opg.vis.art === 'ur');
@@ -3280,7 +3282,11 @@
   }
 
   const SCENE_DEL = {
-    gruppe: (d, opts) => h('div', { class: 'sd-gruppe ramme-' + (RAMMER.indexOf(d.ramme) >= 0 ? d.ramme : 'boks') }, (d.dele || []).map((x) => sceneDel(x, opts))),
+    gruppe: (d, opts) => {
+      const el = h('div', { class: 'sd-gruppe ramme-' + (RAMMER.indexOf(d.ramme) >= 0 ? d.ramme : 'boks') }, (d.dele || []).map((x) => sceneDel(x, opts)));
+      if (d.gentagelse) el.classList.add('gentagelse'); // en gentagelse i et mønster (formRaekke): se app.css
+      return el;
+    },
     ting: sceneTing,
     tegn: (d) => h('span', { class: 'sd-tegn', 'aria-hidden': 'true' }, d.s),
     tal: (d) => h('span', { class: 'sd-tal' + (d.s === '?' ? ' hul' : '') + (d.ret ? ' ret' : '') }, String(d.s),
@@ -3557,6 +3563,9 @@
     // Tre smalle kort side om side gav stænger på ca. 10 px på en iPhone (D1-tjekket); kun når det giver mest plads
     // iPad på langs: de store kort i den brede kolonne stod tre side om side med meget luft over og under (D1-tjekket)
     if (krop && (window.innerHeight > window.innerWidth || window.innerHeight > 500) && kort.length === 3 && kort.every((s) => s.querySelector('.staenger'))) muligheder.push('gitter');
+    // Variation: fire kort («Hvem passer ikke ind?») står to og to — på højkant også under hinanden, når tegningerne så
+    // bliver klart større (fem ting på en række blev ca. 26 px i 2 × 2 på en iPhone). Tasterne 1–4 følger læseretningen.
+    if (krop && krop.classList.contains('kort-opgave') && kort.length === 4) muligheder.splice(0, muligheder.length, ...(window.innerHeight > window.innerWidth ? ['gitter', 'stak'] : ['gitter']));
     let valgt = null, bedst = 0;
     // Mønter i en bunke (tæt) er en nødløsning: en opstilling uden bunke vælges, hvis den er næsten lige så god —
     // og en lodret bunke kun, når den vandrette ikke kan være der
@@ -4317,6 +4326,8 @@
         }
         await vent(300);
       }
+      // «Hvem passer ikke ind?» lyser kortene ét ad gangen: det sidste må ikke blive ved med at lyse — guld betyder «tryk her»
+      if (opg.vis.art === 'lyt') slukLys(r);
       return;
     }
 

@@ -2316,6 +2316,11 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
 .sd-gruppe.ramme-kasse { background: repeating-linear-gradient(180deg, var(--sti-kant) 0 calc(var(--u) * 2.6), var(--sti) calc(var(--u) * 2.6) calc(var(--u) * 2.8)); border: calc(var(--u) * 0.5) solid var(--sti); border-radius: calc(var(--u) * 0.6); }
 .sd-gruppe.ramme-maatte { background: var(--baggrund-2); border: calc(var(--u) * 0.3) dashed var(--farve-1); border-radius: calc(var(--u) * 2.4); }
 .sd-gruppe.ramme-ingen { min-width: 0; min-height: 0; padding: 0; background: none; border: none; }
+/* Et mønsters gentagelser (formRaekke) har ingen ramme, så kun luften skiller dem: tæt inde i en gentagelse (0,5u) og 3u
+   til den næste på samme linje (rækkens 1,4u + 1,6u). Den første på en linje har ingen nabo foran og får ingen ekstra
+   luft. Før var det 1u mod 1,4u, og «■ ● ? ●» læstes som én række (ui-review 21-10-2026) */
+.sd-gruppe.gentagelse { gap: calc(var(--u) * 0.5); }
+.scene-rad > .sd-gruppe.gentagelse + .sd-gruppe.gentagelse { margin-left: calc(var(--u) * 1.6); }
 
 /* Ting: rækker af 5 (eller én lang række). Spredt: tydeligt større afstand og lidt i uorden */
 .scene .ting-gruppe { gap: calc(var(--u) * 1.2); flex-wrap: nowrap; }
@@ -2454,6 +2459,24 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
 }
 @media (orientation: landscape) and (max-height: 500px) {
   .runde .valg-scene.kort-stak .valg-knap { align-self: auto; width: 100%; }
+}
+/* Variation («Hvem passer ikke ind?», 20-10-2026): de fire kort er opgaven og står to og to (kort-gitter, sat af
+   tilpasScener). Opgavefeltet har kun øret (hør igen) og får en smal kolonne — på højkant en lav række øverst */
+@media (orientation: landscape) and (min-height: 501px) {
+  .runde-krop.scene-opgave.kort-store.kort-opgave { grid-template-columns: clamp(170px, 20vw, 250px) minmax(0, 1fr); }
+}
+@media (orientation: portrait) {
+  .runde-krop.scene-opgave.kort-opgave { grid-template-rows: minmax(110px, 0.5fr) minmax(0, 1.5fr); }
+  .runde-krop.kort-opgave .valg { height: 100%; }
+  .runde-krop.kort-opgave .valg-scene.kort-gitter .valg-knap { height: calc(50% - 11px); }
+  /* Under hinanden (tilpasScener vælger det, når tegningerne bliver større): kortene deler højden ligeligt */
+  .runde-krop.kort-opgave .valg.valg-scene.kort-stak { justify-content: center; }
+  .runde-krop.kort-opgave .valg-scene.kort-stak .valg-knap { flex: 1 1 0; height: auto; min-height: 0; max-height: 220px; }
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  .runde-krop.scene-opgave.kort-opgave { grid-template-columns: clamp(120px, 20vw, 180px) minmax(0, 1fr); }
+  .runde-krop.kort-opgave .valg.valg-scene.kort-gitter { flex-flow: row wrap; justify-content: center; align-content: center; }
+  .runde-krop.kort-opgave .valg-scene.kort-gitter .valg-knap { flex: 0 0 calc(50% - 11px); height: calc(50% - 11px); }
 }
 
 /* Tegnebyen (D): opskriften (et ben pr. linje) ved siden af prikgitteret — over det på højkant */

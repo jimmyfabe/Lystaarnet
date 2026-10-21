@@ -1185,7 +1185,11 @@
       function nyBarneopgave() {
         if (!aktiv()) return;
         const r = rng();
-        const typer = O.EMNER[emne].niveauer[niveau];
+        // «Hvem passer ikke ind?» og «Hvad mangler?» kræver børnedelens kort-layout (tilpasScener) — ikke i duellen,
+        // medmindre trinnet intet andet har
+        const alle = O.EMNER[emne].niveauer[niveau];
+        const uden = alle.filter((t) => (O.VARIATION_TYPER || []).indexOf(t) < 0);
+        const typer = uden.length ? uden : alle;
         let o;
         let f = 0;
         do { o = O.puljeOpgave(O.vaelg(r, typer), niveau, r, null); f++; } while (!o.valg && f < 20); // fast pulje (Piper)

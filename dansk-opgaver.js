@@ -63,6 +63,10 @@
   const RAEKKEFOELGE = 'solimuaktenrbåhfgødypævjcqwxz'.split('');
   const HOLDELYDE = 'mslfnvr'.split('');
   const STOPLYDE = 'ptkbdg'.split('');
+  // Variation (ikkeForlyd): lyde, der let forveksles (trin 2 bruger dem som det ord, der ikke passer ind) · ord, hvis billede
+  // kan hedde flere ting (talordene er terninger, farveordene en klat) — de bruges ikke i «Hvem passer ikke ind?»
+  const NABOLYD = { m: 'n', n: 'm', f: 'v', v: 'f', b: 'p', p: 'b', d: 't', t: 'd', g: 'k', k: 'g', l: 'r', r: 'l' };
+  const IKKE_BILLEDORD = ['to', 'ti', 'ni', 'tre', 'fire', 'fem', 'seks', 'gul', 'blå'];
   const KUN_NAVN = 'qwxz'.split('');
   // Bogstavets id i lydlisten (æ, ø, å skrives ae, oe, aa i filnavne)
   const lydId = (b) => 'lyd-' + ({ æ: 'ae', ø: 'oe', å: 'aa' }[b] || b);
@@ -403,6 +407,27 @@
         vis: { art: 'bogstav', bogstav: b },
         svar: rigtig, valg: valg, valgArt: 'emoji',
         hjaelp: [{ art: 'hoerIgen' }, hjaelpBogstav(b, rigtig)],
+      });
+    },
+    // Variation (20-10-2026): «Hvem passer ikke ind?» med lyde — tre billedord starter med samme lyd, det fjerde gør ikke.
+    // Trin 1: holdelydene (s, m, l, f, r) og et ord med en tydeligt anden lyd · trin 2: også stoplydene, og halvdelen af
+    // gangene netop nabolyden (m/n, f/v, b/p, d/t, g/k, l/r). Hjælpen viser bogstavet med et af de tre ord.
+    ikkeForlyd(niveau, rng) {
+      const ord = ordIGruppe(['A', 'B', 'C', 'D']).filter((o) => IKKE_BILLEDORD.indexOf(o) < 0);
+      const lyde = (niveau >= 2 ? HOLDELYDE.concat(STOPLYDE) : HOLDELYDE).filter((x) => ord.filter((o) => o[0] === x).length >= 3);
+      const b = vaelg(rng, lyde);
+      const ens = bland(rng, ord.filter((o) => o[0] === b)).slice(0, 3);
+      const nabo = ord.filter((o) => o[0] === NABOLYD[b]);
+      const andre = ord.filter((o) => o[0] !== b && o[0] !== NABOLYD[b]);
+      const svar = vaelg(rng, niveau >= 2 && nabo.length && rng() < 0.5 ? nabo : andre);
+      const valg = bland(rng, ens.concat([svar]));
+      return opgave({
+        emne: 'lyde', type: 'ikkeForlyd', niveau, noegle: 'ikkeForlyd:' + b + ':' + ens.slice().sort().join('-') + '>' + svar, ikon: '👂',
+        tale: 'Tre af ordene starter med samme lyd. Hvilket ord passer ikke ind? ' + valg.map(stort).join(', ') + '.',
+        tekst: 'Hvilket passer ikke?',
+        vis: { art: 'lyt' },
+        svar: svar, valg: valg, valgArt: 'emoji',
+        hjaelp: [hjaelpBogstav(b, ens[0])],
       });
     },
 
@@ -1105,7 +1130,7 @@
   // typer[0] er den letteste — en runde starter altid med den
   const EMNER = {
     rim: { navn: 'Rim', maxNiveau: 3, niveauer: { 1: ['rim', 'huskRim', 'rimHave'], 2: ['rim', 'huskRim', 'rimRemse', 'rimHave'], 3: ['rim', 'passerIkke', 'rimPar', 'rimHave'] } },
-    lyde: { navn: 'Lyde', maxNiveau: 3, niveauer: { 1: ['lydBogstav', 'bytLyd'], 2: ['lydBogstav', 'forlyd', 'bytLyd', 'taelLyde'], 3: ['forlyd', 'udlyd', 'lydBogstav', 'fjernLyd'] } },
+    lyde: { navn: 'Lyde', maxNiveau: 3, niveauer: { 1: ['lydBogstav', 'bytLyd', 'ikkeForlyd'], 2: ['lydBogstav', 'forlyd', 'bytLyd', 'taelLyde', 'ikkeForlyd'], 3: ['forlyd', 'udlyd', 'lydBogstav', 'fjernLyd'] } },
     // C · Spor i sandet står aldrig først (den bedømmes ikke og kan derfor aldrig alene åbne et højere trin)
     alfabet: { navn: 'Alfabetet', maxNiveau: 3, niveauer: { 1: ['findBogstav', 'storLille', 'haandskrift', 'sporISandet'], 2: ['storLille', 'findBogstav', 'efterBogstav', 'haandskrift', 'alfabetOrden', 'sporISandet'], 3: ['efterBogstav', 'foerBogstav', 'findBogstav', 'alfabetHylde', 'sporISandet'] } },
     lydering: { navn: 'Lydering', maxNiveau: 3, niveauer: { 1: ['lydering', 'retVokal', 'lydTog'], 2: ['laesOrd', 'lydering', 'retVokal', 'skiftBogstav', 'lydTog'], 3: ['laesOrd', 'bygOrd', 'delOrd', 'lydTog'] } },
@@ -1115,11 +1140,22 @@
   // D2/D3: rimremsen, lydene i et ord, «tag den første lyd væk» og rimparret høres også (code-review #1).
   // C: minispillene, der kun kan løses ved at høre (Opgaver.MINISPIL lyt: true)
   const LYT_TYPER = ['lydBogstav', 'forlyd', 'udlyd', 'findBogstav', 'lydering', 'findOrd', 'ordISaetning', 'rim', 'passerIkke', 'huskRim', 'bytLyd',
-    'rimRemse', 'taelLyde', 'fjernLyd', 'rimPar', 'lydTog', 'rimHave', 'fortaelleBro'];
+    'rimRemse', 'taelLyde', 'fjernLyd', 'rimPar', 'lydTog', 'rimHave', 'fortaelleBro', 'ikkeForlyd'];
 
   function lavOpgave(type, niveau, rng) { return GEN[type](niveau, rng); }
   // Fast pulje som i opgaver.js (Piper-stemmen): rng vælger nummeret, opgaven laves med sit eget frø
-  function puljeOpgave(type, niveau, rng) { return lavOpgave(type, niveau, lavRng(puljeFroe('dansk:' + type, niveau, puljeNr(rng)))); }
+  // Kål ligner salat på billedet (code-review 21-10-2026). Ordet tages ikke ud af ikkeForlyd selv — så skifter puljen,
+  // og dens nye sætninger har ingen Piper-fil. Puljen springer i stedet videre til næste nummer (dens tale findes)
+  const PULJE_UDEN_ORD = { ikkeForlyd: ['kål'] };
+  function puljeOpgave(type, niveau, rng) {
+    const nr = puljeNr(rng), uden = PULJE_UDEN_ORD[type] || [];
+    let o;
+    for (let k = 0; k < O.PULJE; k++) {
+      o = lavOpgave(type, niveau, lavRng(puljeFroe('dansk:' + type, niveau, ((nr - 1 + k) % O.PULJE) + 1)));
+      if (!(o.valg || []).some((v) => uden.indexOf(v) >= 0)) break;
+    }
+    return o;
+  }
 
   function lavRunde(emneId, niveau, rng, opts) {
     opts = opts || {};
@@ -1151,6 +1187,7 @@
     const t = {
       rim: () => 'Rim: ' + (r || '').replace('-', ' – '),
       passerIkke: () => 'Hvilket ord rimer ikke (' + (r || '').split('-')[0] + ')',
+      ikkeForlyd: () => 'Hvilket ord starter ikke med ' + (r || '').split(':')[0] + ' (' + ((r || '').split('>')[1] || '') + ')', // Variation 20-10-2026
       lydBogstav: () => 'Lyden ' + r + ' → bogstavet',
       forlyd: () => 'Ord, der starter med lyden ' + r,
       udlyd: () => 'Ord, der slutter med lyden ' + r,
@@ -1565,6 +1602,7 @@
     // C · minispil
     BILLEDE, LYDTOG_ORD, LYDTOG_KLIP, LYDTOG_BYT, vognKort, trinvisPasser, SPOR_TEGN, SPOR_MODEL, TAL_SKRIFT, TAL_LIGNER, sporModel,
     FORTAELLE_TO, FORTAELLE_TRE, FORTAELLE_VIRKNING,
+    VARIATION_TYPER: ['ikkeForlyd'], NABOLYD, IKKE_BILLEDORD, // Variation (20-10-2026)
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Dansk;
