@@ -12,23 +12,24 @@
 
   // ---------- Dyrene. Rækkefølgen er læringsrækkefølgen: de første KERNE er niveau 1 (dyr, alle børn kender, og lort,
   // der ikke ligner hinanden), de første MELLEM niveau 2, alle niveau 3 (runde 2, 20-10-2026: 28 dyr). «Nær» = lorten
-  // eller sporet ligner (symmetrisk, test) — kun på niveau 3 står et nært dyr blandt valgene. fakta siges efter det
+  // eller sporet ligner — i naturen eller på tegningerne (kontaktarket 21-10-2026: sorte kugler, små korn, pølser og brune
+  // kugler; symmetrisk, test) — kun på niveau 3 står et nært dyr blandt valgene. fakta siges efter det
   // rigtige svar, ledetraad i hjælpens første trin (aldrig dyrets navn). sporOrd: dyrets «spor» er ikke et fodspor. ----------
   const DYR = [
     // 1–10: niveau 1
     { id: 'ko', navn: 'ko', bestemt: 'koen', e: '🐄', naer: ['hest', 'raadyr'],
       fakta: 'Koen spiser masser af græs, så dens lort bliver en stor, flad kokasse.',
       ledetraad: 'Dyret giver os mælk.' },
-    { id: 'hest', navn: 'hest', bestemt: 'hesten', e: '🐎', naer: ['ko'],
+    { id: 'hest', navn: 'hest', bestemt: 'hesten', e: '🐎', naer: ['ko', 'hare', 'baever'],
       fakta: 'Hesten spiser græs, og dens lort hedder hestepærer.',
       ledetraad: 'Man kan ride på dyret.' },
-    { id: 'hare', navn: 'hare', bestemt: 'haren', e: '🐇', naer: ['raadyr', 'egern', 'kanin'],
+    { id: 'hare', navn: 'hare', bestemt: 'haren', e: '🐇', naer: ['raadyr', 'egern', 'kanin', 'hest', 'baever'],
       fakta: 'Haren spiser græs, så dens lort er små, runde, grønbrune kugler.',
       ledetraad: 'Dyret har lange ører og meget lange bagben.' },
     { id: 'pindsvin', navn: 'pindsvin', bestemt: 'pindsvinet', e: '🦔', naer: [],
       fakta: 'Pindsvinet spiser biller, så dets lort glimter af små skinnende stykker.',
       ledetraad: 'Dyret har pigge på ryggen.' },
-    { id: 'hund', navn: 'hund', bestemt: 'hunden', e: '🐕', naer: ['raev', 'kat', 'ulv'],
+    { id: 'hund', navn: 'hund', bestemt: 'hunden', e: '🐕', naer: ['raev', 'kat', 'ulv', 'skovmaar'],
       fakta: 'Hunden får den samme mad hver dag, så dens lort er en jævn pølle.',
       ledetraad: 'Dyret siger vov.' },
     { id: 'kat', navn: 'kat', bestemt: 'katten', e: '🐈', naer: ['hund'],
@@ -37,7 +38,7 @@
     { id: 'hoene', navn: 'høne', bestemt: 'hønen', e: '🐔', naer: ['gaas'],
       fakta: 'Hønens lort har en hvid klat, og det hvide er hønens tis.',
       ledetraad: 'Dyret lægger æg, som vi kan spise.' },
-    { id: 'faar', navn: 'får', bestemt: 'fåret', e: '🐑', naer: ['raadyr', 'krondyr'],
+    { id: 'faar', navn: 'får', bestemt: 'fåret', e: '🐑', naer: ['raadyr', 'krondyr', 'vildsvin'],
       fakta: 'Fåret spiser græs, og dets lort er små sorte kugler i en klump.',
       ledetraad: 'Dyret siger mæh.' },
     // Sneglens «spor» er slimsporet
@@ -54,7 +55,7 @@
     { id: 'raev', navn: 'ræv', bestemt: 'ræven', e: '🦊', naer: ['hund', 'graevling', 'ulv', 'skovmaar'],
       fakta: 'Ræven spiser mus, så der er små hår i dens lort.',
       ledetraad: 'Dyret har en lang busket hale og spidse ører.' },
-    { id: 'raadyr', navn: 'rådyr', bestemt: 'rådyret', e: '🦌', naer: ['hare', 'ko', 'faar', 'krondyr'],
+    { id: 'raadyr', navn: 'rådyr', bestemt: 'rådyret', e: '🦌', naer: ['hare', 'ko', 'faar', 'krondyr', 'vildsvin'],
       fakta: 'Rådyret spiser blade og knopper, så dets lort er små, sorte bønner.',
       ledetraad: 'Dyret har en hvid plet bagi og hopper højt, når det bliver bange.' },
     { id: 'graevling', navn: 'grævling', bestemt: 'grævlingen', e: '🦡', naer: ['raev'],
@@ -81,36 +82,46 @@
       fakta: 'Bien laver ikke lort i bistadet. Den venter, til den kan flyve ud.',
       ledetraad: 'Dyret laver honning af blomsternes søde saft.' },
     // 21–28: niveau 3
-    { id: 'vildsvin', navn: 'vildsvin', bestemt: 'vildsvinet', e: '🐗', naer: ['krondyr'],
+    { id: 'vildsvin', navn: 'vildsvin', bestemt: 'vildsvinet', e: '🐗', naer: ['krondyr', 'faar', 'raadyr'],
       fakta: 'Vildsvinet roder i jorden efter mad, og dets lort er en tyk, klumpet pølse.',
       ledetraad: 'Dyret graver i jorden med snuden.' },
     { id: 'krondyr', navn: 'krondyr', bestemt: 'krondyret', e: '🦌', naer: ['raadyr', 'faar', 'vildsvin'],
       fakta: 'Krondyret spiser græs og lyng, så dets lort er store, sorte bønner.',
       ledetraad: 'Dyret har et stort gevir og brøler om efteråret.' },
-    { id: 'rotte', navn: 'rotte', bestemt: 'rotten', e: '🐀', naer: ['mus'],
+    { id: 'rotte', navn: 'rotte', bestemt: 'rotten', e: '🐀', naer: ['mus', 'flagermus'],
       fakta: 'Rottens lort ligner musens, men er meget større.',
       ledetraad: 'Dyret har en lang, næsten nøgen hale og kan svømme.' },
-    { id: 'ulv', navn: 'ulv', bestemt: 'ulven', e: '🐺', naer: ['hund', 'raev'],
+    { id: 'ulv', navn: 'ulv', bestemt: 'ulven', e: '🐺', naer: ['hund', 'raev', 'skovmaar'],
       fakta: 'Ulven spiser hjorte, så der er hår og knoglestumper i dens lort.',
       ledetraad: 'Dyret hyler sammen med sin flok.' },
     { id: 'odder', navn: 'odder', bestemt: 'odderen', e: '🦦', naer: [],
       fakta: 'Odderen spiser fisk, så der er fiskeben og skæl i dens lort.',
       ledetraad: 'Dyret bor ved åer og søer og fanger fisk.' },
     // Bæverens «spor» er det gnavede træ, flagermusens huset, den bor i
-    { id: 'baever', navn: 'bæver', bestemt: 'bæveren', e: '🦫', naer: [], sporOrd: 'træet',
+    { id: 'baever', navn: 'bæver', bestemt: 'bæveren', e: '🦫', naer: ['hest', 'hare'], sporOrd: 'træet',
       fakta: 'Bæveren spiser bark og laver det meste af sin lort i vandet.',
       ledetraad: 'Dyret klasker med halen i vandet, når der er fare.' },
-    { id: 'skovmaar', navn: 'skovmår', bestemt: 'skovmåren', e: '🐾', naer: ['raev'],
+    { id: 'skovmaar', navn: 'skovmår', bestemt: 'skovmåren', e: '🐾', naer: ['raev', 'hund', 'ulv'],
       fakta: 'Skovmåren lægger sin lort, så andre kan se den: her bor jeg!',
       ledetraad: 'Dyret har en gul plet på halsen.' },
-    { id: 'flagermus', navn: 'flagermus', bestemt: 'flagermusen', e: '🦇', naer: ['mus'], sporOrd: 'huset',
+    { id: 'flagermus', navn: 'flagermus', bestemt: 'flagermusen', e: '🦇', naer: ['mus', 'rotte'], sporOrd: 'huset',
       fakta: 'Flagermusen spiser insekter, så dens lort er fuld af små insektstumper.',
       ledetraad: 'Dyret kan flyve og finder vej ved at lytte til ekko.' },
   ];
+  // Størrelsen (21-10-2026): hver lort er tegnet i én af tre målestokke, og ved siden af står en barnefinger i samme
+  // målestok (grafik-kilde/natur/finger-<str>.svg). Tegningens bredde (96) er så mange cm — en museklat og en kokasse kan
+  // begge ses, og fingeren viser forskellen. Lortenes mål (med kilder) står i docs/NATUR-FAKTA.md.
+  const STOERRELSER = { lille: 6, mellem: 20, stor: 40 };
+  const STR = {
+    ko: 'stor', hest: 'mellem', hare: 'lille', pindsvin: 'lille', hund: 'mellem', kat: 'mellem', hoene: 'lille', faar: 'lille',
+    snegl: 'lille', egern: 'lille', ugle: 'lille', raev: 'mellem', raadyr: 'lille', graevling: 'mellem', gaas: 'mellem',
+    kanin: 'lille', mus: 'lille', regnorm: 'lille', kaalorm: 'lille', bi: 'lille', vildsvin: 'mellem', krondyr: 'lille',
+    rotte: 'lille', ulv: 'mellem', odder: 'mellem', baever: 'lille', skovmaar: 'lille', flagermus: 'lille',
+  };
   const KERNE = 10;
   const MELLEM = 20;
   const DYR_ID = {};
-  DYR.forEach((d) => { DYR_ID[d.id] = d; });
+  DYR.forEach((d) => { DYR_ID[d.id] = d; d.str = STR[d.id]; });
   // Et id fra de gemte data er kun et dyr, hvis det er et af vores egne (ikke 'constructor', '__proto__' … fra prototypen)
   const erDyr = (id) => typeof id === 'string' && Object.prototype.hasOwnProperty.call(DYR_ID, id);
   const stort = (t) => t.charAt(0).toUpperCase() + t.slice(1);
@@ -233,7 +244,7 @@
     return ud;
   }
 
-  const Natur = { DYR, DYR_ID, KERNE, MELLEM, VERDENER, EMNER, GEN, antalValg, lavOpgave, opgaveFor, lavRunde, passerTilNiveau, opgaveKendt, saetninger, lavRng };
+  const Natur = { DYR, DYR_ID, STOERRELSER, KERNE, MELLEM, VERDENER, EMNER, GEN, antalValg, lavOpgave, opgaveFor, lavRunde, passerTilNiveau, opgaveKendt, saetninger, lavRng };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Natur;
   else root.Natur = Natur;

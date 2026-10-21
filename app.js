@@ -3683,7 +3683,11 @@
   function naturVisning(opg) {
     const id = opg.vis.dyr;
     const d = N && N.DYR_ID[id];
-    const lort = h('div', { class: 'natur-lort' }, naturTegning('lort-' + id, 'natur-tegning') || h('span', { class: 'natur-e' }, '💩'));
+    // Barnefingeren i lortens målestok (lille · mellem · stor, natur-opgaver.js STOERRELSER) peger ind fra venstre; hånden
+    // tegnes langt ud over kassen, så feltets kant (overflow: hidden) klipper den — den kommer «udefra»
+    const tegnet = naturTegning('lort-' + id, 'natur-tegning');
+    const lort = h('div', { class: 'natur-lort' }, tegnet || h('span', { class: 'natur-e' }, '💩'),
+      tegnet && d && d.str ? naturTegning('finger-' + d.str, 'natur-finger') : null);
     const spor = h('div', { class: opg.vis.spor ? 'natur-spor' : ['natur-spor', 'skjult'].join(' ') }, // uden mellemrum i strengen (tale-tekster.js)
       naturTegning('spor-' + id, 'natur-tegning') || h('span', { class: 'natur-e' }, d && d.sporOrd ? '🌳' : '🐾'));
     return h('div', { class: 'natur-scene', 'aria-hidden': 'true' },
