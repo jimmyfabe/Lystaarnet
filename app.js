@@ -694,6 +694,22 @@
     },
     // Højst ms på en fil — ellers null (så taler enhedens stemme). Fejl giver også null.
     medFrist(p, ms) { return Promise.race([p.then((b) => b, () => null), new Promise((r) => setTimeout(() => r(null), ms))]); },
+    // Pausen mellem sætningerne (Jimmy 21-10-2026: «Pauserne er blevet for lange … de skal være lidt mindre»): hver fil
+    // slutter med 0,1–0,55 s stilhed (Pipers sentence_silence og stemmens hale, målt 21-10). Kun HALE_BEHOLD af den
+    // spilles, så pausen bliver mindre, men ikke væk. Giver spilletiden i s; en buffer uden getChannelData (testenes falske) spilles helt.
+    HALE_BEHOLD: 0.5,
+    STILLE: 0.01, // ca. −40 dB
+    tider: new WeakMap(), // AudioBuffer → spilletid
+    spilletid(buf) {
+      if (!buf.getChannelData || !buf.sampleRate) return buf.duration;
+      if (this.tider.has(buf)) return this.tider.get(buf);
+      const d = buf.getChannelData(0);
+      let i = d.length - 1;
+      while (i > 0 && Math.abs(d[i]) < this.STILLE) i--;
+      const t = buf.duration - (d.length - 1 - i) / buf.sampleRate * (1 - this.HALE_BEHOLD);
+      this.tider.set(buf, t);
+      return t;
+    },
     // Hent hele stemmen i baggrunden til brug uden net — roligt (to ad gangen) og kun, mens siden er synlig og online.
     // Filerne ligger i IndexedDB (TaleLager nedenfor; sw.js slår dem op dér). status = { hentet, iAlt } til voksendelen
     // (hentet = gemt i IndexedDB).
@@ -946,8 +962,9 @@
             s.buffer = buf; s.connect(Lyd.ctx.destination);
             const k = this.kilde = { s: s, res: slut };
             s.onended = () => { if (this.kilde === k) this.kilde = null; slut(); };
-            s.start(0);
-            setTimeout(slut, buf.duration * 1000 + 400); // hvis onended aldrig kommer
+            const t = Piper.spilletid(buf);
+            s.start(0, 0, t);
+            setTimeout(slut, t * 1000 + 400); // hvis onended aldrig kommer
           } catch (e) { slut(); }
         });
       });
@@ -1001,8 +1018,9 @@
           s.buffer = buf; s.connect(Lyd.ctx.destination);
           const k = this.kilde = { s: s, res: res };
           s.onended = () => { if (this.kilde === k) this.kilde = null; res(); };
-          s.start(0);
-          setTimeout(res, buf.duration * 1000 + 400); // hvis onended aldrig kommer
+          const t = Piper.spilletid(buf);
+          s.start(0, 0, t);
+          setTimeout(res, t * 1000 + 400); // hvis onended aldrig kommer
         } catch (e) { res(); }
       });
       (async () => {
