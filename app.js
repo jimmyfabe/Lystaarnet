@@ -76,10 +76,13 @@
 
   // Natur (pilot 20-10-2026, natur-opgaver.js): se lorten og sporet → tryk på dyret; «Hvem har gået her?» (trin 0,
   // 21-10-2026): kun sporet. Åbne fra start; fremskridtet gemmes som engelsk i data.dansk[emne] (gem.js kender emnet).
-  // hvad: voksnes overblik (voksen.js indlæser ikke natur-opgaver.js).
+  // hvad: voksnes overblik (voksen.js indlæser ikke natur-opgaver.js). Savannen (pilot 21-10-2026, fase 1: sporet) er
+  // pilot: true — den lyser aldrig som anbefalet (indholdsplanen: ellers måler vi lyset, ikke lysten); ▶ går kun dertil for
+  // at fortsætte en afbrudt mission dér (spilVerden).
   const NATUR_VERDENER = [
     { id: 'naturLort', fag: 'natur', e: '💩', navn: 'Gæt en lort', emne: 'naturLort', hvad: 'Lort og spor → dyr', tale: 'Gæt en lort. Hvem har lavet den?' },
     { id: 'naturSpor', fag: 'natur', e: '🐾', navn: 'Hvem har gået her?', emne: 'naturSpor', hvad: 'Spor → dyr', tale: 'Hvem har gået her? Se sporet, og tryk på dyret.' },
+    { id: 'naturSavanne', fag: 'natur', e: '🦁', navn: 'Savannen', emne: 'naturSavanne', hvad: 'Savannens spor → dyr', tale: 'Savannen. Her bor løven og zebraen.', pilot: true },
   ];
 
   // Fagene på fagvalget i tastaturets rækkefølge (1, 2, 3, 4). Engelsk og natur kun, når deres opgavefil er indlæst.
@@ -113,6 +116,7 @@
     historiebog: 'I Historiebogen er der små historier. Tryk på et ord, så hører du det. Læs historien, tegn den, og skriv et ord fra den.',
     naturLort: 'Alle dyr laver lort, og den ser forskellig ud. Se på lorten og på sporet. Tryk så på det dyr, der har lavet den.',
     naturSpor: 'Når et dyr går i mudder eller sne, sætter det spor. Se på sporet. Tryk så på det dyr, der har gået her.',
+    naturSavanne: 'Langt væk ligger savannen, en stor slette med græs og spredte træer. Her bor løven, zebraen og giraffen. Se sporet, og tryk på dyret.',
   };
 
   // «Vælg selv» (🎒): fagets emner som store ikoner, delt i afsnit (Jimmy 18-10-2026: «når man vælger dansk er det det
@@ -134,6 +138,7 @@
     { fag: 'engelsk', e: '🧺', navn: 'Hverdagens ting', tale: 'Hverdagens ting. Køkkenet, hjemmet og legepladsen på engelsk.', verdener: ['engKoekken', 'engHjemme', 'engLegeplads'] },
     { fag: 'engelsk', e: '🛒', navn: 'Mad og tøj', tale: 'Mad og tøj. Lyt til maden og tøjet på engelsk.', verdener: ['engMad', 'engToej'] },
     { fag: 'natur', e: '🔍', navn: 'Dyrenes spor', tale: 'Dyrenes spor. Hvem har været her?', verdener: ['naturLort', 'naturSpor'] },
+    { fag: 'natur', e: '🌍', navn: 'Savannen', tale: 'Savannen. Her bor løven og zebraen.', verdener: ['naturSavanne'] },
   ];
 
   // Skolens ord bruges i oplæsningen (tælle videre, tage væk, forskel, 10'er-venner …)
@@ -1861,7 +1866,9 @@
   function anbefaletVerden(fag) {
     fag = fag || 'matematik';
     const liste = verdenerFor(fag);
-    const aabne = liste.map((v, i) => i).filter((i) => verdenAaben(i, fag) && emneSlaaetTil(liste[i].emne));
+    // En pilot (Savannen) anbefales aldrig — heller ikke en afbrudt mission dér (den fortsætter ▶ alligevel: spilVerden)
+    // eller den sidst spillede
+    const aabne = liste.map((v, i) => i).filter((i) => verdenAaben(i, fag) && emneSlaaetTil(liste[i].emne) && !liste[i].pilot);
     if (!aabne.length) return 0;
     // En afbrudt mission (🗺️ midt i runden) går forud, så de fyldte fodspor ikke tabes
     for (const felt of PAUSET_FELTER) {
@@ -1876,6 +1883,19 @@
     }
     const ikkeMestret = aabne.find((i) => { const e = emneData(liste[i].emne); return !e || !e.mestret; });
     return ikkeMestret !== undefined ? ikkeMestret : aabne[aabne.length - 1];
+  }
+
+  // ▶ på kortet: en afbrudt mission i en pilot fortsættes — ellers ville ▶ starte den anbefalede verden, og startRunde
+  // sletter så de fyldte fodspor (én mission pr. fag). Stationernes glød og vennen følger stadig anbefaletVerden
+  function spilVerden(fag) {
+    fag = fag || 'matematik';
+    const liste = verdenerFor(fag);
+    for (const felt of PAUSET_FELTER) {
+      const p = S.afbrudt[felt];
+      const pi = p ? liste.findIndex((v) => v.id === p.verden.id) : -1;
+      if (pi >= 0 && liste[pi].pilot && verdenAaben(pi, fag) && emneSlaaetTil(liste[pi].emne)) return pi;
+    }
+    return anbefaletVerden(fag);
   }
 
   function stjerner(emne) {
@@ -2038,7 +2058,7 @@
     }, h('span', { 'aria-hidden': 'true' }, '🎒'));
     flade.append(fritKnap);
 
-    const v = liste[anbefalet];
+    const v = liste[spilVerden(fag)];
     const spil = () => { Lyd.init(); Lyd.tryk(); startRunde(v); };
     const spilKnap = h('button', { class: 'stor-knap spil-knap kort-spil puls', type: 'button', 'aria-label': 'Spil: ' + v.navn, onclick: spil },
       h('span', { 'aria-hidden': 'true' }, '▶'), verdenIkonLille(v, 'kort-spil-ikon'));
@@ -3698,7 +3718,8 @@
   }
 
   // ---------- Natur (pilot 20-10-2026): «Gæt en lort» — se lorten (og sporet), tryk på dyret. Ingen læsetekst. ----------
-  // «Hvem har gået her?» (trin 0, 21-10-2026, vis.art 'naturSpor'): kun sporet, stort, på samme skovbund.
+  // «Hvem har gået her?» (trin 0, 21-10-2026, vis.art 'naturSpor'): kun sporet, stort, på samme skovbund — i Savannen
+  // (emne naturSavanne) på tørt græs og sand (.savanne).
   // Lorten står stort på en stribe skovbund, sporet ved siden af. På niveau 3 er sporet skjult, til hjælpen viser det
   // (naturSpor). Kun spillets egne tegninger (grafik.js natur); mangler en, står emojien — uglens «spor» er dens træ.
   const naturTegning = (navn, klasse) => (GR && GR.natur ? tegning(GR.natur[navn], klasse) : null);
@@ -3707,7 +3728,7 @@
     const d = N && N.DYR_ID[id];
     if (opg.vis.art === 'naturSpor') {
       // Sporet har klassen natur-spor, så hjælpens første trin (naturSpor) får det til at lyse
-      return h('div', { class: ['natur-scene', 'spor-alene'].join(' '), 'aria-hidden': 'true' },
+      return h('div', { class: ['natur-scene', 'spor-alene'].concat(opg.emne === 'naturSavanne' ? ['savanne'] : []).join(' '), 'aria-hidden': 'true' },
         h('div', { class: 'natur-fund' }, h('div', { class: 'natur-spor' },
           naturTegning('spor-' + id, 'natur-tegning') || h('span', { class: 'natur-e' }, '🐾'))),
         h('div', { class: 'natur-jord' }));
@@ -6609,6 +6630,8 @@
       case 'naturLort': return [['lort-raev', '💩'], ['spor-raev', '🐾'], ['dyr-raev', '🦊']].map(([navn, e]) => naturTegning(navn, 'natur-lektion') || h('span', { class: 'lektion-emoji' }, e));
       // «Hvem har gået her?»: sporet og dyret, der har sat det (hunden)
       case 'naturSpor': return [['spor-hund', '🐾'], ['dyr-hund', '🐕']].map(([navn, e]) => naturTegning(navn, 'natur-lektion') || h('span', { class: 'lektion-emoji' }, e));
+      // Savannen: giraffens spor og giraffen
+      case 'naturSavanne': return [['spor-giraf', '🐾'], ['dyr-giraf', '🦒']].map(([navn, e]) => naturTegning(navn, 'natur-lektion') || h('span', { class: 'lektion-emoji' }, e));
       case 'jagt': return [h('span', { class: 'lektion-emoji' }, '🫧'), h('span', { class: 'bogstav-kort lektion-bogstav' }, h('span', { class: 'bogstav-stort' }, 'S'), h('span', { class: 'bogstav-lille' }, 's'))];
       default: return fyrtaarn();
     }

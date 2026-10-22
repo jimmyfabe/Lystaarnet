@@ -1558,6 +1558,16 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
 .overblik-indhold ul { margin: 6px 0; padding-left: 22px; }
 .overblik-tabel { width: 100%; border-collapse: collapse; font-size: 17px; }
 .overblik-tabel td { padding: 6px 8px; border-top: 1px solid #e6e1d6; vertical-align: top; }
+/* Overblikkets tabeller på en smal skærm (telefon på højkant): hver række bliver til linjer — verdenen øverst, så emnet,
+   trinnet, runderne og procenten, der brydes efter behov. Som tabel gik de op til 103 px ud over kortet på 390 px (e2e
+   voksen, 22-10-2026). Opstartstabellen står inde i .opstart-rulle, ruller selv vandret og røres ikke */
+@media (max-width: 599px) {
+  .overblik-indhold section > .overblik-tabel { display: block; }
+  .overblik-indhold section > .overblik-tabel tr { display: flex; flex-wrap: wrap; column-gap: 14px; padding: 6px 0; border-top: 1px solid #e6e1d6; }
+  .overblik-indhold section > .overblik-tabel td { padding: 0; border-top: 0; }
+  .overblik-indhold section > .overblik-tabel td:first-child { flex-basis: 100%; font-weight: 700; }
+  .overblik-indhold section > .overblik-tabel td:empty { display: none; }
+}
 /* Opstart (Indstillinger): højst de 10 seneste starter. Tallene står under hinanden; på en smal telefon ruller tabellen
    vandret (feltet kan få fokus, så piletasterne ruller). «Skærm» — tiden med sort skærm — er det tal, man kigger efter.
    En blød skygge i kanten viser, at der er mere at rulle til, og forsvinder ved enden: skyggerne sidder fast i feltets
@@ -3123,4 +3133,7 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
   .natur-scene.spor-alene { --natur-l: min(400px, 60cqw, 66cqh); }
   @container (max-aspect-ratio: 1/1) { .natur-scene.spor-alene { --natur-l: min(400px, 84cqw, 60cqh); --natur-jord-b: calc(var(--natur-l) + 60px); } }
 }
+/* Savannen (pilot 21-10-2026): sporet på tørt græs og sand i stedet for skovbund — lidt mørkere sand end sporenes
+   egen bund (#F0D59B i spor-*.svg), så jorden kan ses under tegningen */
+.natur-scene.savanne { --natur-graes: #c2ad55; --natur-jord: #e0c184; --natur-jord-moerk: #bf9a5c; }
 .lektion-tegning .natur-lektion { width: clamp(80px, 15vmin, 140px); height: clamp(80px, 15vmin, 140px); }
