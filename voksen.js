@@ -722,9 +722,9 @@
       // Natur (trin 0, 21-10-2026): sin egen række pr. verden — runder i alt og % rigtige i første forsøg (pilotens måling)
       const naturRaekker = NATUR_VERDENER.map((v) => raekke(v, d.dansk[v.emne], v.hvad));
       // Natur (natur-opgaver.js indlæses ikke her): «naturLort:raev» → «Gæt en lort: ræv», «naturSpor:raev» → «Spor: ræv»
-      // (kort, uden stationens «?» midt i linjen), «savanneSpor:loeve» → «Savannen: løve» — id'erne staver æ/å som ae/aa
+      // (kort, uden stationens «?» midt i linjen), «savanneSpor:loeve» → «Savannen, spor: løve» (og lort) — id'erne staver æ/å som ae/aa
       // (test-natur tjekker det for hvert dyr)
-      const beskrivNatur = (n) => { const m = /^(naturLort|naturSpor|savanneSpor):([a-z]+)$/.exec(n); return m ? (m[1] === 'naturLort' ? 'Gæt en lort: ' : m[1] === 'savanneSpor' ? 'Savannen: ' : 'Spor: ') + m[2].replace(/ae/g, 'æ').replace(/aa/g, 'å').replace(/oe/g, 'ø') : null; };
+      const beskrivNatur = (n) => { const m = /^(naturLort|naturSpor|savanneSpor|savanneLort):([a-z]+)$/.exec(n); return m ? ({ naturLort: 'Gæt en lort: ', naturSpor: 'Spor: ', savanneSpor: 'Savannen, spor: ', savanneLort: 'Savannen, lort: ' })[m[1]] + m[2].replace(/ae/g, 'æ').replace(/aa/g, 'å').replace(/oe/g, 'ø') : null; };
       const beskriv = (n) => beskrivNatur(n) || (D && D.beskrivNoegle(n)) || O.beskrivNoegle(n);
       // Det driller (flest fejl, seneste først)
       const driller = [];

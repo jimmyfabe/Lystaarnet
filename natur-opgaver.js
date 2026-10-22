@@ -144,25 +144,33 @@
     skovmaar: { naer: ['hare', 'pindsvin', 'egern', 'graevling', 'odder'], fakta: 'Skovmåren hopper, så dens spor ligger to og to.' },
   };
   // ---------- Savannen (pilot efter trin 0, 21-10-2026): syv dyr, der ikke bor i Danmark. Fase 1 er «Hvem har gået
-  // her?» — sporet → dyret. Fakta med kilder i docs/SAVANNE-FAKTA.md (ret dér først). Rækkefølgen er læringsrækkefølgen:
-  // de første SAVANNE_KERNE er niveau 1, de første SAVANNE_MELLEM niveau 2, alle niveau 3. naer = sporene ligner hinanden
-  // (én hov ↔ to klove, fire ↔ tre tæer, løse tåpuder ↔ tæer på sålen, rund fod ↔ fod med tæer); symmetrisk (test).
-  // Tegningerne: grafik-kilde/natur/<dyr|spor>-<id>.svg (dyrene er samledyrene i naturlige farver; strudsen er ny) ----------
+  // her?» — sporet → dyret; fase 2 er «Gæt en lort» — lorten → dyret (kun dyrene med en lort-del: strudsens lort er ikke
+  // fundet). Fakta med kilder i docs/SAVANNE-FAKTA.md (ret dér først). Rækkefølgen er læringsrækkefølgen: de første
+  // SAVANNE_KERNE er niveau 1, de første SAVANNE_MELLEM niveau 2, alle niveau 3. naer = sporene (spor.naer) eller lortene
+  // (lort.naer) ligner hinanden; symmetrisk (test). lort.str = fingerens målestok (STOERRELSER) — kun hvor størrelsen er
+  // kildebelagt. Tegningerne: grafik-kilde/natur/<dyr|spor|lort>-<id>.svg (dyrene er samledyrene i naturlige farver;
+  // strudsen er ny) ----------
   const SAVANNE = [
     { id: 'loeve', navn: 'løve', bestemt: 'løven', e: '🦁', ledetraad: 'Dyret er en stor kat, der brøler højt.',
-      spor: { naer: ['flodhest'], fakta: 'I løvens spor ser man fire tæer, men ingen kløer.' } },
+      spor: { naer: ['flodhest'], fakta: 'I løvens spor ser man fire tæer, men ingen kløer.' },
+      lort: { naer: ['naesehorn'], fakta: 'Løven spiser andre dyr, og i dens lort er der hår fra dem.' } },
     { id: 'elefant', navn: 'elefant', bestemt: 'elefanten', e: '🐘', ledetraad: 'Dyret har en lang snabel, som det drikker med.',
-      spor: { naer: ['flodhest', 'naesehorn'], fakta: 'Elefantens fod laver et stort, næsten rundt aftryk.' } },
+      spor: { naer: ['flodhest', 'naesehorn'], fakta: 'Elefantens fod laver et stort, næsten rundt aftryk.' },
+      lort: { naer: ['naesehorn', 'zebra'], str: 'stor', fakta: 'Elefanten spiser græs og grene, og dens lort er store klumper med plantestumper.' } },
     { id: 'giraf', navn: 'giraf', bestemt: 'giraffen', e: '🦒', ledetraad: 'Dyret har en meget lang hals.',
-      spor: { naer: ['zebra'], fakta: 'Giraffens fod er stor som en tallerken og har to klove.' } },
+      spor: { naer: ['zebra'], fakta: 'Giraffens fod er stor som en tallerken og har to klove.' },
+      lort: { naer: ['zebra'], fakta: 'Giraffen er kæmpehøj, men dens lort er bitte små piller.' } },
     { id: 'zebra', navn: 'zebra', bestemt: 'zebraen', e: '🦓', ledetraad: 'Dyret har sorte og hvide striber.',
-      spor: { naer: ['giraf'], fakta: 'Zebraen har én hov på hver fod, ligesom hesten.' } },
+      spor: { naer: ['giraf'], fakta: 'Zebraen har én hov på hver fod, ligesom hesten.' },
+      lort: { naer: ['elefant', 'giraf'], str: 'mellem', fakta: 'Zebraens lort er klumper, der som regel får en revne på tværs.' } },
     { id: 'flodhest', navn: 'flodhest', bestemt: 'flodhesten', e: '🦛', ledetraad: 'Dyret ligger i vandet om dagen og spiser græs om natten.',
-      spor: { naer: ['naesehorn', 'loeve', 'elefant'], fakta: 'Flodhesten har fire tæer på hver fod.' } },
+      spor: { naer: ['naesehorn', 'loeve', 'elefant'], fakta: 'Flodhesten har fire tæer på hver fod.' },
+      lort: { naer: ['naesehorn'], fakta: 'Flodhesten vifter med halen, så lorten sprøjter ud til alle sider.' } },
     { id: 'struds', navn: 'struds', bestemt: 'strudsen', e: '🪶', ledetraad: 'Dyret er verdens største fugl, men det kan ikke flyve.',
       spor: { naer: [], fakta: 'Strudsen har kun to tæer, og alle andre fugle har flere.' } },
     { id: 'naesehorn', navn: 'næsehorn', bestemt: 'næsehornet', e: '🦏', ledetraad: 'Dyret har horn på snuden.',
-      spor: { naer: ['flodhest', 'elefant'], fakta: 'Næsehornet har tre tæer på hver fod.' } },
+      spor: { naer: ['flodhest', 'elefant'], fakta: 'Næsehornet har tre tæer på hver fod.' },
+      lort: { naer: ['elefant', 'flodhest', 'loeve'], fakta: 'Næsehorn lægger deres lort i fælles bunker.' } },
   ];
   const SAVANNE_KERNE = 4;
   const SAVANNE_MELLEM = 6;
@@ -177,7 +185,8 @@
   const stort = (t) => t.charAt(0).toUpperCase() + t.slice(1);
 
   // ---------- Verdenerne: «Gæt en lort» (pilot 20-10), «Hvem har gået her?» (trin 0, 21-10: kun sporet) og Savannen
-  // (pilot, fase 1: sporet). vis = visningens art i app.js (begge spor-verdener viser kun sporet) ----------
+  // (pilot: én verden med flere opgavetyper, SAVANNE_TYPER). vis = visningens art i app.js (spor-typerne viser kun
+  // sporet) ----------
   const VERDENER = {
     naturLort: {
       navn: 'Gæt en lort', type: 'naturLort', ikon: '💩', kerne: KERNE,
@@ -190,24 +199,50 @@
       dyr: DYR.filter((d) => SPOR[d.id]).map((d) => d.id),
     },
     naturSavanne: {
-      navn: 'Savannen', type: 'savanneSpor', vis: 'naturSpor', ikon: '🦁', savanne: true,
-      spoerg: 'Hvem har gået her?', tekst: 'Hvem har gået her?',
+      navn: 'Savannen', type: 'savanneSpor', typer: ['savanneSpor', 'savanneLort'], ikon: '🦁', savanne: true,
       dyr: SAVANNE.map((d) => d.id),
     },
   };
+  // Savannens opgavetyper — én ny pr. fase (indholdsplanen 21-10): visningen, spørgsmålet og den del af dyret (del), som
+  // dyrene, «nær» og fakta kommer fra
+  const SAVANNE_TYPER = {
+    savanneSpor: { vis: 'naturSpor', spoerg: 'Hvem har gået her?', tekst: 'Hvem har gået her?', del: 'spor' },
+    savanneLort: { vis: 'naturLort', spoerg: 'Hvem har lavet den?', tekst: 'Hvem har lavet den?', del: 'lort' },
+  };
   const visArt = (V) => V.vis || V.type;
-  // Dyrene, der ligner svaret: lorten (naturLort) eller sporet (naturSpor, naturSavanne)
-  const naerFor = (emne, id) => (emne === 'naturSpor' ? SPOR[id].naer : emne === 'naturSavanne' ? DYR_ID[id].spor.naer : DYR_ID[id].naer);
+  // Typens opsætning i en verden: skovens verdener har én type hver; Savannens type (standard: den første) får sin del og
+  // dyrene med den del. null for en ukendt type (fra gemte data)
+  function typeDef(emne, type) {
+    const V = VERDENER[emne];
+    if (!V.savanne) return !type || type === V.type ? V : null;
+    type = type || V.type;
+    if (V.typer.indexOf(type) < 0) return null;
+    const T = SAVANNE_TYPER[type];
+    return Object.assign({}, V, T, { type: type, dyr: SAVANNE.filter((d) => d[T.del]).map((d) => d.id) });
+  }
+  // Kode, der bygger en opgave, får kun kendte typer og dyr (lavRunde og GEN); alt andet er en fejl i koden, og den får
+  // et klart navn (code-review 22-10-2026). Gemte data prøves med opgaveKendt, der bare siger nej
+  function opsaetning(emne, type, id) {
+    const V = typeDef(emne, type);
+    if (!V) throw new Error('Natur: ukendt type ' + emne + '/' + type);
+    if (id !== undefined && V.dyr.indexOf(id) < 0) throw new Error('Natur: ' + id + ' findes ikke i ' + emne + '/' + V.type);
+    return V;
+  }
+  // Dyrene, der ligner svaret: lorten (naturLort), sporet (naturSpor) eller typens del på savannen
+  const naerFor = (emne, id, type) => {
+    const V = opsaetning(emne, type, id);
+    return V.savanne ? DYR_ID[id][V.del].naer : emne === 'naturSpor' ? SPOR[id].naer : DYR_ID[id].naer;
+  };
 
   // ---------- Opgaven: se lorten (og sporet) → tryk på dyret ----------
   // Niveau 1: to valg blandt de første KERNE dyr, sporet ses · 2: tre valg blandt de første MELLEM, sporet ses · 3: tre
   // valg blandt alle, hvoraf ét er «nært», og sporet kommer først med hjælpen (på niveau 1–2 aldrig et dyr, der ligner
   // svaret, blandt valgene). «Hvem har gået her?» bruger de samme niveauer, men kun dyrene med et fodspor (9 · 14 · 20).
-  // Savannen har sine egne syv dyr (4 · 6 · 7).
+  // Savannen har sine egne syv dyr (spor 4 · 6 · 7; lort uden strudsen 4 · 5 · 6).
   const antalValg = (niveau) => (niveau <= 1 ? 2 : 3);
-  const puljeFor = (niveau, emne) => {
-    const V = VERDENER[emne || 'naturLort'];
-    if (V.savanne) return V.dyr.slice(0, niveau <= 1 ? SAVANNE_KERNE : niveau === 2 ? SAVANNE_MELLEM : V.dyr.length);
+  const puljeFor = (niveau, emne, type) => {
+    const V = opsaetning(emne || 'naturLort', type);
+    if (V.savanne) return SAVANNE.slice(0, niveau <= 1 ? SAVANNE_KERNE : niveau === 2 ? SAVANNE_MELLEM : SAVANNE.length).map((d) => d.id).filter((id) => V.dyr.indexOf(id) >= 0);
     return DYR.slice(0, niveau <= 1 ? KERNE : niveau === 2 ? MELLEM : DYR.length).map((d) => d.id).filter((id) => V.dyr.indexOf(id) >= 0);
   };
   const ros = (d) => 'Ja! Det er ' + d.bestemt + '.';
@@ -215,29 +250,31 @@
   const seSporet = (d) => 'Se ' + (d.sporOrd || 'sporet') + '. ' + d.ledetraad;
   function gaetLort(niveau, rng) { return opgaveFor(niveau, vaelg(rng, puljeFor(niveau)), rng); }
   function hvemGik(niveau, rng) { return opgaveFor(niveau, vaelg(rng, puljeFor(niveau, 'naturSpor')), rng, 'naturSpor'); }
-  function savanneSpor(niveau, rng) { return opgaveFor(niveau, vaelg(rng, puljeFor(niveau, 'naturSavanne')), rng, 'naturSavanne'); }
-  // Opgaven med et bestemt dyr (runden vælger selv dyrene): valgene er andre dyr fra niveauets pulje
-  function opgaveFor(niveau, id, rng, emne) {
+  function savanneSpor(niveau, rng) { return opgaveFor(niveau, vaelg(rng, puljeFor(niveau, 'naturSavanne', 'savanneSpor')), rng, 'naturSavanne', 'savanneSpor'); }
+  function savanneLort(niveau, rng) { return opgaveFor(niveau, vaelg(rng, puljeFor(niveau, 'naturSavanne', 'savanneLort')), rng, 'naturSavanne', 'savanneLort'); }
+  // Opgaven med et bestemt dyr (runden vælger selv dyrene): valgene er andre dyr fra niveauets pulje (og typens)
+  function opgaveFor(niveau, id, rng, emne, type) {
     emne = emne || 'naturLort';
-    const naer = naerFor(emne, id);
-    const andre = puljeFor(niveau, emne).filter((x) => x !== id);
+    const naer = naerFor(emne, id, type);
+    const andre = puljeFor(niveau, emne, type).filter((x) => x !== id);
     const fjerne = bland(rng, andre.filter((x) => naer.indexOf(x) < 0));
     const naere = bland(rng, andre.filter((x) => naer.indexOf(x) >= 0));
     const forkerte = (niveau >= 3 ? naere.slice(0, 1) : []).concat(fjerne).slice(0, antalValg(niveau) - 1);
-    return bygOpgave(niveau, id, bland(rng, forkerte.concat([id])), emne);
+    return bygOpgave(niveau, id, bland(rng, forkerte.concat([id])), emne, type);
   }
   // Opgaven ud fra dyret og valgene. Al tekst kommer herfra — også i en gentagelse fra de gemte data (lavRunde)
-  function bygOpgave(niveau, id, valg, emne) {
+  function bygOpgave(niveau, id, valg, emne, type) {
     emne = emne || 'naturLort';
-    const V = VERDENER[emne];
+    const V = opsaetning(emne, type, id);
     const d = DYR_ID[id];
     const sporAlene = visArt(V) === 'naturSpor';
-    const fakta = emne === 'naturSpor' ? SPOR[id].fakta : emne === 'naturSavanne' ? d.spor.fakta : d.fakta;
+    const fakta = V.savanne ? d[V.del].fakta : emne === 'naturSpor' ? SPOR[id].fakta : d.fakta;
     return {
       fag: 'natur', emne: emne, type: V.type, niveau: niveau, noegle: V.type + ':' + id, ikon: V.ikon,
       tale: V.spoerg,
       tekst: V.tekst,
-      // «Hvem har gået her?» (og Savannen) viser kun sporet, stort; «Gæt en lort» lorten og (på niveau 1–2) sporet ved siden af
+      // «Hvem har gået her?» (og Savannens spor) viser kun sporet, stort; «Gæt en lort» (også på savannen) lorten og (på
+      // niveau 1–2) sporet ved siden af
       vis: sporAlene ? { art: 'naturSpor', dyr: id } : { art: 'naturLort', dyr: id, spor: niveau < 3 },
       svar: id, valg: valg, valgArt: 'billede',
       ros: ros(d),                      // efter det rigtige svar: «Ja! Det er ræven.» …
@@ -246,13 +283,14 @@
       hjaelp: [{ art: 'naturSpor', tale: seSporet(d) }, { art: 'visNatur', tale: visDyret(d) }],
     };
   }
-  const GEN = { naturLort: gaetLort, naturSpor: hvemGik, savanneSpor: savanneSpor };
+  const GEN = { naturLort: gaetLort, naturSpor: hvemGik, savanneSpor: savanneSpor, savanneLort: savanneLort };
 
   // Emner (verdener) og niveauer — samme form som opgaver.js/dansk-opgaver.js, så rundemotoren og gem.js kan bruge dem
   const EMNER = {
     naturLort: { navn: VERDENER.naturLort.navn, maxNiveau: 3, niveauer: { 1: ['naturLort'], 2: ['naturLort'], 3: ['naturLort'] } },
     naturSpor: { navn: VERDENER.naturSpor.navn, maxNiveau: 3, niveauer: { 1: ['naturSpor'], 2: ['naturSpor'], 3: ['naturSpor'] } },
-    naturSavanne: { navn: VERDENER.naturSavanne.navn, maxNiveau: 3, niveauer: { 1: ['savanneSpor'], 2: ['savanneSpor'], 3: ['savanneSpor'] } },
+    // Savannen blander sine typer i hver runde (lavRunde)
+    naturSavanne: { navn: VERDENER.naturSavanne.navn, maxNiveau: 3, niveauer: { 1: VERDENER.naturSavanne.typer, 2: VERDENER.naturSavanne.typer, 3: VERDENER.naturSavanne.typer } },
   };
 
   // Ingen fast pulje som i opgaver.js: stemmens sætninger afhænger kun af dyret (saetninger), og runden vælger selv dyrene
@@ -262,15 +300,17 @@
   // kun på niveau 3 — og sporet vises som på rundens niveau
   function passerTilNiveau(o, niveau) {
     if (!o || !Object.prototype.hasOwnProperty.call(VERDENER, o.emne)) return false;
-    const pulje = puljeFor(niveau, o.emne);
+    const V = typeDef(o.emne, o.type);
+    if (!V) return false;
+    const pulje = puljeFor(niveau, o.emne, V.type);
     if (!Array.isArray(o.valg) || o.valg.length !== antalValg(niveau) || pulje.indexOf(o.svar) < 0) return false;
     if (new Set(o.valg).size !== o.valg.length || o.valg.indexOf(o.svar) < 0 || !o.valg.every((v) => pulje.indexOf(v) >= 0)) return false;
-    if (o.emne === 'naturLort' && (!o.vis || o.vis.spor !== (niveau < 3))) return false;
-    return niveau >= 3 || !o.valg.some((v) => naerFor(o.emne, o.svar).indexOf(v) >= 0);
+    if (visArt(V) === 'naturLort' && (!o.vis || o.vis.spor !== (niveau < 3))) return false;
+    return niveau >= 3 || !o.valg.some((v) => naerFor(o.emne, o.svar, V.type).indexOf(v) >= 0);
   }
   // En gemt opgave (afbrudt mission, «kommer igen») kan stamme fra en anden udgave: kun hvis dyrene stadig findes
   function opgaveKendt(o) {
-    const V = o && Object.prototype.hasOwnProperty.call(VERDENER, o.emne) ? VERDENER[o.emne] : null;
+    const V = o && Object.prototype.hasOwnProperty.call(VERDENER, o.emne) && typeof o.type === 'string' ? typeDef(o.emne, o.type) : null;
     return !!(V && o.fag === 'natur' && o.type === V.type && o.vis && o.vis.art === visArt(V) && erDyr(o.svar) &&
       V.dyr.indexOf(o.svar) >= 0 && o.vis.dyr === o.svar && Array.isArray(o.valg) &&
       o.valg.every((v) => erDyr(v) && V.dyr.indexOf(v) >= 0) && Array.isArray(o.hjaelp)); // valgene er verdenens egne dyr
@@ -285,7 +325,10 @@
     opts = opts || {};
     const antal = opts.antal || 5;
     niveau = Math.min(EMNER[emneId].maxNiveau, Math.max(1, Math.round(Number(niveau)) || 1));
-    const pulje = puljeFor(niveau, emneId);
+    // Verdenens typer i runden: skiftevis fra en tilfældig start (Savannen: spor, lort, spor … eller lort, spor …). Kun
+    // én type → intet træk fra rng, så skovens runder er de samme som før
+    const typer = EMNER[emneId].niveauer[niveau];
+    let start = typer.length > 1 ? Math.floor(rng() * typer.length) : 0;
     const brugt = Object.create(null); // dyr → gange i denne runde
     const plads = {};
     const nylige = (Array.isArray(opts.nylige) ? opts.nylige : []).filter(erDyr);
@@ -300,21 +343,26 @@
       .forEach((o, i) => {
         const p = Math.min(antal - 1, 2 + i);
         if (plads[p]) return;
-        plads[p] = Object.assign(bygOpgave(niveau, o.svar, o.valg.slice(), emneId), { gentaget: true });
+        plads[p] = Object.assign(bygOpgave(niveau, o.svar, o.valg.slice(), emneId, o.type), { gentaget: true });
         brugt[o.svar] = 1;
       });
+    // Gentagelserne beholder deres type, så rækken rettes ind efter den første (code-review 22-10-2026): typen før den er
+    // en anden, og efter en opgave kommer den næste type. Kun to gentagelser af samme type kan stå i træk
+    const foerste = Object.keys(plads).map(Number).sort((a, b) => a - b)[0];
+    if (typer.length > 1 && foerste !== undefined) start = (typer.indexOf(plads[foerste].type) - foerste % typer.length + typer.length) % typer.length;
     const runde = [];
     for (let i = 0; i < antal; i++) {
       if (plads[i]) { runde.push(plads[i]); continue; }
       const forrige = runde[i - 1];
       const naeste = plads[i + 1];
+      const type = forrige ? typer[(typer.indexOf(forrige.type) + 1) % typer.length] : typer[start];
       // Tilfældig orden først, så en stabil sortering: færrest gange i runden, så trinnet (ikke set for nylig → længst
       // siden → sidste runde). Er puljen kun 2 × antal (niveau 2 med 10), skifter runderne mellem to sæt
-      const id = bland(rng, pulje)
+      const id = bland(rng, puljeFor(niveau, emneId, type))
         .filter((x) => !(forrige && forrige.svar === x) && !(naeste && naeste.svar === x))
         .sort((a, b) => ((brugt[a] || 0) - (brugt[b] || 0)) || (trin(a) - trin(b)))[0];
       brugt[id] = (brugt[id] || 0) + 1;
-      runde.push(opgaveFor(niveau, id, rng, emneId));
+      runde.push(opgaveFor(niveau, id, rng, emneId, type));
     }
     return runde;
   }
@@ -325,10 +373,11 @@
     for (const d of DYR) ud.push(ros(d), d.fakta, seSporet(d), visDyret(d), stort(d.navn) + '.');
     for (const id of VERDENER.naturSpor.dyr) ud.push(SPOR[id].fakta);
     for (const d of SAVANNE) ud.push(ros(d), d.spor.fakta, seSporet(d), visDyret(d), stort(d.navn) + '.');
+    for (const d of SAVANNE) if (d.lort) ud.push(d.lort.fakta);
     return ud;
   }
 
-  const Natur = { DYR, DYR_ID, SPOR, SAVANNE, SAVANNE_KERNE, SAVANNE_MELLEM, STOERRELSER, KERNE, MELLEM, VERDENER, EMNER, GEN, antalValg, puljeFor, lavOpgave, opgaveFor, lavRunde, passerTilNiveau, opgaveKendt, saetninger, lavRng };
+  const Natur = { DYR, DYR_ID, SPOR, SAVANNE, SAVANNE_TYPER, SAVANNE_KERNE, SAVANNE_MELLEM, STOERRELSER, KERNE, MELLEM, VERDENER, EMNER, GEN, antalValg, puljeFor, lavOpgave, opgaveFor, lavRunde, passerTilNiveau, opgaveKendt, saetninger, lavRng };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Natur;
   else root.Natur = Natur;

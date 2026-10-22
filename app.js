@@ -76,13 +76,13 @@
 
   // Natur (pilot 20-10-2026, natur-opgaver.js): se lorten og sporet → tryk på dyret; «Hvem har gået her?» (trin 0,
   // 21-10-2026): kun sporet. Åbne fra start; fremskridtet gemmes som engelsk i data.dansk[emne] (gem.js kender emnet).
-  // hvad: voksnes overblik (voksen.js indlæser ikke natur-opgaver.js). Savannen (pilot 21-10-2026, fase 1: sporet) er
+  // hvad: voksnes overblik (voksen.js indlæser ikke natur-opgaver.js). Savannen (pilot 21-10-2026: spor og lort skiftevis) er
   // pilot: true — den lyser aldrig som anbefalet (indholdsplanen: ellers måler vi lyset, ikke lysten); ▶ går kun dertil for
   // at fortsætte en afbrudt mission dér (spilVerden).
   const NATUR_VERDENER = [
     { id: 'naturLort', fag: 'natur', e: '💩', navn: 'Gæt en lort', emne: 'naturLort', hvad: 'Lort og spor → dyr', tale: 'Gæt en lort. Hvem har lavet den?' },
     { id: 'naturSpor', fag: 'natur', e: '🐾', navn: 'Hvem har gået her?', emne: 'naturSpor', hvad: 'Spor → dyr', tale: 'Hvem har gået her? Se sporet, og tryk på dyret.' },
-    { id: 'naturSavanne', fag: 'natur', e: '🦁', navn: 'Savannen', emne: 'naturSavanne', hvad: 'Savannens spor → dyr', tale: 'Savannen. Her bor løven og zebraen.', pilot: true },
+    { id: 'naturSavanne', fag: 'natur', e: '🦁', navn: 'Savannen', emne: 'naturSavanne', hvad: 'Spor og lort → dyr', tale: 'Savannen. Her bor løven og zebraen.', pilot: true },
   ];
 
   // Fagene på fagvalget i tastaturets rækkefølge (1, 2, 3, 4). Engelsk og natur kun, når deres opgavefil er indlæst.
@@ -116,7 +116,7 @@
     historiebog: 'I Historiebogen er der små historier. Tryk på et ord, så hører du det. Læs historien, tegn den, og skriv et ord fra den.',
     naturLort: 'Alle dyr laver lort, og den ser forskellig ud. Se på lorten og på sporet. Tryk så på det dyr, der har lavet den.',
     naturSpor: 'Når et dyr går i mudder eller sne, sætter det spor. Se på sporet. Tryk så på det dyr, der har gået her.',
-    naturSavanne: 'Langt væk ligger savannen, en stor slette med græs og spredte træer. Her bor løven, zebraen og giraffen. Se sporet, og tryk på dyret.',
+    naturSavanne: 'Langt væk ligger savannen, en stor slette med græs og spredte træer. Her bor løven, zebraen og giraffen. Se sporet eller lorten, og tryk på dyret.',
   };
 
   // «Vælg selv» (🎒): fagets emner som store ikoner, delt i afsnit (Jimmy 18-10-2026: «når man vælger dansk er det det
@@ -3719,28 +3719,31 @@
 
   // ---------- Natur (pilot 20-10-2026): «Gæt en lort» — se lorten (og sporet), tryk på dyret. Ingen læsetekst. ----------
   // «Hvem har gået her?» (trin 0, 21-10-2026, vis.art 'naturSpor'): kun sporet, stort, på samme skovbund — i Savannen
-  // (emne naturSavanne) på tørt græs og sand (.savanne).
+  // (emne naturSavanne, både spor og lort) på tørt græs og sand (.savanne).
   // Lorten står stort på en stribe skovbund, sporet ved siden af. På niveau 3 er sporet skjult, til hjælpen viser det
   // (naturSpor). Kun spillets egne tegninger (grafik.js natur); mangler en, står emojien — uglens «spor» er dens træ.
   const naturTegning = (navn, klasse) => (GR && GR.natur ? tegning(GR.natur[navn], klasse) : null);
   function naturVisning(opg) {
     const id = opg.vis.dyr;
     const d = N && N.DYR_ID[id];
+    const sand = opg.emne === 'naturSavanne' ? ['savanne'] : [];
     if (opg.vis.art === 'naturSpor') {
       // Sporet har klassen natur-spor, så hjælpens første trin (naturSpor) får det til at lyse
-      return h('div', { class: ['natur-scene', 'spor-alene'].concat(opg.emne === 'naturSavanne' ? ['savanne'] : []).join(' '), 'aria-hidden': 'true' },
+      return h('div', { class: ['natur-scene', 'spor-alene'].concat(sand).join(' '), 'aria-hidden': 'true' },
         h('div', { class: 'natur-fund' }, h('div', { class: 'natur-spor' },
           naturTegning('spor-' + id, 'natur-tegning') || h('span', { class: 'natur-e' }, '🐾'))),
         h('div', { class: 'natur-jord' }));
     }
     // Barnefingeren i lortens målestok (lille · mellem · stor, natur-opgaver.js STOERRELSER) peger ind fra venstre; hånden
-    // tegnes langt ud over kassen, så feltets kant (overflow: hidden) klipper den — den kommer «udefra»
+    // tegnes langt ud over kassen, så feltets kant (overflow: hidden) klipper den — den kommer «udefra». Savannens dyr har
+    // målestokken i lort.str og kun, hvor størrelsen er kildebelagt (docs/SAVANNE-FAKTA.md)
     const tegnet = naturTegning('lort-' + id, 'natur-tegning');
+    const str = d && (d.lort ? d.lort.str : d.str);
     const lort = h('div', { class: 'natur-lort' }, tegnet || h('span', { class: 'natur-e' }, '💩'),
-      tegnet && d && d.str ? naturTegning('finger-' + d.str, 'natur-finger') : null);
+      tegnet && str ? naturTegning('finger-' + str, 'natur-finger') : null);
     const spor = h('div', { class: opg.vis.spor ? 'natur-spor' : ['natur-spor', 'skjult'].join(' ') }, // uden mellemrum i strengen (tale-tekster.js)
       naturTegning('spor-' + id, 'natur-tegning') || h('span', { class: 'natur-e' }, d && d.sporOrd ? '🌳' : '🐾'));
-    return h('div', { class: 'natur-scene', 'aria-hidden': 'true' },
+    return h('div', { class: ['natur-scene'].concat(sand).join(' '), 'aria-hidden': 'true' },
       h('div', { class: 'natur-fund' }, lort, spor),
       h('div', { class: 'natur-jord' }));
   }
@@ -6630,8 +6633,8 @@
       case 'naturLort': return [['lort-raev', '💩'], ['spor-raev', '🐾'], ['dyr-raev', '🦊']].map(([navn, e]) => naturTegning(navn, 'natur-lektion') || h('span', { class: 'lektion-emoji' }, e));
       // «Hvem har gået her?»: sporet og dyret, der har sat det (hunden)
       case 'naturSpor': return [['spor-hund', '🐾'], ['dyr-hund', '🐕']].map(([navn, e]) => naturTegning(navn, 'natur-lektion') || h('span', { class: 'lektion-emoji' }, e));
-      // Savannen: giraffens spor og giraffen
-      case 'naturSavanne': return [['spor-giraf', '🐾'], ['dyr-giraf', '🦒']].map(([navn, e]) => naturTegning(navn, 'natur-lektion') || h('span', { class: 'lektion-emoji' }, e));
+      // Savannen: giraffens lort og spor og giraffen
+      case 'naturSavanne': return [['lort-giraf', '💩'], ['spor-giraf', '🐾'], ['dyr-giraf', '🦒']].map(([navn, e]) => naturTegning(navn, 'natur-lektion') || h('span', { class: 'lektion-emoji' }, e));
       case 'jagt': return [h('span', { class: 'lektion-emoji' }, '🫧'), h('span', { class: 'bogstav-kort lektion-bogstav' }, h('span', { class: 'bogstav-stort' }, 'S'), h('span', { class: 'bogstav-lille' }, 's'))];
       default: return fyrtaarn();
     }
