@@ -723,8 +723,9 @@
       const naturRaekker = NATUR_VERDENER.map((v) => raekke(v, d.dansk[v.emne], v.hvad));
       // Natur (natur-opgaver.js indlæses ikke her): «naturLort:raev» → «Gæt en lort: ræv», «naturSpor:raev» → «Spor: ræv»
       // (kort, uden stationens «?» midt i linjen), «savanneSpor:loeve» → «Savannen, spor: løve» (og lort) — id'erne staver æ/å som ae/aa
-      // — og «savanneTael:7» → «Savannen, tæl: 7 zebraer» (test-natur tjekker det for hvert dyr og antal)
-      const beskrivNatur = (n) => { const t = /^savanneTael:([1-9][0-9]?)$/.exec(n); if (t) return 'Savannen, tæl: ' + t[1] + (t[1] === '1' ? ' zebra' : ' zebraer'); const m = /^(naturLort|naturSpor|savanneSpor|savanneLort):([a-z]+)$/.exec(n); return m ?({ naturLort: 'Gæt en lort: ', naturSpor: 'Spor: ', savanneSpor: 'Savannen, spor: ', savanneLort: 'Savannen, lort: ' })[m[1]] + m[2].replace(/ae/g, 'æ').replace(/aa/g, 'å').replace(/oe/g, 'ø') : null; };
+      // — «savanneTael:7» → «Savannen, tæl: 7 zebraer» og «savanneLyd:struds» → «Savannen, første lyd: struds» (test-natur
+      // tjekker det for hvert dyr og antal)
+      const beskrivNatur = (n) => { const t = /^savanneTael:([1-9][0-9]?)$/.exec(n); if (t) return 'Savannen, tæl: ' + t[1] + (t[1] === '1' ? ' zebra' : ' zebraer'); const m = /^(naturLort|naturSpor|savanneSpor|savanneLort|savanneLyd):([a-z]+)$/.exec(n); return m ?({ naturLort: 'Gæt en lort: ', naturSpor: 'Spor: ', savanneSpor: 'Savannen, spor: ', savanneLort: 'Savannen, lort: ', savanneLyd: 'Savannen, første lyd: ' })[m[1]] + m[2].replace(/ae/g, 'æ').replace(/aa/g, 'å').replace(/oe/g, 'ø') : null; };
       const beskriv = (n) => beskrivNatur(n) || (D && D.beskrivNoegle(n)) || O.beskrivNoegle(n);
       // Det driller (flest fejl, seneste først)
       const driller = [];

@@ -82,7 +82,7 @@
   const NATUR_VERDENER = [
     { id: 'naturLort', fag: 'natur', e: '💩', navn: 'Gæt en lort', emne: 'naturLort', hvad: 'Lort og spor → dyr', tale: 'Gæt en lort. Hvem har lavet den?' },
     { id: 'naturSpor', fag: 'natur', e: '🐾', navn: 'Hvem har gået her?', emne: 'naturSpor', hvad: 'Spor → dyr', tale: 'Hvem har gået her? Se sporet, og tryk på dyret.' },
-    { id: 'naturSavanne', fag: 'natur', e: '🦁', navn: 'Savannen', emne: 'naturSavanne', hvad: 'Spor og lort → dyr · tæl zebraer', tale: 'Savannen. Her bor løven og zebraen.', pilot: true },
+    { id: 'naturSavanne', fag: 'natur', e: '🦁', navn: 'Savannen', emne: 'naturSavanne', hvad: 'Spor og lort → dyr · tæl zebraer · første lyd', tale: 'Savannen. Her bor løven og zebraen.', pilot: true },
   ];
 
   // Fagene på fagvalget i tastaturets rækkefølge (1, 2, 3, 4). Engelsk og natur kun, når deres opgavefil er indlæst.
@@ -2234,9 +2234,9 @@
   const antalOpgaver = () => ([5, 8, 10].indexOf(voksen.opgaverPrRunde) >= 0 ? voksen.opgaverPrRunde : 8);
   // Natur husker de senest viste dyr, mens siden er åben (S.naturNylige), så næste runde begynder med dyr, barnet ikke
   // lige har set (runde 2, 20-10-2026). Ikke i de gemte data: et nyt felt ville kræve en migrering. Kun dyrene: Savannens
-  // tælling (fase 3) har et tal som svar
-  function naturRunde(emne, niveau, rng, gentag) {
-    const opgaver = N.lavRunde(emne, niveau, rng, { gentag: gentag, antal: antalOpgaver(), nylige: S.naturNylige || [] });
+  // tælling (fase 3) har et tal som svar. udenLyt: oplæsningen er fra, så Savannens «første lyd» springes over
+  function naturRunde(emne, niveau, rng, gentag, udenLyt) {
+    const opgaver = N.lavRunde(emne, niveau, rng, { gentag: gentag, antal: antalOpgaver(), nylige: S.naturNylige || [], udenLyt: !!udenLyt });
     S.naturNylige = (S.naturNylige || []).concat(opgaver.map((o) => o.svar).filter((x) => typeof x === 'string')).slice(-40);
     return opgaver;
   }
@@ -2300,9 +2300,10 @@
       ed.niveau = Math.min(E.EMNER[emne].maxNiveau, Math.max(1, ed.niveau || 1));
       opgaver = E.lavRunde(emne, ed.niveau, rng, { gentag: (data.gentag[emne] || []).filter(opgaveKendt), antal: antalOpgaver() });
     } else if (verden.fag === 'natur') {
-      // Natur: se lorten (og sporet) → tryk på dyret. Billederne bærer opgaven, så den kan også spilles uden lyd
+      // Natur: se lorten (og sporet) → tryk på dyret. Billederne bærer opgaven, så den kan også spilles uden lyd — kun
+      // Savannens «Hvilket dyr starter med …?» skal høres, og den kommer ikke uden oplæsning
       ed.niveau = Math.min(N.EMNER[emne].maxNiveau, Math.max(1, ed.niveau || 1));
-      opgaver = naturRunde(emne, ed.niveau, rng, (data.gentag[emne] || []).filter(opgaveKendt));
+      opgaver = naturRunde(emne, ed.niveau, rng, (data.gentag[emne] || []).filter(opgaveKendt), udenLyt);
     } else {
       ed.niveau = O.klemNiveau(emne, ed.niveau);
       opgaver = O.lavRunde(emne, ed.niveau, rng, { ting: T.ting, gentag: (data.gentag[emne] || []).filter(opgaveKendt), udenLyt: udenLyt, antal: antalOpgaver() });
@@ -3744,6 +3745,17 @@
         h('div', { class: 'natur-vandhul' }),
         h('div', { class: 'natur-jord' }));
     }
+    // «Hvilket dyr starter med …?» (fase 4): eksemplets billede (solen, lammet …) og på niveau 1–2 bogstavet på sandet;
+    // dyrene står på kortene. På niveau 3 står bogstavet usynligt på sin plads (.gemt), til hjælpen viser det (visBogstav) —
+    // så billedet ikke flytter sig, når det kommer frem
+    if (opg.vis.art === 'naturLyd') {
+      const b = opg.vis.bogstav || (d && d.forlyd) || '';
+      const kort = b ? bogstavKort(b) : null;
+      if (kort && !opg.vis.bogstav) kort.classList.add('gemt');
+      return h('div', { class: ['natur-scene', 'natur-lyd'].concat(sand).join(' '), 'aria-hidden': 'true' },
+        h('div', { class: 'natur-lyd-par' }, h('span', { class: 'natur-lyd-e' }, ordTegn(opg.vis.e)), kort),
+        h('div', { class: 'natur-jord' }));
+    }
     if (opg.vis.art === 'naturSpor') {
       // Sporet har klassen natur-spor, så hjælpens første trin (naturSpor) får det til at lyse
       return h('div', { class: ['natur-scene', 'spor-alene'].concat(sand).join(' '), 'aria-hidden': 'true' },
@@ -4969,13 +4981,20 @@
       return;
     }
     if (art === 'visBogstav') {
-      hjaelpeFelt(h('div', { class: 'vis-bogstav' }, bogstavKort(trin.bogstav), trin.e ? h('span', { class: 'vis-bogstav-e', 'aria-hidden': 'true' }, ordTegn(trin.e)) : null,
-        trin.ord ? h('span', { class: 'vis-bogstav-ord' }, trin.ord) : null));
+      // Natur, «Hvilket dyr starter med …?»: scenens eget billede og bogstav lyser (på niveau 3 kommer bogstavet frem på sin
+      // plads) i stedet for en kopi nederst — kopien tog feltets højde, så scenen skrumpede (UI-review 22-10-2026)
+      const par = opg.vis.art === 'naturLyd' ? vis.querySelector('.natur-lyd-par') : null;
+      const kort = par && par.querySelector('.bogstav-kort');
+      if (kort) { kort.classList.remove('gemt'); hop(kort, 'pop'); par.classList.add('lyser'); } else {
+        hjaelpeFelt(h('div', { class: 'vis-bogstav' }, bogstavKort(trin.bogstav), trin.e ? h('span', { class: 'vis-bogstav-e', 'aria-hidden': 'true' }, ordTegn(trin.e)) : null,
+          trin.ord ? h('span', { class: 'vis-bogstav-ord' }, trin.ord) : null));
+      }
       await vent(200);
       if (!levende()) return;
       if (opg.emne === 'alfabet') { await Tale.sigVent('Sådan ser det ud.'); return; }
       await Lyd.klip(D.lydId(trin.bogstav), D.lydReserve(trin.bogstav));
       if (levende() && trin.ord) await Tale.sigVent(stort(trin.ord) + (trin.midt ? ' har den lyd i midten.' : trin.slut || opg.type === 'udlyd' ? ' slutter med den lyd.' : ' starter med den lyd.'));
+      if (kort) par.classList.remove('lyser'); // bogstavet bliver stående
       return;
     }
     // D2: hele alfabetet (ikke knapper) — de nævnte bogstaver er markeret og lyser op ét ad gangen.

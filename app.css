@@ -3136,6 +3136,47 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
 /* Savannen (pilot 21-10-2026): sporet på tørt græs og sand i stedet for skovbund — lidt mørkere sand end sporenes
    egen bund (#F0D59B i spor-*.svg), så jorden kan ses under tegningen */
 .natur-scene.savanne { --natur-graes: #c2ad55; --natur-jord: #e0c184; --natur-jord-moerk: #bf9a5c; }
+/* «Hvilket dyr starter med …?» (Savannen, fase 4, 22-10-2026): lydens billede (dansks eksempelord: ☀️ sol, 🐑 lam, 5 fem,
+   9 ni) og på niveau 1–2 bogstavet på et hvidt kort, side om side på sandet. Svarkortene er dyrene */
+.natur-scene.natur-lyd { min-width: min(100%, 48vmin); }
+.natur-lyd-par { display: flex; align-items: center; justify-content: center; gap: clamp(20px, 5vmin, 56px); margin-bottom: clamp(8px, 2vmin, 18px); }
+.natur-lyd-e { font-size: clamp(72px, 18vmin, 170px); line-height: 1; }
+.natur-lyd .bogstav-kort { font-size: clamp(64px, 15vmin, 140px); color: var(--farve-1-moerk); background: var(--hvid); border-radius: 28px; padding: 0.1em 0.3em; box-shadow: 0 6px 0 var(--skygge); }
+/* Niveau 3: bogstavet står usynligt på sin plads, til hjælpen viser det (app.js visBogstav) — så billedet ikke flytter sig */
+.natur-lyd .bogstav-kort.gemt { visibility: hidden; }
+/* Hjælpen: billedet og bogstavet lyser i guld som sporet (.natur-spor.lyser) — i en ramme lidt uden om parret (::before),
+   så parret og billedet beholder deres plads og størrelse. Rammen går ikke ned i sandet */
+.natur-lyd-par { position: relative; z-index: 0; }
+.natur-lyd-par::before {
+  content: ''; position: absolute; inset: -12px -16px -2px; z-index: -1; border-radius: 28px; opacity: 0; transition: opacity 0.3s;
+  background: rgba(255, 200, 61, 0.28); box-shadow: 0 0 0 6px var(--guld), 0 0 24px var(--guld);
+}
+.natur-lyd-par.lyser::before { opacity: 1; }
+.natur-lyd .natur-jord { width: 100%; }
+@supports (width: 1cqw) {
+  .natur-lyd-e { font-size: min(170px, 26cqw, 46cqh); }
+  .natur-lyd .bogstav-kort { font-size: min(140px, 20cqw, 38cqh); }
+  /* Højt felt (iPad på højkant): side om side, ca. 1,4 gange større end liggende — bredden er grænsen. Det bredeste par er
+     solen (ca. 1,37 × billedets skrift) med «Ss» (1,54 × kortets) og terningerne for ni (1,15 ×) med «Nn» (1,81 ×): ca. 87cqw */
+  @container (max-aspect-ratio: 1/1) {
+    .natur-lyd-e { font-size: min(240px, 33cqw, 30cqh); }
+    .natur-lyd .bogstav-kort { font-size: min(196px, 27cqw, 24cqh); }
+  }
+  /* Meget højt felt (telefon på højkant): side om side fik de kun ca. en tredjedel af bredden og tom plads over og under
+     (UI-review 22-10-2026). Bogstavet står over billedet, så begge kan bruge bredden og højden: ca. 1,45 gange større */
+  @container (max-aspect-ratio: 3/4) {
+    .natur-lyd-par { flex-direction: column-reverse; gap: clamp(16px, 5cqh, 32px); }
+    .natur-lyd-e { font-size: min(200px, 44cqw, 28cqh); }
+    .natur-lyd .bogstav-kort { font-size: min(160px, 34cqw, 22cqh); }
+  }
+  /* Lavt felt liggende (højst 250 px, fx 640 × 360 og 667 × 375): sandet nåede ned i vennens hjørne nederst til venstre og
+     rørte vennen (UI-review 22-10-2026: sandet fra x = 77, vennens tegning til x = 77). Scenen står midt i feltet til højre
+     for vennen: margenen er vennens bredde fra feltets indholdskant (som --ven-side i tæl nedenfor), og scenen rykker
+     halvdelen af den til højre. Den er højst ca. 67cqw + 20 px bred, så der er plads */
+  @container (min-aspect-ratio: 1/1) and (max-height: 250px) {
+    .natur-scene.natur-lyd { margin-left: calc(1.1 * clamp(46px, 8vmin, 80px) - 4px); }
+  }
+}
 .lektion-tegning .natur-lektion { width: clamp(80px, 15vmin, 140px); height: clamp(80px, 15vmin, 140px); }
 /* «Tæl ved vandhullet» (Savannen, fase 3, 22-10-2026): zebraerne (dyr-zebra.svg, 96 × 96, hovene ved y ≈ 84) i
    matematikkens rækker af 5 og blokke af 10, og under dem en flad blå pyt på sandet. Tegningen er 1em, så tællehjælpens
