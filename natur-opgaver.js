@@ -174,6 +174,14 @@
   ];
   const SAVANNE_KERNE = 4;
   const SAVANNE_MELLEM = 6;
+  // Fase 3 «Tæl ved vandhullet» (22-10-2026): zebraer ved vandhullet → tryk på tallet. Svaret er et antal, ikke et dyr.
+  // Samme intervaller som matematikkens «Tæl» (opgaver.js G.antal): små antal ses med det samme, større tælles. Fakta
+  // (lige · ulige antal) med kilder i docs/SAVANNE-FAKTA.md «Vandhullet»
+  const TAEL = {
+    dyr: 'zebra', interval: { 1: [1, 6], 2: [3, 10], 3: [8, 20] }, max: 20,
+    fakta: ['Savannezebraen skal drikke vand hver dag.', 'Savannezebraen skal altid kunne finde vand.'],
+  };
+  const erAntal = (n) => Number.isInteger(n) && n >= 1 && n <= TAEL.max;
   const KERNE = 10;
   const MELLEM = 20;
   // Alle dyr efter id — skovens og savannens (id'erne er forskellige; test)
@@ -199,33 +207,35 @@
       dyr: DYR.filter((d) => SPOR[d.id]).map((d) => d.id),
     },
     naturSavanne: {
-      navn: 'Savannen', type: 'savanneSpor', typer: ['savanneSpor', 'savanneLort'], ikon: '🦁', savanne: true,
+      navn: 'Savannen', type: 'savanneSpor', typer: ['savanneSpor', 'savanneLort', 'savanneTael'], ikon: '🦁', savanne: true,
       dyr: SAVANNE.map((d) => d.id),
     },
   };
   // Savannens opgavetyper — én ny pr. fase (indholdsplanen 21-10): visningen, spørgsmålet og den del af dyret (del), som
-  // dyrene, «nær» og fakta kommer fra
+  // dyrene, «nær» og fakta kommer fra. tal: svaret er et antal (TAEL), ikke et dyr
   const SAVANNE_TYPER = {
     savanneSpor: { vis: 'naturSpor', spoerg: 'Hvem har gået her?', tekst: 'Hvem har gået her?', del: 'spor' },
     savanneLort: { vis: 'naturLort', spoerg: 'Hvem har lavet den?', tekst: 'Hvem har lavet den?', del: 'lort' },
+    // Tællingens spørgsmål har zebraens ikon, ikke Savannens løve (UI-review 22-10-2026)
+    savanneTael: { vis: 'naturTael', spoerg: 'Hvor mange zebraer er der ved vandhullet?', tekst: 'Hvor mange zebraer?', tal: true, ikon: '🦓' },
   };
   const visArt = (V) => V.vis || V.type;
   // Typens opsætning i en verden: skovens verdener har én type hver; Savannens type (standard: den første) får sin del og
-  // dyrene med den del. null for en ukendt type (fra gemte data)
+  // dyrene med den del (tællingen: ingen). null for en ukendt type (fra gemte data)
   function typeDef(emne, type) {
     const V = VERDENER[emne];
     if (!V.savanne) return !type || type === V.type ? V : null;
     type = type || V.type;
     if (V.typer.indexOf(type) < 0) return null;
     const T = SAVANNE_TYPER[type];
-    return Object.assign({}, V, T, { type: type, dyr: SAVANNE.filter((d) => d[T.del]).map((d) => d.id) });
+    return Object.assign({}, V, T, { type: type, dyr: T.tal ? [] : SAVANNE.filter((d) => d[T.del]).map((d) => d.id) });
   }
   // Kode, der bygger en opgave, får kun kendte typer og dyr (lavRunde og GEN); alt andet er en fejl i koden, og den får
   // et klart navn (code-review 22-10-2026). Gemte data prøves med opgaveKendt, der bare siger nej
   function opsaetning(emne, type, id) {
     const V = typeDef(emne, type);
     if (!V) throw new Error('Natur: ukendt type ' + emne + '/' + type);
-    if (id !== undefined && V.dyr.indexOf(id) < 0) throw new Error('Natur: ' + id + ' findes ikke i ' + emne + '/' + V.type);
+    if (id !== undefined && !(V.tal ? erAntal(id) : V.dyr.indexOf(id) >= 0)) throw new Error('Natur: ' + id + ' findes ikke i ' + emne + '/' + V.type);
     return V;
   }
   // Dyrene, der ligner svaret: lorten (naturLort), sporet (naturSpor) eller typens del på savannen
@@ -242,19 +252,32 @@
   const antalValg = (niveau) => (niveau <= 1 ? 2 : 3);
   const puljeFor = (niveau, emne, type) => {
     const V = opsaetning(emne || 'naturLort', type);
+    if (V.tal) {
+      const [fra, til] = TAEL.interval[niveau <= 1 ? 1 : niveau === 2 ? 2 : 3];
+      const ud = [];
+      for (let n = fra; n <= til; n++) ud.push(n);
+      return ud;
+    }
     if (V.savanne) return SAVANNE.slice(0, niveau <= 1 ? SAVANNE_KERNE : niveau === 2 ? SAVANNE_MELLEM : SAVANNE.length).map((d) => d.id).filter((id) => V.dyr.indexOf(id) >= 0);
     return DYR.slice(0, niveau <= 1 ? KERNE : niveau === 2 ? MELLEM : DYR.length).map((d) => d.id).filter((id) => V.dyr.indexOf(id) >= 0);
   };
   const ros = (d) => 'Ja! Det er ' + d.bestemt + '.';
   const visDyret = (d) => 'Det er ' + d.bestemt + '. Tryk på den, der lyser.';
   const seSporet = (d) => 'Se ' + (d.sporOrd || 'sporet') + '. ' + d.ledetraad;
+  const taelRos = (n) => 'Ja! Der er ' + (n === 1 ? 'én zebra' : n + ' zebraer') + '.';
   function gaetLort(niveau, rng) { return opgaveFor(niveau, vaelg(rng, puljeFor(niveau)), rng); }
   function hvemGik(niveau, rng) { return opgaveFor(niveau, vaelg(rng, puljeFor(niveau, 'naturSpor')), rng, 'naturSpor'); }
   function savanneSpor(niveau, rng) { return opgaveFor(niveau, vaelg(rng, puljeFor(niveau, 'naturSavanne', 'savanneSpor')), rng, 'naturSavanne', 'savanneSpor'); }
   function savanneLort(niveau, rng) { return opgaveFor(niveau, vaelg(rng, puljeFor(niveau, 'naturSavanne', 'savanneLort')), rng, 'naturSavanne', 'savanneLort'); }
-  // Opgaven med et bestemt dyr (runden vælger selv dyrene): valgene er andre dyr fra niveauets pulje (og typens)
+  function savanneTael(niveau, rng) { return opgaveFor(niveau, vaelg(rng, puljeFor(niveau, 'naturSavanne', 'savanneTael')), rng, 'naturSavanne', 'savanneTael'); }
+  // Opgaven med et bestemt dyr (runden vælger selv dyrene): valgene er andre dyr fra niveauets pulje (og typens).
+  // Tællingen: de nærmeste nabotal fra 1 til niveauets største antal, i rækkefølge (som matematikkens «Tæl», O.lavValg)
   function opgaveFor(niveau, id, rng, emne, type) {
     emne = emne || 'naturLort';
+    if (opsaetning(emne, type, id).tal) {
+      const til = puljeFor(niveau, emne, type).slice(-1)[0];
+      return bygOpgave(niveau, id, O.lavValg(rng, id, 1, til, null, antalValg(niveau)), emne, type);
+    }
     const naer = naerFor(emne, id, type);
     const andre = puljeFor(niveau, emne, type).filter((x) => x !== id);
     const fjerne = bland(rng, andre.filter((x) => naer.indexOf(x) < 0));
@@ -266,6 +289,19 @@
   function bygOpgave(niveau, id, valg, emne, type) {
     emne = emne || 'naturLort';
     const V = opsaetning(emne, type, id);
+    if (V.tal) {
+      return {
+        fag: 'natur', emne: emne, type: V.type, niveau: niveau, noegle: V.type + ':' + id, ikon: V.ikon,
+        tale: V.spoerg,
+        tekst: V.tekst,
+        vis: { art: 'naturTael', dyr: TAEL.dyr, antal: id }, // zebraerne i rækker af 5 og blokke af 10 ved vandhullet
+        svar: id, valg: valg,             // tallene står på kortene (ingen valgArt, som matematikken)
+        ros: taelRos(id),                 // «Ja! Der er 7 zebraer.» …
+        fakta: TAEL.fakta[id % 2],        // … og én sand sætning om zebraen og vandet
+        // Fejl straffes aldrig: vennen tæller zebraerne med barnet (over 10: de første 10 på én gang), så vises svaret
+        hjaelp: [{ art: 'tael', tale: 'Lad os tælle zebraerne.' }],
+      };
+    }
     const d = DYR_ID[id];
     const sporAlene = visArt(V) === 'naturSpor';
     const fakta = V.savanne ? d[V.del].fakta : emne === 'naturSpor' ? SPOR[id].fakta : d.fakta;
@@ -283,7 +319,7 @@
       hjaelp: [{ art: 'naturSpor', tale: seSporet(d) }, { art: 'visNatur', tale: visDyret(d) }],
     };
   }
-  const GEN = { naturLort: gaetLort, naturSpor: hvemGik, savanneSpor: savanneSpor, savanneLort: savanneLort };
+  const GEN = { naturLort: gaetLort, naturSpor: hvemGik, savanneSpor: savanneSpor, savanneLort: savanneLort, savanneTael: savanneTael };
 
   // Emner (verdener) og niveauer — samme form som opgaver.js/dansk-opgaver.js, så rundemotoren og gem.js kan bruge dem
   const EMNER = {
@@ -303,6 +339,12 @@
     const V = typeDef(o.emne, o.type);
     if (!V) return false;
     const pulje = puljeFor(niveau, o.emne, V.type);
+    // Tællingen: antallet er i niveauets interval, og tallene på kortene er nabotal fra 1 til niveauets største antal
+    // (med to kort højst 1 væk, med tre højst 2 — som O.lavValg giver dem)
+    if (V.tal) {
+      return Array.isArray(o.valg) && o.valg.length === antalValg(niveau) && pulje.indexOf(o.svar) >= 0 && new Set(o.valg).size === o.valg.length &&
+        o.valg.indexOf(o.svar) >= 0 && o.valg.every((v) => erAntal(v) && v <= pulje[pulje.length - 1] && Math.abs(v - o.svar) < antalValg(niveau));
+    }
     if (!Array.isArray(o.valg) || o.valg.length !== antalValg(niveau) || pulje.indexOf(o.svar) < 0) return false;
     if (new Set(o.valg).size !== o.valg.length || o.valg.indexOf(o.svar) < 0 || !o.valg.every((v) => pulje.indexOf(v) >= 0)) return false;
     if (visArt(V) === 'naturLort' && (!o.vis || o.vis.spor !== (niveau < 3))) return false;
@@ -311,6 +353,11 @@
   // En gemt opgave (afbrudt mission, «kommer igen») kan stamme fra en anden udgave: kun hvis dyrene stadig findes
   function opgaveKendt(o) {
     const V = o && Object.prototype.hasOwnProperty.call(VERDENER, o.emne) && typeof o.type === 'string' ? typeDef(o.emne, o.type) : null;
+    // Tællingen: et helt antal fra 1 til 20, de samme zebraer i visningen og kun tal blandt valgene
+    if (V && V.tal) {
+      return !!(o.fag === 'natur' && o.type === V.type && o.vis && o.vis.art === visArt(V) && erAntal(o.svar) &&
+        o.vis.antal === o.svar && o.vis.dyr === TAEL.dyr && Array.isArray(o.valg) && o.valg.every(erAntal) && Array.isArray(o.hjaelp));
+    }
     return !!(V && o.fag === 'natur' && o.type === V.type && o.vis && o.vis.art === visArt(V) && erDyr(o.svar) &&
       V.dyr.indexOf(o.svar) >= 0 && o.vis.dyr === o.svar && Array.isArray(o.valg) &&
       o.valg.every((v) => erDyr(v) && V.dyr.indexOf(v) >= 0) && Array.isArray(o.hjaelp)); // valgene er verdenens egne dyr
@@ -325,7 +372,7 @@
     opts = opts || {};
     const antal = opts.antal || 5;
     niveau = Math.min(EMNER[emneId].maxNiveau, Math.max(1, Math.round(Number(niveau)) || 1));
-    // Verdenens typer i runden: skiftevis fra en tilfældig start (Savannen: spor, lort, spor … eller lort, spor …). Kun
+    // Verdenens typer i runden: på skift fra en tilfældig start (Savannen: spor, lort, tæl, spor … eller lort, tæl …). Kun
     // én type → intet træk fra rng, så skovens runder er de samme som før
     const typer = EMNER[emneId].niveauer[niveau];
     let start = typer.length > 1 ? Math.floor(rng() * typer.length) : 0;
@@ -374,10 +421,13 @@
     for (const id of VERDENER.naturSpor.dyr) ud.push(SPOR[id].fakta);
     for (const d of SAVANNE) ud.push(ros(d), d.spor.fakta, seSporet(d), visDyret(d), stort(d.navn) + '.');
     for (const d of SAVANNE) if (d.lort) ud.push(d.lort.fakta);
-    return ud;
+    // Tæl ved vandhullet: spørgsmålet, hjælpen, rosen for hvert antal og faktaene («Det er 7. Tryk på 7.» har matematikken)
+    ud.push(SAVANNE_TYPER.savanneTael.spoerg, 'Lad os tælle zebraerne.');
+    for (let n = 1; n <= TAEL.max; n++) ud.push(taelRos(n));
+    return ud.concat(TAEL.fakta);
   }
 
-  const Natur = { DYR, DYR_ID, SPOR, SAVANNE, SAVANNE_TYPER, SAVANNE_KERNE, SAVANNE_MELLEM, STOERRELSER, KERNE, MELLEM, VERDENER, EMNER, GEN, antalValg, puljeFor, lavOpgave, opgaveFor, lavRunde, passerTilNiveau, opgaveKendt, saetninger, lavRng };
+  const Natur = { DYR, DYR_ID, SPOR, SAVANNE, SAVANNE_TYPER, SAVANNE_KERNE, SAVANNE_MELLEM, TAEL, STOERRELSER, KERNE, MELLEM, VERDENER, EMNER, GEN, antalValg, puljeFor, lavOpgave, opgaveFor, lavRunde, passerTilNiveau, opgaveKendt, saetninger, lavRng };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Natur;
   else root.Natur = Natur;

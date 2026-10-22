@@ -82,7 +82,7 @@
   const NATUR_VERDENER = [
     { id: 'naturLort', fag: 'natur', e: '💩', navn: 'Gæt en lort', emne: 'naturLort', hvad: 'Lort og spor → dyr', tale: 'Gæt en lort. Hvem har lavet den?' },
     { id: 'naturSpor', fag: 'natur', e: '🐾', navn: 'Hvem har gået her?', emne: 'naturSpor', hvad: 'Spor → dyr', tale: 'Hvem har gået her? Se sporet, og tryk på dyret.' },
-    { id: 'naturSavanne', fag: 'natur', e: '🦁', navn: 'Savannen', emne: 'naturSavanne', hvad: 'Spor og lort → dyr', tale: 'Savannen. Her bor løven og zebraen.', pilot: true },
+    { id: 'naturSavanne', fag: 'natur', e: '🦁', navn: 'Savannen', emne: 'naturSavanne', hvad: 'Spor og lort → dyr · tæl zebraer', tale: 'Savannen. Her bor løven og zebraen.', pilot: true },
   ];
 
   // Fagene på fagvalget i tastaturets rækkefølge (1, 2, 3, 4). Engelsk og natur kun, når deres opgavefil er indlæst.
@@ -2233,10 +2233,11 @@
   // B10: opgaver pr. runde og pause efter så mange runder — den voksne vælger under Indstillinger
   const antalOpgaver = () => ([5, 8, 10].indexOf(voksen.opgaverPrRunde) >= 0 ? voksen.opgaverPrRunde : 8);
   // Natur husker de senest viste dyr, mens siden er åben (S.naturNylige), så næste runde begynder med dyr, barnet ikke
-  // lige har set (runde 2, 20-10-2026). Ikke i de gemte data: et nyt felt ville kræve en migrering
+  // lige har set (runde 2, 20-10-2026). Ikke i de gemte data: et nyt felt ville kræve en migrering. Kun dyrene: Savannens
+  // tælling (fase 3) har et tal som svar
   function naturRunde(emne, niveau, rng, gentag) {
     const opgaver = N.lavRunde(emne, niveau, rng, { gentag: gentag, antal: antalOpgaver(), nylige: S.naturNylige || [] });
-    S.naturNylige = (S.naturNylige || []).concat(opgaver.map((o) => o.svar)).slice(-40);
+    S.naturNylige = (S.naturNylige || []).concat(opgaver.map((o) => o.svar).filter((x) => typeof x === 'string')).slice(-40);
     return opgaver;
   }
   const pauseEfter = () => ([2, 3, 4].indexOf(voksen.pauseEfter) >= 0 ? voksen.pauseEfter : 3);
@@ -2733,7 +2734,8 @@
       for (let r = start; r < Math.min(antal, start + 10); r += 5) {
         const raekke = h('div', { class: 'ting-raekke' });
         for (let k = r; k < Math.min(antal, r + 5, start + 10); k++) {
-          raekke.append(h('span', { class: 'ting taelbar' + (gruppe ? ' gruppe-' + gruppe : '') }, emoji));
+          // emoji kan være en funktion, der laver en ny tegning til hver ting (Natur: zebraerne ved vandhullet)
+          raekke.append(h('span', { class: 'ting taelbar' + (gruppe ? ' gruppe-' + gruppe : '') }, typeof emoji === 'function' ? emoji() : emoji));
         }
         blok.append(raekke);
       }
@@ -3727,6 +3729,21 @@
     const id = opg.vis.dyr;
     const d = N && N.DYR_ID[id];
     const sand = opg.emne === 'naturSavanne' ? ['savanne'] : [];
+    // «Tæl ved vandhullet» (Savannen, fase 3, 22-10-2026): zebraerne i rækker af 5 og blokke af 10 som matematikkens
+    // «Tæl» (tingGruppe: hver zebra er taelbar, så tællehjælpen tæller dem) ved vandhullet på sandet
+    if (opg.vis.art === 'naturTael') {
+      const zebra = () => naturTegning('dyr-' + id, 'natur-ting-tegning') || (d ? d.e : '🦓');
+      // Zebraernes størrelse regnes i app.css af rækkerne og søjlerne: --kol er den bredeste række under hinanden, --raek alle
+      // rækkerne, og --kol-side søjlerne, når blokkene står side om side (telefon liggende)
+      const n = opg.vis.antal;
+      let raek = 0, kolSide = 0;
+      for (let s = 0; s < n; s += 10) { const i = Math.min(10, n - s); raek += Math.ceil(i / 5); kolSide += Math.min(5, i); }
+      const maal = '--kol:' + Math.min(n, 5) + ';--raek:' + raek + ';--blokke:' + Math.ceil(n / 10) + ';--kol-side:' + kolSide;
+      return h('div', { class: ['natur-scene', 'natur-tael'].concat(sand).join(' '), style: maal, 'aria-hidden': 'true' },
+        tingGruppe(opg.vis.antal, zebra),
+        h('div', { class: 'natur-vandhul' }),
+        h('div', { class: 'natur-jord' }));
+    }
     if (opg.vis.art === 'naturSpor') {
       // Sporet har klassen natur-spor, så hjælpens første trin (naturSpor) får det til at lyse
       return h('div', { class: ['natur-scene', 'spor-alene'].concat(sand).join(' '), 'aria-hidden': 'true' },
@@ -3936,7 +3953,7 @@
     // «Sig efter mig»: én stor, grøn knap — barnet har sagt sætningen (ingen mikrofon, intet kan være forkert)
     if (opg.valgArt === 'sig') return [h('span', { class: 'sig-ikon', 'aria-hidden': 'true' }, '🗣️'), h('span', { class: 'sig-tekst' }, 'Jeg sagde det')];
     if (opg.fag === 'engelsk') return engelskBillede(x);
-    if (opg.fag === 'natur') return naturDyrBillede(x);
+    if (opg.fag === 'natur' && opg.valgArt === 'billede') return naturDyrBillede(x); // tællingen har tal på kortene
     const v = opg.vis;
     if (opg.valgArt === 'form') return formSvg(x, ['cirkel', 'trekant', 'firkant', 'kvadrat', 'rektangel', 'femkant', 'sekskant'].indexOf(x), 0, false);
     if (opg.valgArt === 'gruppe') return tingGruppe(x === 'a' ? v.a : v.b, O.TING[v.ting].e, x, 'knap');
@@ -4450,8 +4467,8 @@
         await taelOp(lille, stor.length + 1, levende);
         return;
       }
-      // Mange ting i blokke af 10: «10», så tæl videre (halverer tiden)
-      const blok = opg.vis.art === 'ting' && opg.vis.antal > 10 ? vis.querySelector('.ting-blok') : null;
+      // Mange ting i blokke af 10: «10», så tæl videre (halverer tiden) — også zebraerne ved vandhullet
+      const blok = (opg.vis.art === 'ting' || opg.vis.art === 'naturTael') && opg.vis.antal > 10 ? vis.querySelector('.ting-blok') : null;
       if (blok) {
         const ti = [...blok.querySelectorAll('.taelbar')];
         await markerGruppe(ti, 10, levende);

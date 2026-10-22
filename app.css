@@ -3137,3 +3137,110 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
    egen bund (#F0D59B i spor-*.svg), så jorden kan ses under tegningen */
 .natur-scene.savanne { --natur-graes: #c2ad55; --natur-jord: #e0c184; --natur-jord-moerk: #bf9a5c; }
 .lektion-tegning .natur-lektion { width: clamp(80px, 15vmin, 140px); height: clamp(80px, 15vmin, 140px); }
+/* «Tæl ved vandhullet» (Savannen, fase 3, 22-10-2026): zebraerne (dyr-zebra.svg, 96 × 96, hovene ved y ≈ 84) i
+   matematikkens rækker af 5 og blokke af 10, og under dem en flad blå pyt på sandet. Tegningen er 1em, så tællehjælpens
+   mærke og «talt» virker som i «Tæl». Lidt mindre end matematikkens ting, så pytten og sandet også kan være der */
+.natur-ting-tegning { display: block; width: 1em; height: 1em; overflow: visible; }
+.natur-tael .ting-gruppe { position: relative; z-index: 2; }
+/* Pyttens og sandets højde — også i formlerne for zebraernes størrelse herunder */
+.natur-tael { --pyt: clamp(22px, 6vmin, 52px); --sand: clamp(18px, 4vmin, 34px); }
+.natur-vandhul {
+  position: relative; z-index: 1; width: min(92%, 640px); height: var(--pyt);
+  margin: calc(var(--pyt) * -0.45) 0 calc(var(--pyt) * -0.4);
+  border-radius: 50%; background: radial-gradient(ellipse at 50% 38%, #b5dbee, #7fb4d1 55%, #5d93b4);
+}
+.natur-tael .natur-jord { width: 100%; height: var(--sand); }
+/* Scenen er ellers kun så bred som zebraerne: med 1–2 zebraer blev pytten en lille plet (code-review 22-10-2026) */
+.natur-scene.natur-tael { min-width: min(100%, 48vmin); }
+@supports (width: 1cqw) {
+  .natur-scene.natur-tael { min-width: min(100%, 60cqw); }
+  /* Zebraens størrelse står på gruppen, og zebraerne arver den — så kan mellemrummene herunder regnes i zebraens em */
+  .natur-tael .ting-gruppe .ting.taelbar { font-size: inherit; }
+  .natur-tael .ting-gruppe.stor { font-size: min(150px, 17cqw, 40cqh); }
+  .natur-tael .ting-gruppe.mellem { font-size: min(130px, 17cqw, 30cqh); }
+  /* Tællehjælpens tal-mærke står over zebraens hoved, ikke oven på det (UI-review 22-10-2026: på en telefon dækkede det
+     2/3 af hovedet, liggende næsten hele zebraen). Ørerne er øverst ved y ≈ 10 af 96 og hovedet ved x ≈ 43–88: mærket står
+     med midten over ørerne (67 %) og bunden 2 px over dem, og det er lavere end matematikkens (1,2em). --maerke-rum er
+     dets plads: mærket og de 2 px med tingens scale(1.12) og mindst 4 px luft til hovene på zebraen over. Rækkerne og
+     blokkene har den plads imellem sig, minus zebraernes tomme bund og top (0,13em, også med scale). Før var mærket 1,3em
+     højt og 3 px over ørerne — så åd scale de 5 px luft, og mærket i en bloks 2. række hang 1–2 px under zebraen over
+     (UI-review 22-10-2026). Over 10 tælles de første 10 som én blok («10» står på zebra 10), så under hinanden skal der kun
+     være plads over den øverste række, når der er højst 10 */
+  .natur-tael { --maerke: clamp(17px, 2.6vmin, 24px); --maerke-rum: calc(1.46 * var(--maerke) + 5px); }
+  .natur-tael .taelbar.talt[data-n]::after {
+    top: auto; right: 33%; bottom: calc(90% + 2px); transform: translateX(50%);
+    font-size: var(--maerke); min-width: 1.3em; height: 1.2em; line-height: 1.2em; padding: 0 0.2em; border-radius: 0.6em;
+  }
+  .natur-tael .ting-gruppe { padding-top: max(0px, calc(var(--maerke-rum) - 0.05em - 1vmin)); }
+  .natur-tael .ting-blok { gap: max(1vmin, calc(var(--maerke-rum) - 0.13em)); }
+  /* Hovene står på pyttens kant: en stor zebra (én zebra på en telefon er 150 px) har en højere tom bund (0,125em og
+     blokkens polstring), end pytten trækker sig op (0,45 af sin højde) — så trækker gruppen pytten resten af vejen */
+  .natur-tael .ting-gruppe { margin-bottom: min(0px, calc(0.45 * var(--pyt) - 0.125em - 1vmin)); }
+  /* Højt felt: scenen holder vennens hjørne nederst til venstre frit (vennen er clamp(46px, 8vmin, 80px) høj og står 6 px
+     over feltets kant, der har 16 px polstring) — ellers gik sandet ind over vennen på en lille telefon med 20 zebraer.
+     --pj er det, der står under zebraerne: pyttens synlige del og sandet (--pj-midt), vennens hjørne og lidt luft.
+     --ven-side er vennens bredde fra feltets indholdskant (tegningen er 1,1em og står 10 px inde, polstringen er 16 px) og 2 px */
+  .natur-tael {
+    --ven-rum: calc(clamp(46px, 8vmin, 80px) - 8px);
+    --ven-side: calc(1.1 * clamp(46px, 8vmin, 80px) - 4px);
+    --pj-midt: calc(0.15 * var(--pyt) + var(--sand));
+    --pj: calc(var(--pj-midt) + var(--ven-rum) + 6px);
+  }
+  /* Mere end 10: de to tierblokke under hinanden — side om side kun der, hvor zebraerne bliver større af det (nedenfor).
+     Mellem blokkene er der 3vmin mere end mellem rækkerne (1vmin + blokkenes polstring), så de 10 stadig ses som én blok.
+     Højden regnes som på højkant (alle rækkerne med mærkernes plads, pytten og sandet); før var den 16cqh, og med 16–20
+     gik scenen 4–9 px ud af feltet og op i spørgsmålet på lave telefoner liggende (code-review 22-10-2026). Sandet står
+     ikke over vennen her, så rækken holder sig i bredden fri af vennens hjørne i begge sider (--ven-side) — ellers gik
+     sandet ind over vennen på en iPad liggende, da zebraerne voksede. Under 20 px bliver zebraerne aldrig: i et felt, der
+     er så lavt, at de skulle være mindre, må scenen hellere løbe over (code-review 22-10-2026: det ses kun i en emulator —
+     iPhone SE 1. gen. liggende har højst iOS 15 og dermed ingen container queries) */
+  /* Den halve blok står venstrestillet under søjle 1–4 som rækkerne af 5 i blokken over — ikke midtstillet (UI-review) */
+  .natur-tael .ting-gruppe.lille {
+    flex-direction: column; flex-wrap: nowrap; align-items: flex-start;
+    font-size: max(20px, min(120px,
+      calc((100cqw - 2 * var(--ven-side) - 2vmin - (var(--kol, 5) - 1) * 0.6vmin) / (var(--kol, 5) + 0.12)),
+      calc((100cqh - (var(--raek, 4) - 1) * var(--maerke-rum) - 5vmin - var(--pj-midt)) / (0.87 * var(--raek, 4) + 0.13))));
+    padding-top: 0; row-gap: calc(var(--maerke-rum) - 0.13em + 1vmin);
+  }
+  /* Side om side står begge blokke på pytten: den halve blok (11–19) er den nederste række, som i den fulde blok.
+     Zebraerne er så store, som alle søjlerne kan være i bredden (--kol-side; blokkenes polstring og --blok-side imellem
+     dem) og to rækker med mærkernes plads i højden (før 8cqw: 40 px på en iPhone liggende) — og mindst 20 px som ovenfor.
+     --blok-side er mindst mærkernes plads: med 3vmin stod blokkene tættere end rækkerne (25–32 mod 32–34 px), så tieren
+     blev læst som to rækker af ti og ikke som to blokke (UI-review 22-10-2026) */
+  .natur-tael {
+    --blok-side: max(3vmin, var(--maerke-rum));
+    --zb-side: max(20px, min(110px,
+      calc((100cqw - var(--blokke, 2) * 2vmin - (var(--blokke, 2) - 1) * var(--blok-side) - (var(--kol-side, 10) - var(--blokke, 2)) * 0.6vmin) / (var(--kol-side, 10) + 0.12)),
+      calc((100cqh - 2 * var(--maerke-rum) - 1vmin - var(--pj)) / 1.82)));
+  }
+  @container (max-aspect-ratio: 1/1) {
+    .natur-tael .natur-jord { margin-bottom: var(--ven-rum); }
+    /* Zebraerne er så store, som den bredeste række kan være (--kol zebraer med mellemrum og blokkens polstring, og plads
+       til «talt»s scale(1.12)), og som alle rækkerne kan være i højden med mærkernes plads (--raek; app.js naturVisning).
+       Før var de højst 17cqw: én zebra lige så lille som fem, 55 px på en iPhone (UI-review 22-10-2026). Højderne:
+       én blok = r·rum + 1vmin + (0,87r + 0,08)em, to blokke under hinanden = (r − 1)·rum + 5vmin + (0,87r + 0,13)em */
+    .natur-tael { --zb: calc((100cqw - 2vmin - (var(--kol, 5) - 1) * 0.6vmin) / (var(--kol, 5) + 0.12)); }
+    .natur-tael .ting-gruppe.stor { font-size: min(150px, var(--zb), calc((100cqh - var(--raek, 1) * var(--maerke-rum) - 1vmin - var(--pj)) / (0.87 * var(--raek, 1) + 0.08))); }
+    .natur-tael .ting-gruppe.mellem { font-size: min(130px, var(--zb), calc((100cqh - var(--raek, 2) * var(--maerke-rum) - 1vmin - var(--pj)) / (0.87 * var(--raek, 2) + 0.08))); }
+    .natur-tael .ting-gruppe.lille { font-size: min(120px, var(--zb), calc((100cqh - (var(--raek, 4) - 1) * var(--maerke-rum) - 5vmin - var(--pj)) / (0.87 * var(--raek, 4) + 0.13))); }
+  }
+  @container (min-aspect-ratio: 11/5) {
+    .natur-tael .ting-gruppe.lille {
+      flex-direction: row; align-items: flex-end; padding-top: max(0px, calc(var(--maerke-rum) - 0.05em - 1vmin)); font-size: var(--zb-side);
+      column-gap: var(--blok-side);
+    }
+    /* To brede blokke når ned i vennens hjørne: scenen holder det frit som på højkant */
+    .natur-tael .ting-gruppe.lille ~ .natur-jord { margin-bottom: var(--ven-rum); }
+  }
+  /* Lave telefoner liggende (feltet højst 250 px højt og mindst 3:2, fx 640 × 360, 667 × 375 og 750 × 369): med 16–20
+     (den anden blok har to rækker) bliver zebraerne større side om side end i fire rækker under hinanden, for mærkernes
+     plads tager det meste af højden (målt 22-10-2026: 24–34 px mod 18–23 px). 11–15 står under hinanden (tre rækker):
+     13–15 bliver større dér, 11–12 er næsten lige store (code-review 22-10-2026) */
+  @container (min-aspect-ratio: 3/2) and (max-height: 250px) {
+    .natur-tael .ting-gruppe.lille:has(> .ting-blok + .ting-blok > .ting-raekke + .ting-raekke) {
+      flex-direction: row; align-items: flex-end; padding-top: max(0px, calc(var(--maerke-rum) - 0.05em - 1vmin)); font-size: var(--zb-side);
+      column-gap: var(--blok-side);
+    }
+    .natur-tael .ting-gruppe.lille:has(> .ting-blok + .ting-blok > .ting-raekke + .ting-raekke) ~ .natur-jord { margin-bottom: var(--ven-rum); }
+  }
+}
