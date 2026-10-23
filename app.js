@@ -375,6 +375,19 @@
     const svg = GR && GR.verdener ? tegning(GR.verdener[v.id], 'verden-tegning') : null;
     return h('span', { class: klasse + (svg ? ' med-tegning' : ''), 'aria-hidden': 'true' }, svg || (v.svg ? '🗼' : v.e));
   }
+  // Knappernes ikoner (23-10-2026): egne tegninger i dyrenes stil (grafik.ikoner) i stedet for systemets emoji — 🎒 er
+  // rygsækken (Vælg selv) og 🔊 højttaleren (Læs op igen). Andre ikoner, og uden grafik.js, står som emojien
+  const KNAP_TEGNING = { '🎒': 'rygsaek', '🔊': 'hoejttaler' };
+  function knapIkon(e) {
+    const id = typeof e === 'string' ? KNAP_TEGNING[e] : null;
+    return (id && GR && GR.ikoner ? tegning(GR.ikoner[id], 'knap-tegning') : null) || e;
+  }
+  // Ikonet foran spørgsmålet: i Natur står verdenens tegning, når ikonet er verdenens eget (💩, 🐾 og Savannens 🦁, 23-10-2026);
+  // typerne med deres eget ikon (🦓, 👂) og de andre fag beholder emojien
+  function opgaveIkon(opg) {
+    const v = opg.fag === 'natur' && opg.ikon ? NATUR_VERDENER.find((x) => x.emne === opg.emne && x.e === opg.ikon) : null;
+    return (v && GR && GR.verdener ? tegning(GR.verdener[v.id], 'verden-tegning') : null) || opg.ikon || '';
+  }
   // C · minispil: tegningerne i Grafik.minispil (id = overskriften i docs/LYSTAARNET-GRAFIK-C.md). Mangler en, bruges emojien.
   const MINI = (GR && GR.minispil) || {};
   const erMinispil = (opg) => !!opg && O.MINISPIL.some((m) => m.id === opg.type);
@@ -1202,7 +1215,7 @@
       class: 'ikon-knap' + (ekstraKlasse ? ' ' + ekstraKlasse : ''),
       'aria-label': label, title: label, type: 'button',
       onclick: (e) => { Lyd.init(); Lyd.tryk(); onclick(e); },
-    }, ikon);
+    }, knapIkon(ikon));
   }
 
   // Tom plads lige så bred som en ikonknap, så titlen står midt på skærmen
@@ -1981,7 +1994,7 @@
     const kort = (t, ikon, navn, label) => h('button', {
       class: 'fag-kort tilstand-kort ' + t + (data.tilstand === t ? ' sidst' : ''), type: 'button', 'aria-label': label, 'data-tilstand': t,
       onclick: () => vaelg(t),
-    }, h('span', { class: 'fag-ikon', 'aria-hidden': 'true' }, ikon), h('span', { class: 'fag-navn' }, navn));
+    }, h('span', { class: 'fag-ikon', 'aria-hidden': 'true' }, knapIkon(ikon)), h('span', { class: 'fag-navn' }, navn));
     const fagKnap = D ? fagSkiftKnap(fag) : topbarPlads();
     S.gentagTale = 'Vil du på eventyr, eller vil du selv vælge?';
     skift(h('div', { class: 'skaerm fagvalg tilstandvalg fag-' + fag },
@@ -2058,7 +2071,7 @@
     const fritKnap = h('button', {
       class: 'kort-frit', type: 'button', 'aria-label': 'Vælg selv',
       onclick: () => { Lyd.init(); Lyd.tryk(); visVaelgSelv('Vælg selv. Tryk på det, du vil lege med.'); },
-    }, h('span', { 'aria-hidden': 'true' }, '🎒'));
+    }, h('span', { 'aria-hidden': 'true' }, knapIkon('🎒')));
     flade.append(fritKnap);
 
     const v = liste[spilVerden(fag)];
@@ -2459,9 +2472,10 @@
     S.spaertTil = performance.now() + 300; // et dobbelttryk på sidste svar må ikke besvare den nye opgave
     [...r.dom.prikker.querySelectorAll('.prik')].forEach((p, i) => p.classList.toggle('nu', i === r.i));
     r.dom.tekst.textContent = '';
-    r.dom.tekst.append(h('span', { class: 'opgave-ikon', 'aria-hidden': 'true' }, opg.ikon || ''), ' ' + opg.tekst);
+    r.dom.tekst.append(h('span', { class: 'opgave-ikon', 'aria-hidden': 'true' }, opgaveIkon(opg)), ' ' + opg.tekst);
     r.dom.visning.textContent = '';
     r.dom.visning.append(tegnVisning(opg));
+    if (opg.fag === 'natur') maalLortTop(r.dom.visning);
     r.dom.hjaelp.textContent = '';
     r.dom.hjaelp.parentNode.classList.remove('med-hjaelp');
     saetUdtryk(r.dom.ven, grundUdtryk(opg));
@@ -3794,6 +3808,136 @@
     return h('div', { class: ['natur-scene'].concat(sand).join(' '), 'aria-hidden': 'true' },
       h('div', { class: 'natur-fund' }, lort, spor),
       h('div', { class: 'natur-jord' }));
+  }
+  // Hvor lortens tegning begynder i sin 96-ramme (23-10-2026): på højkant står sporet lige over den (app.css --lort-top).
+  // Tegningerne er forskellige — flodhestens vand begynder ved y ≈ 21, de fleste lorte først midt i rammen — så det måles
+  // på den viste tegning, når den står i feltet. Uden mål (eller uden tegning) bruger CSS en lav top, så intet rører
+  function maalLortTop(felt) {
+    const scene = felt.querySelector('.natur-scene');
+    const svg = scene && scene.querySelector('.natur-lort > svg.natur-tegning');
+    if (!svg || typeof svg.getBBox !== 'function') return;
+    let former = null;
+    try { former = tegningsFigurer(svg); } catch (e) { return; }
+    if (!former || !former.length) return;
+    // En halv enhed over den synlige top; højst halvvejs, så lortens tomme kasse ikke stikker op over feltet
+    const top = Math.min(...former.map((f) => f.t));
+    if (!Number.isFinite(top)) return;
+    scene.style.setProperty('--lort-top', Math.max(0, Math.min(0.5, (top - 0.5) / 96)).toFixed(3));
+    try { maalFinger(scene, former); } catch (e) { /* fingeren bliver, hvor den er tegnet */ }
+  }
+  // Figurerne i en tegning med deres kasse i tegningens egen ramme (viewBox-enheder): getBBox gennem figurens transform
+  // plus den halve streg. getBBox alene er uden streg — lorte tegnet som tykke streger (hundens er 21 bred) begynder synligt
+  // op til 6 enheder over kassen, og så gik hjælpens lysende ring om sporet ind i toppen af dem (code-review 23-10-2026).
+  // ind: rammen → figurens egne koordinater (til isPointInFill)
+  function tegningsFigurer(svg) {
+    const rod = svg.getScreenCTM();
+    if (!rod || !rod.a || !rod.d) return null; // en tegning på 0 × 0 kan ikke vendes om (inverse() giver NaN uden fejl)
+    const ud = rod.inverse(), former = [];
+    for (const el of svg.querySelectorAll('path,ellipse,circle,rect,polygon,polyline,line')) { // uden mellemrum (tale-tekster.js)
+      const b = el.getBBox(), ctm = el.getScreenCTM();
+      if ((!b.width && !b.height) || !ctm) continue;
+      const m = ud.multiply(ctm);
+      const cs = getComputedStyle(el);
+      const streg = !!cs.stroke && cs.stroke !== 'none';
+      const halv = streg ? (parseFloat(cs.strokeWidth) || 0) / 2 * Math.sqrt(Math.abs(m.a * m.d - m.b * m.c)) : 0;
+      const hj = [[b.x, b.y], [b.x + b.width, b.y], [b.x, b.y + b.height], [b.x + b.width, b.y + b.height]].map(([x, y]) => [m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f]);
+      former.push({ el, m, ind: m.inverse(), fyld: cs.fill !== 'none', streg, halv,
+        l: Math.min(...hj.map((p) => p[0])) - halv, r: Math.max(...hj.map((p) => p[0])) + halv,
+        t: Math.min(...hj.map((p) => p[1])) - halv, b: Math.max(...hj.map((p) => p[1])) + halv });
+    }
+    return former;
+  }
+  // Fingeren på højkant (23-10-2026): sporkortet står over lorten ude til højre (app.css), og fingeren — lortens målestok —
+  // kommer ind fra venstre. Før krydsede hånden kortets nederste venstre hjørne, og spidsen pegede på kortet. Nu skubbes
+  // fingeren til venstre, til hele tegningen er til venstre for FINGER_HOEJRE (kortet begynder tidligst 24 enheder inde i
+  // lortens 96-ramme, for sporet er højst 0,75 × lorten; resten er luft til hjælpens ring), og sænkes, til den er
+  // FINGER_LUFT over lortens tegning. Flytningen er andele af rammen (--finger-dx, --finger-dy), så den passer, også når
+  // iPad'en vendes. På langs står kortet ved siden af lorten: der bliver fingeren, hvor den er tegnet vandret, og sænkes
+  // kun lodret (--finger-dy-langs) — før pegede den op til 160 px ud i luften over lorten, og den store finger gik ind i
+  // elefantens lort (UI-review 23-10-2026)
+  const FINGER_HOEJRE = 21, FINGER_LUFT = 0.75;
+  // Fingerens underkant pr. halve kolonne (nøglen er 2 · x) og dens højre kant i fingerens 96-ramme: punkter langs hver figur,
+  // lige linjer imellem, og stregen som skiver tæt langs dem (højst en kvart enhed imellem; runde ender og hjørner). Før stod
+  // kun den halve streg lige ned, og i hele kolonner — fingeren rørte rådyrets lort (e2e 23-10-2026). Tegningen er den samme
+  // hver gang, så den måles én gang pr. finger (code-review fund 3: ca. 1000 DOM-kald pr. opgave)
+  const fingerProfiler = new Map();
+  function fingerProfil(fing, fUd) {
+    const noegle = fing.innerHTML;
+    if (fingerProfiler.has(noegle)) return fingerProfiler.get(noegle);
+    const under = {};
+    let hoejre = -Infinity;
+    const saet = (k, y) => { if (!(k in under) || y > under[k]) under[k] = y; };
+    for (const el of fing.querySelectorAll('path')) {
+      const m = fUd.multiply(el.getScreenCTM()), cs = getComputedStyle(el);
+      const skala = Math.sqrt(Math.abs(m.a * m.d - m.b * m.c));
+      const halv = cs.stroke && cs.stroke !== 'none' ? (parseFloat(cs.strokeWidth) || 0) / 2 * skala : 0;
+      const skive = (x, y) => { for (let k = Math.ceil((x - halv) * 2); k <= Math.floor((x + halv) * 2); k++) saet(k, y + Math.sqrt(Math.max(0, halv * halv - (k / 2 - x) ** 2))); };
+      // Punkterne højst en halv enhed fra hinanden langs figuren (ærmet er over 1800 enheder langt; 160 punkter gav et hjørne
+      // 1,5 enhed for højt). Et spring længere end to punkter er en ny delsti (M), ikke en linje (code-review 23-10-2026)
+      const len = el.getTotalLength(), n = Math.min(20000, Math.max(160, Math.ceil((len * skala) / 0.5))), spring = (2 * len * skala) / n;
+      let fx = null, fy = null;
+      for (let i = 0; i <= n; i++) {
+        const p = el.getPointAtLength((len * i) / n);
+        const x = m.a * p.x + m.c * p.y + m.e, y = m.b * p.x + m.d * p.y + m.f;
+        hoejre = Math.max(hoejre, x + halv);
+        if (fx === null || Math.hypot(x - fx, y - fy) > spring) skive(x, y);
+        else {
+          if (fx !== x) for (let k = Math.ceil(Math.min(fx, x) * 2); k <= Math.floor(Math.max(fx, x) * 2); k++) saet(k, fy + ((y - fy) * (k / 2 - fx)) / (x - fx));
+          const trin = halv ? Math.ceil(Math.hypot(x - fx, y - fy) / 0.25) : 0;
+          for (let j = 1; j <= trin; j++) skive(fx + ((x - fx) * j) / trin, fy + ((y - fy) * j) / trin);
+        }
+        fx = x; fy = y;
+      }
+    }
+    const profil = { under, hoejre };
+    fingerProfiler.set(noegle, profil);
+    return profil;
+  }
+  function maalFinger(scene, lortFormer) {
+    const fing = scene.querySelector('.natur-lort > svg.natur-finger');
+    if (!fing || typeof SVGGeometryElement === 'undefined' || !SVGGeometryElement.prototype.isPointInFill) return;
+    const fRod = fing.getScreenCTM();
+    if (!fRod || !fRod.a || !fRod.d) return;
+    const { under, hoejre } = fingerProfil(fing, fRod.inverse());
+    const dx = Math.min(0, FINGER_HOEJRE - hoejre);
+    // Fingerens underkant i kolonnen x, når den er flyttet d til siden: lige imellem de to halve kolonner, den står imellem
+    const fingerUnder = (x, d) => {
+      const fk = (x - d) * 2, a = under[Math.floor(fk)], b = under[Math.ceil(fk)];
+      return a === undefined ? b : b === undefined ? a : a + (b - a) * (fk - Math.floor(fk));
+    };
+    // Lortens øverste synlige punkt i hver halve kolonne, en af fingrene kan nå (højkant op til FINGER_HOEJRE, på langs op
+    // til fingerens højre kant): isPointInFill/-Stroke i halve enheder ned fra toppen og så halveret tre gange. Toppen er
+    // den samme for begge fingre, så hver kolonne scannes én gang, og begge dy regnes af den. En kolonne opgives, så snart
+    // ingen af fingrene kan komme lavere ned end i en kolonne før (samme tal, færre DOM-kald); spidsen er tit lavest, så
+    // der begyndes ude til højre
+    const pt = fing.createSVGPoint();
+    const ramt = (f, x, y) => { pt.x = x; pt.y = y; const q = pt.matrixTransform(f.ind); return (f.fyld && f.el.isPointInFill(q)) || (f.streg && f.el.isPointInStroke(q)); };
+    let dy = Infinity, dyLangs = Infinity;
+    for (let k = Math.ceil(Math.max(FINGER_HOEJRE, hoejre) * 2); k >= 0; k--) {
+      const x = k / 2, fu = k <= FINGER_HOEJRE * 2 ? fingerUnder(x, dx) : undefined, fu0 = fingerUnder(x, 0);
+      if (fu === undefined && fu0 === undefined) continue;
+      const her = lortFormer.filter((f) => f.l <= x && f.r >= x);
+      if (!her.length) continue;
+      const lort = (y) => her.some((f) => f.t <= y && f.b >= y && ramt(f, x, y));
+      // Toppen er under y − 0,5 (intet over var lort): kan den stadig give en af fingrene et lavere dy?
+      const nytter = (y) => (fu !== undefined && y - 0.5 - fu - FINGER_LUFT < dy) || (fu0 !== undefined && y - 0.5 - fu0 - FINGER_LUFT < dyLangs);
+      for (let y = Math.min(...her.map((f) => f.t)); y <= 96 && nytter(y); y += 0.5) {
+        if (!lort(y)) continue;
+        let over = y - 0.5, ved = y;
+        for (let i = 0; i < 3; i++) { const midt = (over + ved) / 2; if (lort(midt)) ved = midt; else over = midt; }
+        if (fu !== undefined) dy = Math.min(dy, ved - fu - FINGER_LUFT);
+        if (fu0 !== undefined) dyLangs = Math.min(dyLangs, ved - fu0 - FINGER_LUFT);
+        break;
+      }
+    }
+    // Ingen lort under fingeren: den flyttes kun til venstre, fri af kortet (på langs slet ikke)
+    if (dy === Infinity) dy = 0;
+    if (dyLangs === Infinity) dyLangs = 0;
+    // app.css gør kassen lavere, når fingeren flyttes ned; tegningen skal så blive i samme størrelse øverst til venstre
+    fing.setAttribute('preserveAspectRatio', 'xMinYMin slice');
+    scene.style.setProperty('--finger-dx', (dx / 96).toFixed(4));
+    scene.style.setProperty('--finger-dy', (dy / 96).toFixed(4));
+    scene.style.setProperty('--finger-dy-langs', (dyLangs / 96).toFixed(4));
   }
   // Dyret på svarkortet (og i lektionen)
   function naturDyrBillede(id) {
@@ -6475,7 +6619,7 @@
     const knapper = h('div', { class: 'fejring-knapper skjult' },
       h('button', { class: 'stor-knap igen-knap', type: 'button', 'aria-label': 'Spil igen', onclick: () => videre(() => startRunde(verden, { frit: frit })) }, '▶'),
       frit
-        ? h('button', { class: 'stor-knap kort-knap', type: 'button', 'aria-label': 'Til Vælg selv', onclick: () => videre(() => visVaelgSelv()) }, '🎒')
+        ? h('button', { class: 'stor-knap kort-knap', type: 'button', 'aria-label': 'Til Vælg selv', onclick: () => videre(() => visVaelgSelv()) }, knapIkon('🎒'))
         : h('button', { class: 'stor-knap kort-knap', type: 'button', 'aria-label': 'Til kortet', onclick: () => videre(() => visKort(false)) }, '🗺️'));
     let aabnet = false;
     let token = -1; // sættes efter skærmskiftet nedenfor
@@ -6749,7 +6893,7 @@
       h('div', { class: 'topbar' },
         ikonKnap('🗺️', 'Tilbage til eventyret', () => visKort(false)),
         fagKnap,
-        h('div', { class: 'topbar-titel' }, '🎒 Vælg selv'),
+        h('div', { class: 'topbar-titel' }, h('span', { class: 'titel-ikon', 'aria-hidden': 'true' }, knapIkon('🎒')), ' ', 'Vælg selv'),
         fagKnap ? h('div', { class: 'topbar-hoejre' }, topbarPlads(), hoejttaler()) : hoejttaler()), // titlen i midten
       h('div', { class: 'vaelg-selv-liste' }, grupper)),
     (e) => {

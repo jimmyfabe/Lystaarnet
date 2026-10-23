@@ -109,6 +109,7 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
 .topbar-titel.lang { font-size: clamp(18px, 3vmin, 32px); }
 .topbar-hoejre { display: flex; gap: 12px; }
 .titel-ikon .verden-tegning { display: inline-block; width: 1.4em; height: 1.4em; vertical-align: -0.35em; }
+.titel-ikon .knap-tegning { display: inline-block; width: 1.25em; height: 1.25em; vertical-align: -0.28em; transform: none; }
 /* Tom plads i stedet for en knap, så titlen står i midten. Den giver sig først, hvis titlen ellers ikke kan være der. */
 .topbar-plads { flex: 0 1 var(--ikon); min-width: 0; }
 .kort .topbar-titel { flex: 1 0 auto; } /* barnets navn og perlerne skæres aldrig af — pladsen giver sig i stedet */
@@ -131,6 +132,9 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
   transition: transform 0.08s;
 }
 .ikon-knap:active { transform: translateY(3px) scale(0.96); box-shadow: 0 1px 0 var(--skygge); }
+/* Knappernes egne tegninger (🎒 rygsækken, 🔊 højttaleren; app.js knapIkon, 23-10-2026): samme plads som emojien (1em i
+   linjen), skaleret op, så de fylder som emojien — tegningerne bruger kun ca. 0,8 af deres ramme */
+.knap-tegning { display: block; width: 1em; height: 1em; margin: 0 auto; overflow: visible; transform: scale(1.2); }
 
 /* ---------- Store runde knapper (▶ ✔ 🗺️) ---------- */
 .stor-knap {
@@ -1100,6 +1104,8 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
   --finger-a: #ff9fa3; --finger-b: #9cc8ff;
 }
 .opgave-ikon { margin-right: 2px; }
+/* Verdenens tegning foran spørgsmålet (Savannens løve; app.js opgaveIkon): så stor som emojien og uden at gøre linjen højere */
+.opgave-ikon .verden-tegning { display: inline-block; width: 1.6em; height: 1.6em; vertical-align: -0.42em; margin: -0.3em 0; }
 .fremdrift-dyr { margin-left: 6px; font-size: clamp(30px, 4.6vmin, 44px); line-height: 1; filter: brightness(0) opacity(0.3); }
 
 /* Hjælpefeltet under opgaven: her kommer fingre, tallinje osv. — opgaven bliver stående */
@@ -1447,6 +1453,7 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
 @keyframes hop { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-26px) scale(1.08); } 70% { transform: translateY(0) scale(0.96); } }
 @keyframes vip { 0%, 100% { transform: rotate(0); } 30% { transform: rotate(-14deg); } 65% { transform: rotate(10deg); } }
 @keyframes pop { 0% { transform: scale(1); } 45% { transform: scale(1.22); } 100% { transform: scale(1); } }
+@keyframes pop-lille { 0% { transform: scale(1); } 45% { transform: scale(1.08); } 100% { transform: scale(1); } }
 @keyframes ryst { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } }
 
 @media (prefers-reduced-motion: reduce) {
@@ -3210,6 +3217,18 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
   display: flex; flex-direction: column; align-items: center; max-width: 100%;
 }
 .natur-fund { position: relative; z-index: 1; display: flex; align-items: flex-end; justify-content: center; gap: clamp(16px, 4vmin, 56px); margin-bottom: calc(var(--natur-l) * -0.06); }
+/* Fingeren (lortens målestok) på langs: sporkortet står ved siden af lorten, så fingeren bliver, hvor den er tegnet
+   vandret, og flyttes lodret, til den næsten rører lortens tegning (23-10-2026: spidsen pegede op til 160 px ud i luften
+   på 1180 × 820, og den store finger gik ind i elefantens lort). app.js
+   maalFinger regner det på den viste tegning (--finger-dy-langs, andel af 96-rammen); kassen bliver lavere, så meget den
+   flyttes ned, så den ikke får feltet til at rulle. Højkant har sin egen regel nedenfor */
+.natur-scene:has(.natur-finger) .natur-finger {
+  height: calc(100% - var(--natur-l) * max(0, var(--finger-dy-langs, 0)));
+  transform: translateY(calc(var(--natur-l) * var(--finger-dy-langs, 0)));
+}
+/* Uden sporet (niveau 3, til hjælpen viser det) holder ::after sporets plads, så lorten og fingeren står samme sted og
+   intet hopper, når sporet kommer frem — også på langs (23-10-2026: før hoppede lorten 130 px til siden på 1180 × 820) */
+.natur-scene:has(.natur-spor.skjult) .natur-fund::after { content: ''; flex: none; width: var(--natur-s); height: var(--natur-s); }
 /* cqw/cqh er .visning's indholdsboks (feltet minus 16 px polstring). Mellemrummet er mindst sporets glød (ring 6 + glød 24 px),
    så gløden ikke rører lorten; lort + mellemrum + spor ≤ 93cqw, så gløden ved feltets kant står i polstringen */
 @supports (width: 1cqw) {
@@ -3219,6 +3238,39 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
   @container (max-aspect-ratio: 1/1) {
     .natur-scene { --natur-l: min(480px, 88cqw, 56cqh); --natur-s: min(260px, 46cqw, 30cqh); --natur-jord-b: calc(var(--natur-l) + 60px); }
     .natur-fund { flex-direction: column-reverse; align-items: center; gap: 30px; }
+    /* Scenen med lorten: tæt sammen og store (23-10-2026: på telefonen stod sporkortet alene midt i feltet med 40–120 px
+       tomt ned til lorten). Sporet står --natur-luft over lortens tegning: lortens kasse trækkes op med den tomme top, som
+       app.js maalLortTop måler på den viste tegning (--lort-top, andel af 96-rammen; reserven 0,2 er flodhestens vand).
+       Luften er sporets guldring (6 px), og sporkortet slutter selv 8 af 96 over sin kasse. Jorden holder plads til vennens
+       hjørne (--ven-rum, som ved vandhullet); lortens kasse når 0,02 × lorten under jorden, så den får lidt mere. Højden
+       (--natur-rum): sporet + (1 − top) × lorten (lortens synlige del, margenerne og jorden) ≤ 100cqh minus luften og
+       vennens hjørne. Lorten regnes først med plads til et spor på 36 %, op til hele bredden; sporet får så resten, op til
+       75cqw — så fylder parret feltet, også når lorten når kanterne. Uden sporet (niveau 3) holder ::after sporets plads
+       (regel ovenfor), og så ligger lortens tomme top inde i feltet. Sporet alene, vandhullet og lyden: målene ovenfor */
+    .natur-scene:has(.natur-lort) {
+      --ven-rum: calc(clamp(46px, 8vmin, 80px) - 8px); --natur-luft: 8px;
+      --natur-rum: calc(100cqh - 4px - var(--ven-rum) - var(--natur-luft));
+      --natur-l: min(480px, 100cqw, calc((var(--natur-rum) - (100cqh - var(--ven-rum)) * 0.36) / (1 - var(--lort-top, 0.2))));
+      --natur-s: min(300px, 75cqw, calc(var(--natur-rum) - var(--natur-l) * (1 - var(--lort-top, 0.2))));
+    }
+    .natur-scene:has(.natur-lort) .natur-fund { gap: 0; }
+    .natur-scene:has(.natur-lort) .natur-lort { margin-top: calc(var(--natur-luft) - var(--natur-l) * var(--lort-top, 0.2)); }
+    .natur-scene:has(.natur-lort) > .natur-jord { margin-bottom: calc(var(--ven-rum) + var(--natur-l) * 0.02); }
+    /* Sporkortet står ude til højre over lorten, og fingeren (lortens målestok) kommer ind fra venstre og rører næsten
+       lorten (23-10-2026: hånden krydsede kortets nederste venstre hjørne, og spidsen pegede på kortet). Også ved lorte
+       uden finger, så kortet ikke skifter side mellem opgaverne (før 41 px på 390 × 844 og 90 px på 820 × 1180). app.js
+       maalFinger regner flytningen på den viste tegning (andele af 96-rammen). Kassen bliver lavere, så meget den flyttes
+       ned, så dens bund bliver ved lortens bund og ikke får feltet til at rulle (tegningen står øverst til venstre i
+       kassen i samme størrelse: preserveAspectRatio xMinYMin slice, sat af maalFinger) */
+    .natur-scene:has(.natur-lort) .natur-spor { align-self: flex-end; }
+    /* Hjælpens pop (1,22 om midten) gik et øjeblik ind over fingerspidsen og ned i lortens top (code-review 23-10-2026):
+       her vokser kortet mindre og kun op og til højre — hjørnet ved fingeren og lorten står stille. Ved alle lorte: uden
+       finger gik pop'et op til 11.780 px² ind i lorten (flodhesten på 820 × 1180) */
+    .natur-scene:has(.natur-lort) .natur-spor.pop { transform-origin: 0 100%; animation-name: pop-lille; }
+    .natur-scene:has(.natur-finger) .natur-finger {
+      height: calc(100% - var(--natur-l) * max(0, var(--finger-dy, 0)));
+      transform: translate(calc(var(--natur-l) * var(--finger-dx, 0)), calc(var(--natur-l) * var(--finger-dy, 0)));
+    }
   }
 }
 .natur-lort, .natur-spor { display: grid; place-items: end center; }
