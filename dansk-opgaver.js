@@ -669,6 +669,25 @@
       });
     },
 
+    // Find parret (Små ord, trin 1 — vendespil; Jimmy via Saga 22-10-2026, docs/INSPIRATION.md): 4 kort med bagsiden op,
+    // 2 par små ord. Et vendt kort viser ordet, og stemmen siger det; to ens bliver liggende, to forskellige vender tilbage.
+    // Ingen straf og ingen tælling: BEDØMMES ALDRIG (bedoemmes: false, Opgaver.taellerMed). 4 kort og ikke 6: højst 3–5
+    // valg pr. skærm (CLAUDE.md). Ordene står på kortene, så den kan klares uden lyd og står ikke på LYT_TYPER
+    findParret(niveau, rng) {
+      const pulje = Object.keys(SMAAORD).filter((o) => SMAAORD[o].trin <= Math.max(1, niveau));
+      const a = vaelg(rng, pulje);
+      const b = vaelg(rng, pulje.filter((o) => o[0] !== a[0])); // visuelt forskellige, som i findOrd
+      return opgave({
+        emne: 'smaaord', type: 'findParret', niveau, noegle: 'findParret:' + [a, b].sort().join('-'), ikon: '🃏',
+        tale: 'Vend to kort. Find to ens ord.',
+        tekst: 'Find parret',
+        vis: { art: 'vendespil', kort: bland(rng, [a, a, b, b]) },
+        svar: 'ok', interaktiv: 'vendespil', bedoemmes: false,
+        // «Vis mig»: alle kortene vender op et øjeblik og vender så tilbage (de fundne par bliver liggende)
+        hjaelp: [{ art: 'visKort', tale: 'Se alle kortene.' }],
+      });
+    },
+
     // =====================================================================
     //  D2 · trin 2 (forslaget 09-10)
     // =====================================================================
@@ -1134,7 +1153,7 @@
     // C · Spor i sandet står aldrig først (den bedømmes ikke og kan derfor aldrig alene åbne et højere trin)
     alfabet: { navn: 'Alfabetet', maxNiveau: 3, niveauer: { 1: ['findBogstav', 'storLille', 'haandskrift', 'sporISandet'], 2: ['storLille', 'findBogstav', 'efterBogstav', 'haandskrift', 'alfabetOrden', 'sporISandet'], 3: ['efterBogstav', 'foerBogstav', 'findBogstav', 'alfabetHylde', 'sporISandet'] } },
     lydering: { navn: 'Lydering', maxNiveau: 3, niveauer: { 1: ['lydering', 'retVokal', 'lydTog'], 2: ['laesOrd', 'lydering', 'retVokal', 'skiftBogstav', 'lydTog'], 3: ['laesOrd', 'bygOrd', 'delOrd', 'lydTog'] } },
-    smaaord: { navn: 'Små ord', maxNiveau: 3, niveauer: { 1: ['findOrd', 'hvorErTingen'], 2: ['findOrd', 'ordISaetning', 'hvorErTingen', 'laesPlacering'], 3: ['ordISaetning', 'bygSaetning', 'findOrd', 'ikkeOrd'] } },
+    smaaord: { navn: 'Små ord', maxNiveau: 3, niveauer: { 1: ['findOrd', 'hvorErTingen', 'findParret'], 2: ['findOrd', 'ordISaetning', 'hvorErTingen', 'laesPlacering'], 3: ['ordISaetning', 'bygSaetning', 'findOrd', 'ikkeOrd'] } },
   };
   // Typer, der kun kan løses ved at høre (springes over uden dansk stemme — medmindre der er indtalte klip).
   // D2/D3: rimremsen, lydene i et ord, «tag den første lyd væk» og rimparret høres også (code-review #1).
@@ -1178,6 +1197,9 @@
       const type = koe.shift();
       const o = puljeOpgave(type, niveau, rng);
       if (brugte[o.noegle] && forsoeg < 400) continue;
+      // Højst én opgave, der ikke bedømmes (Find parret, Spor i sandet), pr. runde — før fyldte de 31 % af Små ord 1 og
+      // 49 % uden oplæsning (code-review 23-10-2026)
+      if (o.bedoemmes === false && runde.some((x) => x.bedoemmes === false) && forsoeg < 400) continue;
       brugte[o.noegle] = true;
       runde.push(o);
     }
@@ -1204,6 +1226,7 @@
       laesOrd: () => 'Læse «' + r + '»',
       bygOrd: () => 'Stave «' + r + '»',
       findOrd: () => 'Genkende ordet «' + r + '»',
+      findParret: () => 'Finde to ens ord: ' + (r || '').replace('-', ' og ') + ' (bedømmes ikke)',
       ordISaetning: () => 'Finde «' + r + '» i en sætning',
       bygSaetning: () => 'Bygge sætningen «' + r + '»',
       huskRim: () => 'Huske et skjult rimkort: ' + (r || '').replace('-', ' – '),

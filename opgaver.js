@@ -2382,7 +2382,7 @@
     const [t, m] = String(klokke).split(':').map(Number);
     return { time: 30 * (t % 12) + 0.5 * m, minut: 6 * m };
   }
-  // Tæller opgaven med i statistik og sværhedsgrad? Nej, når bedoemmes er false (Spor i sandet) — runden spørger her
+  // Tæller opgaven med i statistik og sværhedsgrad? Nej, når bedoemmes er false (Spor i sandet, Find parret) — runden spørger her
   const taellerMed = (opg) => !!opg && opg.bedoemmes !== false;
 
   // De otte minispil: hvor de skal kobles på (kobling[trin − 1] = [emne, niveau]), og om de kun kan løses ved at høre.

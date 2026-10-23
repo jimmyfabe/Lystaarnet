@@ -736,12 +736,15 @@
         const mangler = Object.keys(this.liste).filter((n) => !har.has(n));
         const iAlt = Object.keys(this.liste).length;
         this.status = { hentet: iAlt - mangler.length, iAlt: iAlt };
-        // Styrer service workeren siden, gemmer den selv filen (sw.js) — ellers gør siden det. En fejl ved gemning
+        // Styrer Lystårnets egen service worker siden, gemmer den selv filen (sw.js) — ellers gør siden det. En fejl ved gemning
         // (fx fuld kvote) stopper det hele, så der ikke hentes 80 MB, der ikke kan gemmes. En netfejl (fetch eller
         // indholdet) springer kun filen over; den prøves igen ved næste start.
         // Service workeren sluger sine egne fejl ved gemning, så siden tæller selv efter i IndexedDB for hver
         // TJEK_HVER hentede filer: er antallet ikke vokset, stoppes der, og status viser det, der faktisk ligger dér.
-        const swGemmer = !!(navigator.serviceWorker && navigator.serviceWorker.controller);
+        // Kun vores egen sw gemmer: en anden apps sw med scope «/» på samme domæne kan styre siden på en ny enhed, til
+        // vores tager over — den gemmer intet i lystaarn-tale (Saga 22-10-2026)
+        const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
+        const swGemmer = !!sw && sw.scriptURL === new URL('sw.js', location.href).href;
         const TJEK_HVER = 200;
         let stop = false, sidenTjek = 0, sidstTalt = this.status.hentet;
         let taeller = null; // løftet, mens lageret tælles — den anden arbejder venter på det, før den henter mere
@@ -2347,12 +2350,16 @@
   // En gemt opgave (afbrudt mission, «kommer igen») kan stamme fra en anden udgave af spillet: brug den kun,
   // hvis emnet, visningen og tingene stadig findes — ellers kan runden gå i stå
   const KENDTE_VISNINGER = ['ting', 'terning', 'terninger', 'klodser', 'streger', 'fingre', 'haand', 'kugleramme', 'par', 'flest', 'forskel', 'lyt', 'talstreg', 'plus', 'regnestykke', 'mangler', 'stoerst', 'minus', 'raekke', 'staenger', 'form', 'formScene', 'ur', 'moenter', 'koeb', 'moenster', 'soembraet', 'lineal', 'linealTegn', 'maalKlodser', 'scene', 'rute', 'kurv'];
-  const KENDTE_DANSK = ['ordBillede', 'lyt', 'lytLyd', 'bogstav', 'stortBogstav', 'alfabet', 'lydering', 'skrevetOrd', 'bygOrd', 'saetning', 'bygSaetning', 'scene', 'tryktBogstav', 'retOrd', 'bygAlfabet', 'ikkeSkilt', 'lydTog', 'sand'];
+  const KENDTE_DANSK = ['ordBillede', 'lyt', 'lytLyd', 'bogstav', 'stortBogstav', 'alfabet', 'lydering', 'skrevetOrd', 'bygOrd', 'saetning', 'bygSaetning', 'scene', 'tryktBogstav', 'retOrd', 'bygAlfabet', 'ikkeSkilt', 'lydTog', 'sand', 'vendespil'];
+  // Find parret: 4 kort, hvert ord præcis 2 gange — ellers vises intet (kort er ikke en liste), eller svaret kommer aldrig
+  // (et ord uden makker), og ▶ fortsætter missionen ved samme opgave hver gang (code-review 23-10-2026)
+  const vendespilOk = (v) => v.art !== 'vendespil' || (Array.isArray(v.kort) && v.kort.length === 4 &&
+    v.kort.every((w) => typeof w === 'string' && v.kort.filter((x) => x === w).length === 2));
   function opgaveKendt(o) {
     if (o && o.fag === 'natur') return !!(N && N.opgaveKendt(o));
     if (o && o.fag === 'engelsk' && o.valgArt === 'sig') return !!(E && E.EMNER[o.emne] && E.GEN[o.type] && o.vis && o.vis.art === 'engelskSig' && E.SIG[o.vis.saetning] && o.svar === 'sagt');
     if (o && o.fag === 'engelsk') return !!(E && E.EMNER[o.emne] && E.GEN[o.type] && o.vis && o.vis.art === 'engelskLyt' && E.ORD[o.svar] && Array.isArray(o.valg) && o.valg.every((v) => E.ORD[v]));
-    if (o && o.fag === 'dansk') return !!(D && D.EMNER[o.emne] && D.GEN[o.type] && o.vis && KENDTE_DANSK.indexOf(o.vis.art) >= 0);
+    if (o && o.fag === 'dansk') return !!(D && D.EMNER[o.emne] && D.GEN[o.type] && o.vis && KENDTE_DANSK.indexOf(o.vis.art) >= 0 && vendespilOk(o.vis));
     return !!(o && O.EMNER[o.emne] && o.vis && KENDTE_VISNINGER.indexOf(o.vis.art) >= 0 && (!o.vis.ting || O.TING[o.vis.ting]) &&
       (!o.vis.form || O.FORMER[o.vis.form]));
   }
@@ -2448,7 +2455,7 @@
     r.visSvar = false;
     r.buffer = '';
     r.opdaterDisplay = null; r.bygNulstil = null; r.byg = null; r.figur = null; r.lineal = null; r.vendtOp = false;
-    r.hjaelpIntro = null; r.placer = null; r.trinvis = null; r.sand = null; // C · minispil
+    r.hjaelpIntro = null; r.placer = null; r.trinvis = null; r.sand = null; r.vende = null; // C · minispil, Find parret
     S.spaertTil = performance.now() + 300; // et dobbelttryk på sidste svar må ikke besvare den nye opgave
     [...r.dom.prikker.querySelectorAll('.prik')].forEach((p, i) => p.classList.toggle('nu', i === r.i));
     r.dom.tekst.textContent = '';
@@ -3822,6 +3829,7 @@
       case 'bygHistorie': return h('div', { class: 'dansk-billede byg' }, lytKnap(opg), bygFelter(opg, true));
       case 'lydTog': return lydTogVisning(opg); // C · Lydtoget
       case 'sand': return sandVisning(opg); // C · Spor i sandet
+      case 'vendespil': return vendespilVisning(opg); // Find parret (Små ord, trin 1)
       // D1: scener (fx «i» og «på»), det trykte bogstav og ordet med ét forkert bogstav
       case 'scene': return tegnScene(v.dele, { lag: v.lag });
       case 'tryktBogstav': return h('div', { class: 'dansk-billede trykt' }, h('span', { class: 'trykt-bogstav' }, v.bogstav));
@@ -4286,7 +4294,8 @@
   function registrer(opg, rigtig) {
     const r = S.runde;
     if (r.quiz) return; // 🤔 gemmer intet
-    // C: Spor i sandet bedømmes aldrig (bedoemmes: false) — ingen statistik, intet niveau, ingen gentagelse, ingen fejl
+    // C: Spor i sandet og Find parret bedømmes aldrig (bedoemmes: false) — ingen statistik, intet niveau, ingen gentagelse,
+    // ingen fejl
     if (!O.taellerMed(opg)) return;
     // Engelsk uden lyd (oplæsning fra eller ingen fil til ordet) er gætteleg: intet gemmes, og runden mærkes (fund 3)
     if (opg.fag === 'engelsk' && !enHoeres(opg.ordEn)) { r.udenLyd = true; return; }
@@ -5453,6 +5462,7 @@
     const r = S.runde;
     if (opg.interaktiv === 'kurv') return kurvPanel(opg);
     if (opg.interaktiv === 'sand') return r.sand.panel();
+    if (opg.interaktiv === 'vendespil') return r.vende.panel();
     if (opg.interaktiv === 'soembraet' || opg.interaktiv === 'rute') {
       return h('div', { class: 'interaktiv-panel' },
         ikonKnap('↩️', 'Fortryd', () => { if (r.figur) r.figur.fortryd(); }, 'soem-fortryd'),
@@ -6149,6 +6159,98 @@
     };
     r.figur = st; // tastaturet (rundeTaster → r.figur.taster)
     return h('div', { class: 'sand-post' + (ved ? ' med-ved' : '') }, felt, ved);
+  }
+
+  // ---------- Find parret (interaktiv 'vendespil', Små ord trin 1): vend to kort, og find to ens ord — BEDØMMES ALDRIG ----------
+  // Fire kort med bagsiden op (to par) og Huskekortenes vending (.vende-kort). Et tryk vender kortet: ordet står skrevet på
+  // forsiden, og stemmen siger det («Se.»). Andet kort: to ens bliver liggende med forsiden op (grøn kant, et lille hop og
+  // rigtig-lyden); to forskellige vender tilbage, når ordet er sagt og tidligst 1,2 s efter — ingen fejl-lyd, ingen
+  // markering, ingen tælling og ingen hjælp. Imens kan der ikke vendes et tredje. Begge par fundet → svar('ok'), den
+  // normale vej (registrer springer den over: Opgaver.taellerMed). 💡 «Vis mig» (hjælpen visKort): de skjulte kort vender
+  // op i ca. 2 s og så tilbage. Taster: 1–4 vender kort nr. 1–4; piletasterne flytter fokus (i 2 × 2 også op og ned), og Enter vender kortet.
+  function vendespilVisning(opg) {
+    const r = S.runde, i = r.i, token = S.token;
+    const levende = () => token === S.token && S.runde === r && r.i === i;
+    const ord = opg.vis.kort;
+    const st = { op: [], fundet: [], optaget: false };
+    r.vende = st;
+    // .join(' ') her og ved klasserne nedenfor med vilje: en strenglitteral med mellemrum samler vaerktoej/tale-tekster.js
+    // som en sætning, der skal have en Piper-fil (så går test-tale rød, eller der laves mp3'er med klassenavne)
+    const navn = (k) => ['Kort', k + 1].join(' ');
+    const knapper = ord.map((w, k) => h('button', { class: 'parret-kort', type: 'button', 'data-i': k, 'aria-label': navn(k), onclick: () => st.vend(k) },
+      h('span', { class: 'vende-kort', 'aria-hidden': 'true' },
+        h('span', { class: 'vende-for' }, h('span', { class: 'parret-ord' }, w)),
+        h('span', { class: 'vende-bag' }, '?'))));
+    const rod = h('div', { class: 'parret', role: 'group', 'aria-label': opg.tekst }, knapper);
+    // Forsiden op eller ned — skærmlæseren hører ordet, når det ses
+    const saet = (k, op) => {
+      knapper[k].classList.toggle('op', op);
+      knapper[k].setAttribute('aria-label', op ? ord[k] : navn(k));
+    };
+    const skjult = (k) => st.fundet.indexOf(k) < 0 && st.op.indexOf(k) < 0;
+    st.vend = (k) => {
+      if (r.laast || st.optaget || !levende() || !skjult(k)) return;
+      registrerAktivitet(); // spilletiden: ellers tæller kun svaret til sidst, og et langt vendespil bliver højst 1 min
+      Lyd.init(); Lyd.tryk();
+      saet(k, true);
+      st.op.push(k);
+      const sagt = Tale.sigVent(stort(ord[k]) + '.');
+      if (st.op.length < 2) return;
+      const a = st.op[0], b = st.op[1];
+      st.optaget = true;
+      if (ord[a] !== ord[b]) {
+        // To forskellige: tilbage med bagsiden op — uden lyd, uden markering
+        Promise.all([sagt, ventMs(1200)]).then(() => {
+          if (!levende()) return;
+          saet(a, false); saet(b, false);
+          st.op = []; st.optaget = false;
+        });
+        return;
+      }
+      // Et par: når ordet er sagt, og kortet har vendt
+      Promise.all([sagt, ventMs(450)]).then(() => {
+        if (!levende()) return;
+        st.fundet.push(a, b); st.op = [];
+        knapper[a].classList.add('fundet'); knapper[b].classList.add('fundet');
+        Lyd.rigtig();
+        if (st.fundet.length < ord.length) { st.optaget = false; return; }
+        ventMs(700).then(() => { if (levende()) svar('ok', null); }); // begge par: opgaven er løst
+      });
+    };
+    // 💡 «Vis mig»: de skjulte kort vender op i ca. 2 s (et kort, barnet selv har vendt, bliver liggende), og der kan ikke
+    // trykkes på kortene imens
+    st.visMig = async () => {
+      if (r.laast || st.optaget || !levende()) return;
+      Lyd.init();
+      const trin = (opg.hjaelp || []).find((x) => x.art === 'visKort') || {};
+      const vist = ord.map((w, k) => k).filter(skjult);
+      r.laast = true;
+      r.dom.svar.classList.add('venter');
+      vist.forEach((k) => saet(k, true));
+      await Promise.all([trin.tale ? Tale.sigVent(trin.tale) : null, ventMs(2000)]);
+      if (!levende()) return;
+      vist.forEach((k) => saet(k, false));
+      await ventMs(450); // kortene har vendt, før der kan trykkes igen
+      if (!levende()) return;
+      r.dom.svar.classList.remove('venter');
+      r.laast = false;
+    };
+    st.taster = (e) => {
+      const n = Number(e.key);
+      if (n >= 1 && n <= knapper.length) { st.vend(n - 1); return; }
+      if (['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].indexOf(e.key) < 0) return; // Enter: kortet med fokus vender sig selv (knappens eget klik)
+      e.preventDefault();
+      // Op og ned følger gitteret, som CSS har lagt det (2 × 2 på højkant: kortet under/over); i én række til nabokortet
+      const kol = getComputedStyle(rod).gridTemplateColumns.split(' ').length;
+      const ned = kol < knapper.length ? kol : 1;
+      const skridt = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: ned, ArrowUp: -ned }[e.key];
+      const nu = knapper.indexOf(document.activeElement);
+      knapper[nu < 0 ? (skridt > 0 ? 0 : knapper.length - 1) : (nu + skridt + knapper.length) % knapper.length].focus();
+    };
+    st.panel = () => h('div', { class: ['interaktiv-panel', 'kurv-panel', 'parret-panel'].join(' ') }, // join: se navn ovenfor
+      h('button', { class: ['kurv-knap', 'parret-vis-mig'].join(' '), type: 'button', 'aria-label': 'Vis mig', onclick: () => st.visMig() }, '💡'));
+    r.figur = st; // tastaturet (rundeTaster → r.figur.taster)
+    return rod;
   }
 
   // ---------- Slutbilledet (slut, bedømmes ikke): lyd → (efter hjælp «Ja!») → én rolig bevægelse → evt. tale ----------

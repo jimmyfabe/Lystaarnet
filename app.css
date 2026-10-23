@@ -2628,6 +2628,47 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
 .valg.vendt .vende-for { transform: rotateY(180deg); }
 .valg.vendt .vende-bag { transform: rotateY(0deg); }
 
+/* Find parret (vendespil, Små ord trin 1): fire kort med bagsiden op og Huskekortenes vending. Kortene (3 : 4) er så store,
+   feltet tillader — på én række i et bredt felt (iPad og telefon liggende), 2 × 2 i et højt (højkant). Vennen i hjørnet
+   (.runde-ven: 1,1 × clamp(46px, 8vmin, 80px) fra feltets venstre kant og bund) holdes fri: kortene står enten så lavt, at
+   de ikke når ned til den, eller så smalt, at de ikke når ud til den — det største af de to (--ven-b = vennen + luft) */
+.parret {
+  --g: clamp(10px, 2.4vmin, 24px);
+  --ven-b: calc(1.1 * clamp(46px, 8vmin, 80px) + 8px);
+  --k: min(14vw, 42vh, 220px); /* uden container-enheder (ældre iPads): ca. målene nedenfor */
+  display: grid; grid-template-columns: repeat(4, var(--k)); gap: var(--g); justify-content: center; align-content: center;
+}
+@media (orientation: portrait) { .parret { --k: min(40vw, 21vh, 260px); grid-template-columns: repeat(2, var(--k)); } }
+@supports (width: 1cqw) {
+  .parret { --k: min(240px, max(min((100cqw - 3 * var(--g)) / 4, (100cqh - 2 * var(--ven-b)) * 0.75), min((100cqw - 2 * var(--ven-b) - 3 * var(--g)) / 4, 100cqh * 0.75))); grid-template-columns: repeat(4, var(--k)); }
+  @container (max-aspect-ratio: 6/5) {
+    .parret { --k: min(260px, max(min((100cqw - var(--g)) / 2, (100cqh - var(--g) - 2 * var(--ven-b)) * 0.375), min((100cqw - var(--g) - 2 * var(--ven-b)) / 2, (100cqh - var(--g)) * 0.375))); grid-template-columns: repeat(2, var(--k)); }
+  }
+}
+.parret-kort { position: relative; width: var(--k); height: calc(var(--k) * 4 / 3); padding: 0; border: none; background: none; border-radius: clamp(14px, 2.6vmin, 24px); perspective: 800px; container-type: inline-size; }
+.parret-kort .vende-kort { border-radius: inherit; }
+.parret-kort:active { transform: translateY(3px); }
+/* Bagsiden op (Huskekortenes «vendt»), forsiden op med .op */
+.parret-kort .vende-for { transform: rotateY(180deg); background: var(--hvid); box-shadow: inset 0 0 0 3px var(--farve-1-lys), 0 5px 0 var(--farve-1-lys), 0 8px 16px var(--skygge); }
+.parret-kort .vende-bag { transform: rotateY(0deg); box-shadow: 0 5px 0 var(--farve-1-moerk), 0 8px 16px var(--skygge); }
+.parret-kort.op .vende-for { transform: rotateY(0deg); }
+.parret-kort.op .vende-bag { transform: rotateY(-180deg); }
+/* Siden, der vender væk, skjules også med visibility, når vendingen er halvvejs (0,225 s): Playwrights WebKit på Windows
+   malede bagsiden spejlvendt oven på ordet trods backface-visibility (23-10-2026). Reduceret bevægelse: straks */
+.parret-kort .vende-for, .parret-kort .vende-bag { transition: transform 0.45s ease-in-out, visibility 0s linear 0.225s; }
+.parret-kort .vende-for, .parret-kort.op .vende-bag { visibility: hidden; }
+.parret-kort.op .vende-for { visibility: visible; }
+.parret-ord { font-size: clamp(28px, 6vmin, 72px); font-weight: 800; line-height: 1; color: var(--tekst); white-space: nowrap; }
+@supports (width: 1cqw) { .parret-ord { font-size: min(96px, 40cqw); } .parret-kort .vende-bag { font-size: min(72px, 44cqw); } }
+/* Et fundet par bliver liggende: grøn kant og ét lille hop — et halvt mellemrum (--g fra .parret) op, så det ikke når
+   nabokortet; e2e (parret) måler, at det heller ikke når spørgsmålet (ui-review 23-10-2026: translateY(-10 %) var 22–35 px
+   mod 10–20 px mellemrum og dækkede 🃏 på 768 × 1024) */
+.parret-kort.fundet { animation: parretHop 0.5s ease-out; }
+/* Fundet = en lys flade i temaets farve (ikke kun en mørkere kant, ui-review 23-10-2026); kontrasten tjekkes i test-farver */
+.parret-kort.fundet .vende-for { box-shadow: inset 0 0 0 5px var(--rigtig), 0 5px 0 var(--rigtig-moerk), 0 8px 16px var(--skygge); background: var(--farve-1-lys); }
+.parret-kort.fundet .parret-ord { color: var(--rigtig-moerk); }
+@keyframes parretHop { 0%, 100% { transform: translateY(0); } 45% { transform: translateY(calc(-0.5 * var(--g, 10px))); } }
+
 /* Historiebogen (D1): «🤔 Hvad skete der?» — nummererede pladser, billedbrikker og en rolig afslutning */
 .byg-felter.nummereret .byg-felt { min-width: clamp(72px, 13vmin, 120px); height: clamp(72px, 13vmin, 120px); font-size: clamp(40px, 8vmin, 76px); }
 .byg-felter.nummereret .byg-felt:empty::before { content: attr(data-nr); font-size: clamp(28px, 5vmin, 44px); font-weight: 900; color: var(--farve-1); }
