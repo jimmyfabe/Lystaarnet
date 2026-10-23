@@ -860,6 +860,83 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
 /* Klodser i en række: mærket står over klodsen, så det ikke dækker den (eller naboen) */
 .stang-raekke .klods.talt[data-n]::after { top: auto; right: 50%; bottom: calc(100% + 4px); transform: translateX(50%); }
 .stang-raekke + .stang-raekke .klods.talt[data-n]::after { bottom: auto; top: calc(100% + 4px); }
+/* «Tæl» (antal, app.js taelTing, 22-10-2026) i runden — ikke i Familieduellen, hvor der ikke tælles. Over 10 står den
+   halve blok under søjle 1–4 i blokken over, som rækkerne i tierrammen (før midtstillet: 30–48 px forskudt). Side om side
+   står blokkene kun med 16–20 i brede felter og på samme bund (før stod 11–15 også side om side, og den halve blok svævede
+   midtstillet 14–22 px over bunden) */
+.runde .ting-gruppe.tael-ting.lille { flex-direction: column; flex-wrap: nowrap; align-items: flex-start; }
+/* Over 10 har hver blok en svag baggrund som en tierramme: mærkernes plads giver næsten lige så meget luft inde i blokken
+   som mellem blokkene (640 × 360: 39 mod 48 px, iPad: 64 mod 89 px), så 20 lignede fire løse rækker (ui-review). Rammen
+   er blokkens egen polstring (1vmin), så tingene ikke bliver mindre; mærket på blokkens øverste række står lige over den.
+   1–10 er én blok og ser ud som før */
+.runde .ting-gruppe.tael-ting:has(> .ting-blok + .ting-blok) > .ting-blok { background: var(--baggrund-2); border-radius: 0.3em; }
+@container (min-aspect-ratio: 7/4) {
+  .runde .ting-gruppe.tael-ting.lille:has(> .ting-blok + .ting-blok > .ting-raekke + .ting-raekke) { flex-direction: row; align-items: flex-end; }
+}
+/* Tællehjælpens tal-mærke står over tingen, ikke oven på dens hjørne (før dækkede det 7–24 % af sin egen ting og 3–6 % af
+   naboen på iPad og iPhone, på lave telefoner liggende op til 92 % og 11 %). Som ved vandhullet (.natur-tael) har rækkerne plads til mærket: det er
+   1,2em højt og 2 px over tingen, og --maerke-rum er dets plads med «talt»s scale(1.12) (mærket skaleres med tingen) og ca.
+   3 px luft til tingen over. Tingene vokser 0,07em i hver side, når de er talt, så rækkerne står --maerke-rum + 0,14em fra
+   hinanden, og øverste række har --maerke-rum + 0,07em over sig, når den har mærker: med højst 10 og side om side (16–20).
+   Over 10 tælles de første 10 som én blok («10» står på ting 10 i 2. række), så under hinanden har øverste række intet.
+   Mellem blokkene er der 3vmin mere end mellem rækkerne, så de 10 stadig ses som én blok.
+   Størrelsen: gruppen er --ha·em + --hb høj og --ba·em + --bb bred (en ting er ca. 1,38em bred — Segoe UI Emoji i WebKit;
+   Apples emoji er smallere — og de yderste vokser 0,17em ud, når de er talt). Bredden bruges af lille, side om side og i
+   de lave felter; ellers holder stor og mellem sig til den gamle grænse 14cqw. --maks er den gamle størrelse for stor og
+   mellem; for lille de gamle 66 px og 13cqw, mens søjlerne og rækkerne afløser 16cqh (og i brede felter 7cqw og 32cqh).
+   Kun med container queries (iOS 16+). Ældre iPads får blokkene under hinanden (reglen ovenfor) i den gamle størrelse og
+   uden plads til mærket */
+@supports (width: 1cqw) {
+  .runde .ting-gruppe.tael-ting {
+    --maerke: clamp(17px, 2.6vmin, 24px);
+    --maerke-rum: calc(1.35 * var(--maerke) + 5px);
+    --raekke-luft: calc(var(--maerke-rum) + 0.14em);
+    --ba: calc(var(--kol, 5) * 1.38 + 0.17);
+    --bb: calc((var(--kol, 5) - 1) * 0.6vmin + 2vmin);
+    padding-top: max(0px, calc(var(--maerke-rum) + 0.07em - 1vmin));
+    font-size: min(var(--maks), calc((100cqh - var(--hb)) / var(--ha)));
+  }
+  .runde .ting-gruppe.tael-ting .ting.taelbar { font-size: inherit; }
+  .runde .ting-gruppe.tael-ting .ting-blok { gap: var(--raekke-luft); }
+  .runde .ting-gruppe.tael-ting .taelbar.talt[data-n]::after {
+    top: auto; right: 50%; bottom: calc(100% + 2px); transform: translateX(50%);
+    font-size: var(--maerke); min-width: 1.3em; height: 1.2em; line-height: 1.2em; padding: 0 0.2em; border-radius: 0.6em;
+  }
+  .runde .ting-gruppe.tael-ting.stor { --maks: min(128px, 14cqw, 42cqh); --ha: 1.29; --hb: calc(var(--maerke-rum) + 1vmin); }
+  .runde .ting-gruppe.tael-ting.mellem { --maks: min(100px, 14cqw, 28cqh); --ha: 2.58; --hb: calc(2 * var(--maerke-rum) + 1vmin); }
+  .runde .ting-gruppe.tael-ting.lille {
+    padding-top: 0; row-gap: calc(var(--raekke-luft) + 1vmin);
+    --maks: min(66px, 13cqw, calc((100cqw - var(--bb)) / var(--ba)));
+    --ha: calc(1.29 * var(--raek, 4) - 0.14); --hb: calc(5vmin + (var(--raek, 4) - 1) * var(--maerke-rum));
+  }
+  /* Side om side (16–20 i brede felter: telefon liggende fra ca. 740 × 360): her bliver tingene større end i fire rækker
+     under hinanden (målt 22-10-2026); 11–15 står under hinanden i tre rækker, hvor de er større end side om side */
+  @container (min-aspect-ratio: 7/4) {
+    .runde .ting-gruppe.tael-ting.lille:has(> .ting-blok + .ting-blok > .ting-raekke + .ting-raekke) {
+      padding-top: max(0px, calc(var(--maerke-rum) + 0.07em - 1vmin)); column-gap: calc(var(--raekke-luft) + 1vmin);
+      --ba: 14.11; --bb: calc(9.8vmin + var(--maerke-rum));
+      --maks: min(66px, calc((100cqw - var(--bb)) / var(--ba)));
+      --ha: 2.58; --hb: calc(2 * var(--maerke-rum) + 1vmin);
+    }
+  }
+  /* Lave felter (telefon liggende): vennen står i hjørnet nederst til venstre (--ven-side bred og --ven-rum høj fra feltets
+     indholdskant, som ved vandhullet). Tingene holder sig fri af den enten over den (smalle felter: 640 × 360, 667 × 375)
+     eller til højre for den (brede: 844 × 390 med 6–10) — det, der giver de største ting. Margenerne flytter gruppen kun
+     så meget, som der skal til, og kun så meget, som der er plads til (--rest-b/--rest-h) */
+  @container (min-aspect-ratio: 1/1) and (max-height: 320px) {
+    .runde .ting-gruppe.tael-ting {
+      --ven-rum: calc(clamp(46px, 8vmin, 80px) - 8px);
+      --ven-side: calc(1.1 * clamp(46px, 8vmin, 80px) - 4px);
+      font-size: max(
+        min(var(--maks), calc((100cqh - var(--ven-rum) - var(--hb)) / var(--ha))),
+        min(var(--maks), calc((100cqw - var(--ven-side) - var(--bb)) / var(--ba)), calc((100cqh - var(--hb)) / var(--ha))));
+      --rest-b: calc(100cqw - var(--ba) * 1em - var(--bb));
+      --rest-h: calc(100cqh - var(--ha) * 1em - var(--hb));
+      margin-left: clamp(0px, min(calc(2 * var(--ven-side) - var(--rest-b)), var(--rest-b)), var(--ven-side));
+      margin-bottom: clamp(0px, min(calc(2 * var(--ven-rum) - var(--rest-h)), var(--rest-h)), var(--ven-rum));
+    }
+  }
+}
 
 /* Terning */
 .terning {

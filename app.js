@@ -2515,7 +2515,7 @@
     if (opg.fag === 'natur') return naturVisning(opg);
     const v = opg.vis;
     switch (v.art) {
-      case 'ting': return tingGruppe(v.antal, O.TING[v.ting].e);
+      case 'ting': return taelTing(v.antal, O.TING[v.ting].e);
       case 'terning': return terning(v.antal);
       case 'terninger': return h('div', { class: 'terninger' }, terning(v.a, 'a'), h('span', { class: 'plus-tegn', 'aria-hidden': 'true' }, '+'), terning(v.b, 'b'));
       case 'klodser': return klodser(v.a, v.b);
@@ -2743,6 +2743,18 @@
       blokke.push(blok);
     }
     return h('div', { class: 'ting-gruppe ' + stoerrelse + (gruppe ? ' gruppe-' + gruppe : '') }, blokke);
+  }
+
+  // «Tæl» (antal): tingGruppe med plads over hver ting til tællehjælpens tal-mærke. Størrelsen regnes i app.css
+  // (.tael-ting) af søjlerne (--kol: den bredeste række) og rækkerne (--raek: alle rækkerne under hinanden)
+  function taelTing(antal, emoji) {
+    const g = tingGruppe(antal, emoji);
+    let raek = 0;
+    for (let s = 0; s < antal; s += 10) raek += Math.ceil(Math.min(10, antal - s) / 5);
+    g.classList.add('tael-ting');
+    g.style.setProperty('--kol', Math.min(antal, 5));
+    g.style.setProperty('--raek', raek);
+    return g;
   }
 
   function terning(antal, gruppe) {
@@ -4342,8 +4354,13 @@
   const taelVidere = (opg) => opg.niveau >= 2 || Math.max(opg.vis.a, opg.vis.b) >= 5;
 
   // Tal-mærket på en talt ting. På små ting (klodser, kugler) flytter mærket med, så det ikke dækker naboerne.
+  // I «Tæl» (app.css .runde .tael-ting, kun med container queries) står mærket over tingen med plads til det, så dér kan
+  // alle stå ned til 36 px: et tocifret mærke er ca. 32 px bredt (talt), og luften mellem to er ca. tingen − 30 px — målt
+  // i WebKit 23-10-2026: 43 px → 13 px luft (844 × 390 med 16–20), 34 → 4, 30 → rører; ved 36 px er der ca. 6 px
+  const MAERKE_GRAENSE_TAEL = 36;
   function saetTal(el, n, forrige) {
-    if (forrige && el.offsetWidth && el.offsetWidth < 44) forrige.removeAttribute('data-n');
+    const graense = el.closest('.runde .tael-ting') && window.CSS && CSS.supports('width', '1cqw') ? MAERKE_GRAENSE_TAEL : 44;
+    if (forrige && el.offsetWidth && el.offsetWidth < graense) forrige.removeAttribute('data-n');
     el.setAttribute('data-n', n);
   }
 
