@@ -1145,16 +1145,21 @@
   function lavOpgave(type, niveau, rng) { return GEN[type](niveau, rng); }
   // Fast pulje som i opgaver.js (Piper-stemmen): rng vælger nummeret, opgaven laves med sit eget frø
   // Kål ligner salat på billedet (code-review 21-10-2026). Ordet tages ikke ud af ikkeForlyd selv — så skifter puljen,
-  // og dens nye sætninger har ingen Piper-fil. Puljen springer i stedet videre til næste nummer (dens tale findes)
+  // og dens nye sætninger har ingen Piper-fil. Puljen vælger i stedet blandt sine numre uden ordet (deres tale findes),
+  // med samme chance for hver. Før sprang den til næste nummer, så nummeret efter et kål-nummer kom dobbelt så tit
   const PULJE_UDEN_ORD = { ikkeForlyd: ['kål'] };
+  const puljeTilladte = {};
   function puljeOpgave(type, niveau, rng) {
-    const nr = puljeNr(rng), uden = PULJE_UDEN_ORD[type] || [];
-    let o;
-    for (let k = 0; k < O.PULJE; k++) {
-      o = lavOpgave(type, niveau, lavRng(puljeFroe('dansk:' + type, niveau, ((nr - 1 + k) % O.PULJE) + 1)));
-      if (!(o.valg || []).some((v) => uden.indexOf(v) >= 0)) break;
+    const lav = (nr) => lavOpgave(type, niveau, lavRng(puljeFroe('dansk:' + type, niveau, nr)));
+    const uden = PULJE_UDEN_ORD[type];
+    if (!uden) return lav(puljeNr(rng));
+    const id = type + '|' + niveau;
+    if (!puljeTilladte[id]) {
+      puljeTilladte[id] = [];
+      for (let nr = 1; nr <= O.PULJE; nr++) if (!(lav(nr).valg || []).some((v) => uden.indexOf(v) >= 0)) puljeTilladte[id].push(nr);
     }
-    return o;
+    const ok = puljeTilladte[id];
+    return lav(ok.length ? ok[Math.floor(rng() * ok.length)] : puljeNr(rng));
   }
 
   function lavRunde(emneId, niveau, rng, opts) {
