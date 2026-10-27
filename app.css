@@ -1454,6 +1454,7 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
 @keyframes vip { 0%, 100% { transform: rotate(0); } 30% { transform: rotate(-14deg); } 65% { transform: rotate(10deg); } }
 @keyframes pop { 0% { transform: scale(1); } 45% { transform: scale(1.22); } 100% { transform: scale(1); } }
 @keyframes pop-lille { 0% { transform: scale(1); } 45% { transform: scale(1.08); } 100% { transform: scale(1); } }
+@keyframes pop-mini { 0% { transform: scale(1); } 45% { transform: scale(1.02); } 100% { transform: scale(1); } }
 @keyframes ryst { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } }
 
 @media (prefers-reduced-motion: reduce) {
@@ -3271,6 +3272,12 @@ button:focus-visible, a:focus-visible { outline: 4px solid var(--tekst); outline
       height: calc(100% - var(--natur-l) * max(0, var(--finger-dy, 0)));
       transform: translate(calc(var(--natur-l) * var(--finger-dx, 0)), calc(var(--natur-l) * var(--finger-dy, 0)));
     }
+  }
+  /* Telefonen på højkant (feltet under 480 px: lorten fylder bredden, og kortet står ved feltets højre kant): pop-lille gik
+     op til 9,6 px ud over kanten og 13,4 px op over titlen med ringen (UI-review v312, 390 × 844). Uden for ringen er der
+     kun 10 px til højre og 6 px til toppen, så her vokser kortet 2 % (højst 6 px ved kortets største 300 px) */
+  @container (max-aspect-ratio: 1/1) and (max-width: 480px) {
+    .natur-scene:has(.natur-lort) .natur-spor.pop { animation-name: pop-mini; }
   }
 }
 .natur-lort, .natur-spor { display: grid; place-items: end center; }

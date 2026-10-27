@@ -3905,6 +3905,12 @@
       const fk = (x - d) * 2, a = under[Math.floor(fk)], b = under[Math.ceil(fk)];
       return a === undefined ? b : b === undefined ? a : a + (b - a) * (fk - Math.floor(fk));
     };
+    // Højkant: spidsen må ikke stå inde ved siden af lorten. Kolonnen lige til højre for fingerens højre kant (inden for
+    // FINGER_LUFT) blev før slet ikke målt, og spidsen rørte hestens kugle, der begynder netop ved FINGER_HOEJRE (UI-review
+    // v312). Dér må lortens top ikke stå højere end fingerens underkant i dens yderste kolonne (spids). Kun hesten flyttes af
+    // det (målt 26-10-2026: 2,8 enheder op; elefanten er den nærmeste af de andre med ca. 0,19 til gode). Et krav om luft
+    // dér (FINGER_LUFT, skråt eller lodret) flyttede også kaninens og elefantens finger
+    const kant = hoejre + dx, spids = fingerUnder(kant, dx);
     // Lortens øverste synlige punkt i hver halve kolonne, en af fingrene kan nå (højkant op til FINGER_HOEJRE, på langs op
     // til fingerens højre kant): isPointInFill/-Stroke i halve enheder ned fra toppen og så halveret tre gange. Toppen er
     // den samme for begge fingre, så hver kolonne scannes én gang, og begge dy regnes af den. En kolonne opgives, så snart
@@ -3913,8 +3919,8 @@
     const pt = fing.createSVGPoint();
     const ramt = (f, x, y) => { pt.x = x; pt.y = y; const q = pt.matrixTransform(f.ind); return (f.fyld && f.el.isPointInFill(q)) || (f.streg && f.el.isPointInStroke(q)); };
     let dy = Infinity, dyLangs = Infinity;
-    for (let k = Math.ceil(Math.max(FINGER_HOEJRE, hoejre) * 2); k >= 0; k--) {
-      const x = k / 2, fu = k <= FINGER_HOEJRE * 2 ? fingerUnder(x, dx) : undefined, fu0 = fingerUnder(x, 0);
+    for (let k = Math.ceil(Math.max(FINGER_HOEJRE + FINGER_LUFT, hoejre) * 2); k >= 0; k--) {
+      const x = k / 2, fu = k <= FINGER_HOEJRE * 2 ? fingerUnder(x, dx) : spids !== undefined && x - kant < FINGER_LUFT ? spids - FINGER_LUFT : undefined, fu0 = fingerUnder(x, 0);
       if (fu === undefined && fu0 === undefined) continue;
       const her = lortFormer.filter((f) => f.l <= x && f.r >= x);
       if (!her.length) continue;
