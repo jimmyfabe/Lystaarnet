@@ -1,8 +1,8 @@
 /* sw.js — service worker, så spillet virker uden net.
    Ved hver ny udgave: tæl VERSION op. Filerne hentes med cache: 'reload',
    så GitHub Pages' HTTP-cache ikke giver en blanding af gamle og nye filer. */
-const VERSION = 'mat-2026-10-26-v313';
-// FILER-HASH: cca1aa907972045f mat-2026-10-26-v313 — opdateres med: node test/test-sw.js --opdater
+const VERSION = 'mat-2026-10-28-v322';
+// FILER-HASH: 0190cf1f4fd1b26c mat-2026-10-28-v322 — opdateres med: node test/test-sw.js --opdater
 const FILER = [
   './',
   'index.html',
@@ -27,7 +27,7 @@ const FILER = [
   'engelsk-opgaver.js', // engelsk for begyndere (13-10-2026): ordlisterne og opgaverne
   'natur-opgaver.js', // natur (20-10-2026): Gæt en lort — dyrene, fakta og opgaverne
   'grafik.js', // tegningerne (fase A): venner, verdener, tårnet, kortet og samledyrene
-  'lyd/liste.json', // listen over indtalte klip i lyd/ (tom: Jimmys optagelser er fjernet 12-10; læg hver ny .wav på FILER-listen)
+  'lyd/liste.json', // bogstavlydene i lyd/: vaerktoej/bogstavlyde skriver listen og lyd/<id>.wav-linjerne lige herunder
   'manifest.json',
   'manifest-dino.json',
   'manifest-enhjorning.json',

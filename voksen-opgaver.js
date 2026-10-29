@@ -118,6 +118,96 @@
     return ud;
   };
 
+  // ---------- Grundlag (fase 4 D1, 28-10-2026): hjælpere til folkeskolens regning ----------
+  // Svarene er hele tal («n:», kan tastes) eller decimaltal («d:», kun knapper — taltastaturet har intet komma).
+  // Enheden står i spørgsmålet; svarmulighederne er rene tal (som i ohm).
+  const rund = (v) => Math.round(v * 1e6) / 1e6; // væk med flydende-tal-støj: 0,1 + 0,2 = 0,30000000000000004
+  const gNoegle = (v) => (Number.isInteger(rund(v)) ? 'n:' : 'd:') + rund(v);
+  // Decimaltal med komma som MathML (negative som mn), tusinderne delt som i gTekst
+  function mnd(v) {
+    v = rund(v);
+    const t = gTekst(Math.abs(v));
+    return v < 0 ? '<mrow><mo>−</mo><mn>' + t + '</mn></mrow>' : '<mn>' + t + '</mn>';
+  }
+  const gv = (v, fejl) => ({ vis: math(mnd(v)), nøgle: gNoegle(v), fejl: fejl || null });
+  // Tal i løbende tekst: komma, minus som «−» og hårdt mellemrum mellem tusinderne fra 10 000 (25 000)
+  function gTekst(v) {
+    v = rund(v);
+    const [hel, decimaler] = String(Math.abs(v)).split('.');
+    return (v < 0 ? '−' : '') + (hel.length > 4 ? hel.replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0') : hel) + (decimaler ? ',' + decimaler : '');
+  }
+  // En typisk fejl, der kun bruges, når den er et helt tal (NaN springes over i gOpgave)
+  const kunHel = (v) => (Number.isInteger(rund(v)) ? rund(v) : NaN);
+  // … eller har højst to decimaler (kroner og øre, 2,5 cm)
+  const kunKort = (v) => (Number.isInteger(rund(v * 100)) ? rund(v) : NaN);
+  // Facit og de typiske fejl som tal → opgave(). En fejl, der ikke er et endeligt tal, falder sammen med facit eller en
+  // anden fejl, eller som er ≤ 0 ved et positivt facit (medmindre medNegative), springes over. Mangler der, fyldes op med
+  // naboer i facits egen størrelse (hele tal: ±1, ±2 …; decimaltal: ± den sidste decimal).
+  function gOpgave(o, rng, facit, fejl, medNegative) {
+    const f = rund(facit);
+    const brugt = new Set([gNoegle(f)]);
+    const forkerte = [];
+    const tilfoej = (v, tekst) => {
+      if (forkerte.length >= 3 || !Number.isFinite(v) || (!medNegative && f > 0 && rund(v) <= 0) || brugt.has(gNoegle(v))) return;
+      brugt.add(gNoegle(v));
+      forkerte.push(gv(v, tekst));
+    };
+    for (const [v, tekst] of fejl) tilfoej(v, tekst);
+    const decimaler = String(f).split('.')[1];
+    const d = decimaler ? Math.pow(10, -decimaler.length) : 1;
+    for (const k of [1, -1, 2, -2, 10, -10, 3, -3]) tilfoej(f + k * d, null);
+    return opgave(o, rng, gv(f), forkerte);
+  }
+  // Svar med π: «12π» (nøglen «pi:12»)
+  const piM = (k) => (k === 1 ? mi('π') : mn(k) + mi('π'));
+  const piv = (k, fejl) => ({ vis: math(piM(k)), nøgle: 'pi:' + k, fejl: fejl || null });
+  // Et forhold «2 : 3» (nøglen «r:2:3»)
+  const forholdV = (x, y, fejl) => ({ vis: math(mn(x) + mo(':') + mn(y)), nøgle: 'r:' + x + ':' + y, fejl: fejl || null });
+  // En liste af hele tal i en sætning: «4, 7, 9 og 12»
+  const listeTekst = (l) => l.slice(0, -1).join(', ') + ' og ' + l[l.length - 1];
+  const sum = (l) => l.reduce((a, b) => a + b, 0);
+  const sorteret = (l) => l.slice().sort((a, b) => a - b);
+  // Brøker, der ikke kan forkortes: tællerne 1 … n−1 uden fælles faktor med n
+  const taellere = (n) => { const ud = []; for (let a = 1; a < n; a++) if (gcd(a, n) === 1) ud.push(a); return ud; };
+  // Enhederne (enheder): faktor k; gange = true betyder «værdi · k», ellers «værdi : k». Værdierne giver pæne svar.
+  const G_ENHEDER = {
+    1: [
+      { id: 'mcm', fra: 'm', til: 'cm', k: 100, gange: true, regel: '1 m = 100 cm' },
+      { id: 'kmm', fra: 'km', til: 'm', k: 1000, gange: true, regel: '1 km = 1000 m' },
+      { id: 'kgg', fra: 'kg', til: 'g', k: 1000, gange: true, regel: '1 kg = 1000 g' },
+      { id: 'lml', fra: 'liter', til: 'ml', k: 1000, gange: true, regel: '1 liter = 1000 ml' },
+      { id: 'ldl', fra: 'liter', til: 'dl', k: 10, gange: true, regel: '1 liter = 10 dl' },
+      { id: 'cmmm', fra: 'cm', til: 'mm', k: 10, gange: true, regel: '1 cm = 10 mm' },
+      { id: 'tmin', fra: 'timer', til: 'minutter', k: 60, gange: true, tid: true, regel: '1 time = 60 minutter' },
+      { id: 'minsek', fra: 'minutter', til: 'sekunder', k: 60, gange: true, tid: true, regel: '1 minut = 60 sekunder' },
+    ],
+    2: [
+      { id: 'cmm', fra: 'cm', til: 'm', k: 100, gange: false, regel: '100 cm = 1 m' },
+      { id: 'gkg', fra: 'g', til: 'kg', k: 1000, gange: false, regel: '1000 g = 1 kg' },
+      { id: 'mll', fra: 'ml', til: 'liter', k: 1000, gange: false, regel: '1000 ml = 1 liter' },
+      { id: 'mkm', fra: 'm', til: 'km', k: 1000, gange: false, regel: '1000 m = 1 km' },
+      { id: 'dll', fra: 'dl', til: 'liter', k: 10, gange: false, regel: '10 dl = 1 liter' },
+      { id: 'cll', fra: 'cl', til: 'liter', k: 100, gange: false, regel: '100 cl = 1 liter' },
+      { id: 'mint', fra: 'minutter', til: 'timer', k: 60, gange: false, tid: true, regel: '60 minutter = 1 time' },
+    ],
+    3: [
+      { id: 'm2cm2', fra: 'm²', til: 'cm²', k: 10000, gange: true, regel: '1 m² = 100 cm · 100 cm = 10\u00a0000 cm²' },
+      { id: 'cm2m2', fra: 'cm²', til: 'm²', k: 10000, gange: false, regel: '10\u00a0000 cm² = 1 m² (100 cm · 100 cm)' },
+      { id: 'm3l', fra: 'm³', til: 'liter', k: 1000, gange: true, regel: '1 m³ = 1000 dm³ = 1000 liter' },
+      { id: 'lcm3', fra: 'liter', til: 'cm³', k: 1000, gange: true, regel: '1 liter = 1 dm³ = 1000 cm³' },
+      { id: 'kmtms', fra: 'km/t', til: 'm/s', k: 3.6, gange: false, regel: '1 m/s = 3600 m/t = 3,6 km/t' },
+      { id: 'mskmt', fra: 'm/s', til: 'km/t', k: 3.6, gange: true, regel: '1 m/s = 3600 m/t = 3,6 km/t' },
+      { id: 'ham2', fra: 'hektar', til: 'm²', k: 10000, gange: true, regel: '1 hektar = 100 m · 100 m = 10\u00a0000 m²' },
+    ],
+  };
+  const G_ENHED_TAL = {
+    1: [2, 3, 4, 5, 6, 7, 8, 9, 12, 15, 0.5, 1.5, 2.5, 3.5, 4.5, 0.75, 1.25],
+    2: [5, 8, 12, 15, 25, 30, 45, 60, 75, 90, 120, 150, 250, 340, 600, 750, 1200, 1250, 1750, 2500],
+    3: { m2cm2: [2, 3, 5, 0.5, 1.5, 2.5, 0.25, 0.75, 4, 12], cm2m2: [20000, 35000, 5000, 2500, 120000, 7500, 15000, 50000, 1000, 45000],
+      m3l: [2, 3, 0.5, 1.5, 2.5, 0.25, 0.75, 4, 1.2, 6], lcm3: [2, 3, 0.5, 1.5, 2.5, 0.25, 0.75, 4, 0.2, 1.75],
+      kmtms: [9, 18, 27, 36, 45, 54, 72, 90, 108, 126, 144], mskmt: [2.5, 5, 10, 12.5, 15, 20, 25, 30, 35, 40], ham2: [2, 3, 0.5, 1.5, 2.5, 0.25, 4, 12, 0.75, 6] },
+  };
+
   // ---------- Generatorer ----------
   // Hver: (niveau, rng) → { emne, type, niveau, noegle, spoerg (MathML/HTML), p (parametre), valg, svar, forklaring }
   const V = {
@@ -879,6 +969,432 @@
         forklaring: math(mi('f') + par(mi('x')) + mo('=') + mn(b) + mi('x') + mo('+') + mn(a)) + ', så ' + math(mi('f') + par(mn(x)) + mo('=') + mn(b) + mo('·') + mn(x) + mo('+') + mn(a) + mo('=') + mn(T)) + ' kr.',
       };
       return opgave(o, rng, tal(T), [tal(b * x, 'Glemt startgebyret'), tal((a + b) * x, 'Startgebyret ganget med antal km'), tal(a * x + b, 'Startgebyr og km-pris byttet om')]);
+    },
+
+    // ===== 9. Grundlag (folkeskole 7.–9. kl., fase 4 D1, 28-10-2026) =====
+    // Niveau 1 = 7. klasse, 2 = 8. klasse, 3 = 9. klasse (FP9 uden hjælpemidler). Egne opgaver med tal, der kan regnes i
+    // hovedet; de forkerte svar er typiske elevfejl. Facit regnes igen uafhængigt i test/test-voksen.js.
+    procent(niveau, rng) {
+      const t = niveau === 1 ? 'af' : vaelg(rng, niveau === 2 ? ['ny', 'hvor'] : ['stig', 'foer']);
+      const o = { emne: 'grundlag', type: 'procent', niveau };
+      if (t === 'af') {
+        const p = vaelg(rng, [5, 10, 20, 25, 30, 40, 50, 75]);
+        const G = vaelg(rng, [40, 60, 80, 120, 160, 200, 240, 300, 400, 480, 500, 600, 800, 1000, 1200]);
+        const f = p * G / 100;
+        Object.assign(o, { noegle: 'gPct:af:' + p + ',' + G, p: { t, p, G },
+          spoerg: 'Hvad er ' + p + ' % af ' + G + '?',
+          forklaring: '1 % af ' + G + ' er ' + gTekst(G / 100) + ', så ' + p + ' % er ' + math(mn(p) + mo('·') + mnd(G / 100) + mo('=') + mn(f)) + '.' });
+        return gOpgave(o, rng, f, [[G - f, 'Resten (' + (100 - p) + ' %) i stedet for de ' + p + ' %'], [f * 10, 'Delt med 10 i stedet for med 100'], [kunHel(G / p), 'Delt med procenttallet']]);
+      }
+      if (t === 'ny') {
+        const op = vaelg(rng, ['op', 'ned']), p = vaelg(rng, [10, 20, 25, 30, 40, 50]);
+        const K = vaelg(rng, [200, 240, 300, 400, 480, 500, 600, 800, 1200, 1500, 2000]);
+        const s = op === 'op' ? 1 : -1, d = K * p / 100, f = K + s * d;
+        Object.assign(o, { noegle: 'gPct:ny:' + op + ',' + p + ',' + K, p: { t, op, p, K },
+          spoerg: op === 'op' ? 'En pris på ' + K + ' kr. stiger med ' + p + ' %. Hvad er den nye pris i kr.?' : 'En vare til ' + K + ' kr. sættes ned med ' + p + ' %. Hvad koster den nu i kr.?',
+          forklaring: p + ' % af ' + K + ' kr. er ' + d + ' kr., så ' + math(mn(K) + mo(op === 'op' ? '+' : '−') + mn(d) + mo('=') + mn(f)) + ' kr.' });
+        return gOpgave(o, rng, f, [[d, 'Kun ændringen, ikke den nye pris'], [K - s * d, op === 'op' ? 'Trukket fra i stedet for at lægge til' : 'Lagt til i stedet for at trække fra'], [K + s * p, 'Regnet med ' + p + ' kr. i stedet for ' + p + ' %']]);
+      }
+      if (t === 'hvor') {
+        const b = vaelg(rng, [20, 25, 40, 50, 80, 200, 250, 400, 500]);
+        const p = vaelg(rng, [5, 10, 20, 25, 30, 40, 60, 75, 80].filter((q) => Number.isInteger(b * q / 100)));
+        const a = b * p / 100;
+        Object.assign(o, { noegle: 'gPct:hvor:' + a + ',' + b, p: { t, a, b },
+          spoerg: 'Hvor mange procent er ' + a + ' af ' + b + '?',
+          forklaring: math(frac(mn(a), mn(b)) + mo('=') + frac(mn(p), mn(100))) + ', altså ' + p + ' %.' });
+        return gOpgave(o, rng, p, [[100 - p, 'Resten i stedet for delen'], [kunHel(b / a * 100), 'Brøken vendt om (' + b + ' af ' + a + ')'], [a, 'Tallet i stedet for procenten']]);
+      }
+      if (t === 'stig') {
+        const op = vaelg(rng, ['op', 'ned']), A = vaelg(rng, [40, 50, 80, 120, 150, 200, 250, 400, 500, 800]);
+        const p = vaelg(rng, [10, 20, 25, 30, 40, 50, 60, 75].concat(op === 'op' ? [100] : []).filter((q) => Number.isInteger(A * q / 100)));
+        const d = A * p / 100, B = op === 'op' ? A + d : A - d;
+        Object.assign(o, { noegle: 'gPct:stig:' + A + ',' + B, p: { t, A, B },
+          spoerg: 'En pris ' + (op === 'op' ? 'stiger' : 'falder') + ' fra ' + A + ' kr. til ' + B + ' kr. Hvor mange procent ' + (op === 'op' ? 'steg' : 'faldt') + ' prisen?',
+          forklaring: 'Ændringen er ' + d + ' kr. Den regnes i forhold til den gamle pris: ' + math(frac(mn(d), mn(A)) + mo('=') + frac(mn(p), mn(100))) + ', altså ' + p + ' %.' });
+        return gOpgave(o, rng, p, [[kunKort(d / B * 100), 'Regnet i forhold til den nye pris'], [d, 'Ændringen i kroner, ikke i procent'], [B / A * 100, 'Den nye pris i procent af den gamle']]);
+      }
+      // Prisen før rabatten
+      const p = vaelg(rng, [10, 20, 25, 40, 50, 60, 75]);
+      const K = vaelg(rng, [80, 120, 160, 200, 240, 300, 400, 500, 600, 800, 1000, 1200]);
+      const N = K * (100 - p) / 100;
+      Object.assign(o, { noegle: 'gPct:foer:' + p + ',' + K, p: { t, p, N },
+        spoerg: 'Efter ' + p + ' % rabat koster en jakke ' + N + ' kr. Hvad kostede den før rabatten (kr.)?',
+        forklaring: N + ' kr. er ' + (100 - p) + ' % af den gamle pris. 1 % er ' + math(mn(N) + mo(':') + mn(100 - p) + mo('=') + mnd(K / 100)) + ' kr., så 100 % er ' + math(mn(100) + mo('·') + mnd(K / 100) + mo('=') + mn(K)) + ' kr.' });
+      return gOpgave(o, rng, K, [[kunKort(N + N * p / 100), 'Lagt ' + p + ' % til den nye pris'], [N + p, 'Lagt ' + p + ' kr. til i stedet for ' + p + ' %'], [kunHel(N * 100 / p), 'Delt med rabatten i stedet for med resten']]);
+    },
+
+    // Brøk af et tal: «¾ af 24», «¾ af et tal er 18», «⅔ af ⅗» og «hvor stor en brøkdel er 8 af 20?»
+    broekAfTal(niveau, rng) {
+      const t = niveau === 1 ? 'af' : vaelg(rng, niveau === 2 ? ['af', 'hel'] : ['afBroek', 'del']);
+      const o = { emne: 'grundlag', type: 'broekAfTal', niveau };
+      if (t === 'af' || t === 'hel') {
+        const b = vaelg(rng, niveau === 1 ? [2, 3, 4, 5, 10] : [3, 4, 5, 6, 7, 8, 9, 12]);
+        const a = vaelg(rng, t === 'hel' ? taellere(b).filter((x) => x > 1) : taellere(b)), m = heltal(rng, 2, niveau === 1 ? 12 : 15);
+        const B = math(frac(mn(a), mn(b)));
+        if (t === 'af') {
+          const N = b * m, f = a * m;
+          Object.assign(o, { noegle: 'gBrA:af:' + a + '/' + b + ',' + N, p: { t, a, b, N },
+            spoerg: 'Hvad er ' + B + ' af ' + N + '?',
+            forklaring: a === 1 ? 'Del med nævneren: ' + math(mn(N) + mo(':') + mn(b) + mo('=') + mn(f)) + '.'
+              : 'Del med nævneren, og gang med tælleren: ' + math(mn(N) + mo(':') + mn(b) + mo('=') + mn(m)) + ' og ' + math(mn(m) + mo('·') + mn(a) + mo('=') + mn(f)) + '.' });
+          return gOpgave(o, rng, f, [[m, 'Kun delt med nævneren'], [N * a, 'Kun ganget med tælleren'], [N - f, 'Resten i stedet for delen'], [kunHel(N * b / a), 'Brøken vendt om']]);
+        }
+        const M = a * m, f = b * m;
+        Object.assign(o, { noegle: 'gBrA:hel:' + a + '/' + b + ',' + M, p: { t, a, b, M },
+          spoerg: B + ' af et tal er ' + M + '. Hvad er tallet?',
+          forklaring: (a > 1 ? math(mn(M) + mo(':') + mn(a) + mo('=') + mn(m)) : M) + ' er ' + math(frac(mn(1), mn(b))) + ' af tallet, så tallet er ' + math(mn(m) + mo('·') + mn(b) + mo('=') + mn(f)) + '.' });
+        return gOpgave(o, rng, f, [[kunHel(M * a / b), 'Taget brøken af tallet i stedet'], [m, 'Kun delt med tælleren'], [M * b, 'Glemt at dele med tælleren'], [M, 'Tallet selv']]);
+      }
+      if (t === 'afBroek') {
+        const b = vaelg(rng, [2, 3, 4, 5]), d = vaelg(rng, [3, 4, 5, 6, 8]);
+        const a = vaelg(rng, taellere(b)), c = vaelg(rng, taellere(d)), ac = a * c, bd = b * d;
+        Object.assign(o, { noegle: 'gBrA:afB:' + a + '/' + b + ',' + c + '/' + d, p: { t, a, b, c, d },
+          spoerg: 'Hvad er ' + math(frac(mn(a), mn(b))) + ' af ' + math(frac(mn(c), mn(d))) + '?',
+          forklaring: '«Af» betyder gange: ' + math(frac(mn(a), mn(b)) + mo('·') + frac(mn(c), mn(d)) + mo('=') + frac(mn(ac), mn(bd)) + (gcd(ac, bd) > 1 ? mo('=') + broek(ac, bd) : '')) + '.' });
+        return opgave(o, rng, bv(ac, bd), [bv(a * d + c * b, bd, 'Lagt sammen i stedet for at gange'), bv(a * d, b * c, 'Delt i stedet for at gange'), bv(a + c, b + d, 'Tællere og nævnere lagt sammen'), bv(ac + 1, bd), bv(ac, bd + 1)]);
+      }
+      const B = vaelg(rng, [12, 15, 16, 18, 20, 24, 30, 36, 40, 45, 60]), A = heltal(rng, 2, B - 2), g = gcd(A, B);
+      Object.assign(o, { noegle: 'gBrA:del:' + A + ',' + B, p: { t, A, B },
+        spoerg: 'Hvor stor en brøkdel er ' + A + ' af ' + B + '? Forkort mest muligt.',
+        forklaring: math(frac(mn(A), mn(B)) + (g > 1 ? mo('=') + broek(A, B) : '')) + (g > 1 ? ' — tæller og nævner er delt med ' + g + '.' : ' — brøken kan ikke forkortes.') });
+      return opgave(o, rng, bv(A, B), [bv(B, A, 'Brøken vendt om'), bv(B - A, B, 'Resten i stedet for delen'), bv(A, B - A, 'Delt med resten i stedet for med det hele'), bv(A + 1, B), bv(A - 1, B)]);
+    },
+
+    // Decimaltal: komma under komma, kommaet flyttes ved · og : 10/100/1000, gange og dele med decimaltal
+    decimaltal(niveau, rng) {
+      const t = vaelg(rng, niveau === 1 ? ['plus', 'flyt'] : niveau === 2 ? ['gange', 'dele'] : ['deleDec', 'gange']);
+      const o = { emne: 'grundlag', type: 'decimaltal', niveau };
+      const regn = 'Regn i hovedet: ';
+      if (t === 'plus') {
+        // Én decimal plus to decimaler: 3,4 + 1,25
+        const a10 = 10 * heltal(rng, 1, 8) + heltal(rng, 1, 9), b100 = 100 * heltal(rng, 1, 4) + 10 * heltal(rng, 0, 9) + heltal(rng, 1, 9);
+        const a = a10 / 10, b = b100 / 100, f = (10 * a10 + b100) / 100;
+        const smaa = (a10 % 10) + (b100 % 100); // tiendedelene og hundrededelene lagt sammen «som hele tal»
+        Object.assign(o, { noegle: 'gDec:plus:' + a10 + ',' + b100, p: { t, a, b },
+          spoerg: regn + math(mnd(a) + mo('+') + mnd(b)),
+          forklaring: 'Stil kommaerne under hinanden: ' + math(mn(a.toFixed(2).replace('.', ',')) + mo('+') + mnd(b) + mo('=') + mnd(f)) + '.' });
+        return gOpgave(o, rng, f, [[(a10 + b100) / 100, 'Kommaerne står ikke under hinanden'], [smaa < 100 ? Math.floor(a) + Math.floor(b) + smaa / 100 : NaN, 'Tiendedele og hundrededele lagt sammen som hele tal']]);
+      }
+      if (t === 'flyt') {
+        const x = vaelg(rng, [3.75, 0.4, 12.5, 0.62, 2.05, 15.75, 0.9, 3.3, 46.25, 0.18, 7.5, 1.2, 0.35, 5.06, 28.4]);
+        const k = vaelg(rng, [10, 100, 1000]), gange = vaelg(rng, [true, false]);
+        const n = String(k).length - 1, f = gange ? x * k : x / k, tegn = gange ? '·' : ':';
+        Object.assign(o, { noegle: 'gDec:flyt:' + (gange ? 'g' : 'd') + ',' + x + ',' + k, p: { t, x, k, gange },
+          spoerg: regn + math(mnd(x) + mo(tegn) + mn(k)),
+          forklaring: (gange ? 'At gange' : 'At dele') + ' med ' + k + ' flytter kommaet ' + ['én plads', 'to pladser', 'tre pladser'][n - 1] + ' til ' + (gange ? 'højre' : 'venstre') + ': ' + math(mnd(x) + mo(tegn) + mn(k) + mo('=') + mnd(f)) + '.' });
+        return gOpgave(o, rng, f, [[gange ? x / k : x * k, 'Kommaet flyttet den forkerte vej'], [gange ? f * 10 : f / 10, 'Kommaet flyttet én plads for langt'], [gange ? f / 10 : f * 10, 'Kommaet flyttet én plads for kort']]);
+      }
+      if (t === 'gange') {
+        // Niveau 2: 0,3 · 0,4 og 1,5 · 0,6. Niveau 3: 2,4 · 0,05
+        let p = niveau >= 3 ? heltal(rng, 11, 99) : vaelg(rng, [2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19]);
+        if (p % 10 === 0) p++;
+        const q = niveau >= 3 ? vaelg(rng, [2, 3, 4, 5, 6, 8, 12, 15, 25]) : heltal(rng, 2, 9), db = niveau >= 3 ? 2 : 1;
+        const a = p / 10, b = q / Math.pow(10, db), f = p * q / Math.pow(10, 1 + db);
+        const uforkortet = (p * q / Math.pow(10, 1 + db)).toFixed(1 + db).replace('.', ','); // 0,20 før nullet strøges
+        Object.assign(o, { noegle: 'gDec:gange:' + a + ',' + b, p: { t, a, b },
+          spoerg: regn + math(mnd(a) + mo('·') + mnd(b)),
+          forklaring: 'Regn ' + math(mn(p) + mo('·') + mn(q) + mo('=') + mn(p * q)) + ', og sæt kommaet, så svaret har ' + (1 + db) + ' decimaler — lige så mange som de to tal tilsammen: ' + math(mnd(a) + mo('·') + mnd(b) + mo('=') + mn(uforkortet) + (uforkortet !== gTekst(f) ? mo('=') + mnd(f) : '')) + '.' });
+        return gOpgave(o, rng, f, [[f * 10, 'For få decimaler i svaret'], [f / 10, 'For mange decimaler i svaret'], [a + b, 'Lagt sammen i stedet for at gange']]);
+      }
+      if (t === 'dele') {
+        // At dele med et tal under 1 giver mere: 6 : 0,5 = 12
+        const d = vaelg(rng, [0.5, 0.25, 0.2, 0.1]), N = heltal(rng, 2, 15), r = Math.round(1 / d), f = N * r;
+        Object.assign(o, { noegle: 'gDec:dele:' + N + ',' + d, p: { t, N, d },
+          spoerg: regn + math(mn(N) + mo(':') + mnd(d)),
+          forklaring: 'Hvor mange gange går ' + gTekst(d) + ' op i ' + N + '? At dele med ' + gTekst(d) + ' er det samme som at gange med ' + r + ': ' + math(mn(N) + mo('·') + mn(r) + mo('=') + mn(f)) + '.' });
+        return gOpgave(o, rng, f, [[N * d, 'Ganget i stedet for at dele'], [N / Number(String(d).split('.')[1]), 'Kommaet glemt i det, der deles med']]);
+      }
+      // Decimaltal delt med decimaltal: flyt kommaet lige mange pladser i begge tal
+      const b = vaelg(rng, [0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 0.03, 0.04, 0.05, 0.06, 0.25, 1.5, 2.5]);
+      const F = vaelg(rng, [2, 3, 4, 5, 6, 7, 8, 9, 12, 15, 20, 30, 40]);
+      const a = rund(F * b), n = String(b).split('.')[1].length, s = Math.pow(10, n);
+      Object.assign(o, { noegle: 'gDec:deleDec:' + a + ',' + b, p: { t, a, b },
+        spoerg: regn + math(mnd(a) + mo(':') + mnd(b)),
+        forklaring: 'Flyt kommaet ' + (n === 1 ? 'én plads' : 'to pladser') + ' til højre i begge tal: ' + math(mnd(a) + mo(':') + mnd(b) + mo('=') + mnd(a * s) + mo(':') + mnd(b * s) + mo('=') + mn(F)) + '.' });
+      return gOpgave(o, rng, F, [[a / (b * s), 'Kommaet kun flyttet i det, der deles med'], [a * s / b, 'Kommaet kun flyttet i det, der deles'], n === 1 ? [rund(a * b), 'Ganget i stedet for at dele'] : [F / 10, 'Kommaet flyttet én plads for lidt']]);
+    },
+
+    // Enheder: længde, vægt, rumfang og tid (niveau 1–2), areal, rumfang og fart (niveau 3) — se G_ENHEDER
+    enheder(niveau, rng) {
+      const E = vaelg(rng, G_ENHEDER[niveau]);
+      const liste = niveau === 3 ? G_ENHED_TAL[3][E.id] : G_ENHED_TAL[niveau].filter((v) => {
+        const r = E.gange ? v * E.k : v / E.k;
+        return niveau === 1 ? Number.isInteger(rund(r)) : Number.isInteger(rund(r * 1000)) && r < 100;
+      });
+      const v = vaelg(rng, liste), f = E.gange ? v * E.k : v / E.k;
+      const o = { emne: 'grundlag', type: 'enheder', niveau, noegle: 'gEnh:' + E.id + ':' + v, p: { t: E.id, v },
+        spoerg: 'Hvor mange ' + E.til + ' er ' + gTekst(v) + ' ' + E.fra + '?',
+        forklaring: E.regel + ', så ' + math(mnd(v) + mo(E.gange ? '·' : ':') + mnd(E.k) + mo('=') + mnd(f)) + ' ' + E.til + '.' };
+      let fejl;
+      if (E.tid && E.gange) {
+        fejl = [[v * 100, E.id === 'tmin' ? '1 time er 60 minutter, ikke 100' : '1 minut er 60 sekunder, ikke 100'],
+          [Math.floor(v) * E.k + rund(v % 1) * 100, 'Decimalerne læst som ' + E.til], [kunKort(v / E.k), 'Delt i stedet for at gange'], [Number.isInteger(v) ? v + E.k : NaN, 'Lagt ' + E.k + ' til i stedet for at gange']];
+      } else if (E.tid) {
+        fejl = [[Math.floor(v / 60) + (v % 60) / 100, 'Minutterne skrevet efter kommaet (1 time er 60 minutter, ikke 100)'], [v * 60, 'Ganget i stedet for at dele'], [kunKort(v / 100), 'Delt med 100 i stedet for med 60']];
+      } else if (E.k === 3.6) {
+        fejl = E.gange ? [[v * 3600, 'Glemt at dele med 1000 (meter → km)'], [v * 60, 'Ganget med 60 i stedet for med 3,6'], [kunKort(v / 3.6), 'Delt med 3,6 i stedet for at gange'], [v * 36, 'Kommaet glemt i 3,6']]
+          : [[v * 3.6, 'Ganget med 3,6 i stedet for at dele'], [kunKort(v / 60), 'Delt med 60'], [kunKort(v * 1000 / 60), 'Meter pr. minut i stedet for pr. sekund'], [kunKort(v / 36), 'Kommaet glemt i 3,6']];
+      } else if (E.id === 'm2cm2' || E.id === 'ham2') {
+        fejl = [[v * 100, 'Ganget med 100 som for længder'], [f / 10, 'Én nul for lidt'], [f * 10, 'Én nul for meget']];
+      } else if (E.id === 'cm2m2') {
+        fejl = [[v / 100, 'Delt med 100 som for længder'], [f * 10, 'Én nul for lidt i divisionen'], [f / 10, 'Én nul for meget i divisionen']];
+      } else if (E.gange) {
+        fejl = [[f * 10, 'Én nul for meget'], [f / 10, 'Én nul for lidt'], [v / E.k, 'Delt i stedet for at gange']];
+      } else {
+        fejl = [[v * E.k, 'Ganget i stedet for at dele'], [f * 10, 'Én nul for lidt i divisionen'], [f / 10, 'Én nul for meget i divisionen']];
+      }
+      return gOpgave(o, rng, f, fejl);
+    },
+
+    // Areal og omkreds: rektangel og kvadrat (1), trekant, parallelogram og cirkel (2), trapez, cirkel ud fra
+    // diameteren og et rektangel ud fra omkredsen (3). Cirklens svar skrives med π (nøglen «pi:k»).
+    arealOmkreds(niveau, rng) {
+      const t = vaelg(rng, niveau === 1 ? ['rA', 'rO', 'kA', 'kO'] : niveau === 2 ? ['trekant', 'parallelogram', 'cirkelA', 'cirkelO'] : ['trapez', 'cirkelAd', 'cirkelOd', 'rektP']);
+      const o = { emne: 'grundlag', type: 'arealOmkreds', niveau };
+      const A = ' Hvor stort er arealet i cm²?', Om = ' Hvor lang er omkredsen i cm?', pi = ' Svar med π.';
+      const ud = (noegle, p, spoerg, forklaring) => Object.assign(o, { noegle: 'gAr:' + noegle, p: Object.assign({ t }, p), spoerg, forklaring });
+      if (t === 'rA' || t === 'rO') {
+        const a = heltal(rng, 3, 15), b = heltal(rng, 2, a - 1);
+        if (t === 'rA') {
+          ud('rA:' + a + ',' + b, { a, b }, 'Et rektangel er ' + a + ' cm langt og ' + b + ' cm bredt.' + A,
+            'Areal = længde · bredde: ' + math(mn(a) + mo('·') + mn(b) + mo('=') + mn(a * b)) + ' cm².');
+          return gOpgave(o, rng, a * b, [[2 * (a + b), 'Omkredsen i stedet for arealet'], [a + b, 'Siderne lagt sammen i stedet for ganget'], [2 * a * b, 'Ganget med 2 som for omkredsen']]);
+        }
+        ud('rO:' + a + ',' + b, { a, b }, 'Et rektangel er ' + a + ' cm langt og ' + b + ' cm bredt.' + Om,
+          'Omkreds = alle fire sider: ' + math(mn(a) + mo('+') + mn(b) + mo('+') + mn(a) + mo('+') + mn(b) + mo('=') + mn(2 * (a + b))) + ' cm.');
+        return gOpgave(o, rng, 2 * (a + b), [[a * b, 'Arealet i stedet for omkredsen'], [a + b, 'Kun to af siderne'], [2 * a + b, 'Én side glemt']]);
+      }
+      if (t === 'kA' || t === 'kO') {
+        const s = heltal(rng, 3, 15);
+        if (t === 'kA') {
+          ud('kA:' + s, { s }, 'Et kvadrat har siden ' + s + ' cm.' + A, 'Areal = side · side: ' + math(mn(s) + mo('·') + mn(s) + mo('=') + mn(s * s)) + ' cm².');
+          return gOpgave(o, rng, s * s, [[4 * s, 'Omkredsen i stedet for arealet'], [2 * s, 'Siden ganget med 2 i stedet for med sig selv']]);
+        }
+        ud('kO:' + s, { s }, 'Et kvadrat har siden ' + s + ' cm.' + Om, 'Omkreds = 4 · side: ' + math(mn(4) + mo('·') + mn(s) + mo('=') + mn(4 * s)) + ' cm.');
+        return gOpgave(o, rng, 4 * s, [[s * s, 'Arealet i stedet for omkredsen'], [2 * s, 'Kun to af siderne'], [3 * s, 'Én side glemt']]);
+      }
+      if (t === 'trekant') {
+        let g = heltal(rng, 3, 14);
+        const h = heltal(rng, 2, 12);
+        if ((g * h) % 2) g++; // g · h lige, så arealet er et helt tal
+        ud('trekant:' + g + ',' + h, { g, h }, 'En trekant har grundlinjen ' + g + ' cm og højden ' + h + ' cm.' + A,
+          'Areal = ½ · grundlinje · højde: ' + math(frac(mn(1), mn(2)) + mo('·') + mn(g) + mo('·') + mn(h) + mo('=') + mn(g * h / 2)) + ' cm².');
+        return gOpgave(o, rng, g * h / 2, [[g * h, 'Glemt ½'], [g + h, 'Lagt sammen i stedet for at gange']]);
+      }
+      if (t === 'parallelogram') {
+        const g = heltal(rng, 4, 12), h = heltal(rng, 2, 9), s = h + heltal(rng, 1, 3);
+        ud('par:' + g + ',' + h + ',' + s, { g, h, s }, 'Et parallelogram har grundlinjen ' + g + ' cm og højden ' + h + ' cm. De skrå sider er ' + s + ' cm.' + A,
+          'Areal = grundlinje · højde (ikke den skrå side): ' + math(mn(g) + mo('·') + mn(h) + mo('=') + mn(g * h)) + ' cm².');
+        return gOpgave(o, rng, g * h, [[g * s, 'Brugt den skrå side i stedet for højden'], [kunKort(g * h / 2), 'Halveret som for en trekant'], [2 * (g + s), 'Omkredsen i stedet for arealet']]);
+      }
+      if (t === 'cirkelA' || t === 'cirkelO') {
+        const r = heltal(rng, 2, t === 'cirkelA' ? 10 : 12);
+        if (t === 'cirkelA') {
+          ud('cA:' + r, { r }, 'En cirkel har radius ' + r + ' cm.' + A + pi,
+            'Areal = π · r²: ' + math(mi('π') + mo('·') + sup(mn(r), mn(2)) + mo('=') + piM(r * r)) + ' cm².');
+          return opgave(o, rng, piv(r * r), [piv(2 * r, 'Omkredsen 2πr i stedet for arealet'), piv(4 * r * r, 'Diameteren brugt som radius'), piv(r, 'Glemt at sætte r i anden'), piv(r * r + 1), piv(r * r - 1)]);
+        }
+        ud('cO:' + r, { r }, 'En cirkel har radius ' + r + ' cm.' + Om + pi,
+          'Omkreds = 2 · π · r: ' + math(mn(2) + mo('·') + mi('π') + mo('·') + mn(r) + mo('=') + piM(2 * r)) + ' cm.');
+        return opgave(o, rng, piv(2 * r), [piv(r * r, 'Arealet πr² i stedet for omkredsen'), piv(r, 'Glemt at gange med 2'), piv(4 * r, 'Diameteren brugt som radius'), piv(2 * r + 1), piv(2 * r - 1)]);
+      }
+      if (t === 'trapez') {
+        const a = heltal(rng, 2, 9), b = a + heltal(rng, 1, 8);
+        let h = heltal(rng, 2, 10);
+        if (((a + b) * h) % 2) h++;
+        const f = (a + b) * h / 2;
+        ud('trapez:' + a + ',' + b + ',' + h, { a, b, h }, 'Et trapez har de parallelle sider ' + a + ' cm og ' + b + ' cm og højden ' + h + ' cm.' + A,
+          'Areal = ½ · (de to parallelle sider lagt sammen) · højde: ' + math(frac(mn(1), mn(2)) + mo('·') + par(mn(a) + mo('+') + mn(b)) + mo('·') + mn(h) + mo('=') + mn(f)) + ' cm².');
+        return gOpgave(o, rng, f, [[(a + b) * h, 'Glemt ½'], [b * h, 'Kun den længste af de parallelle sider'], [a * h, 'Kun den korteste af de parallelle sider']]);
+      }
+      if (t === 'cirkelAd') {
+        const d = vaelg(rng, [4, 6, 8, 10, 12, 14, 16, 18, 20]), r = d / 2;
+        ud('cAd:' + d, { d }, 'En cirkel har diameteren ' + d + ' cm.' + A + pi,
+          'Radius er det halve af diameteren, ' + r + ' cm: ' + math(mi('π') + mo('·') + sup(mn(r), mn(2)) + mo('=') + piM(r * r)) + ' cm².');
+        return opgave(o, rng, piv(r * r), [piv(d * d, 'Diameteren brugt som radius'), piv(d, 'Omkredsen πd i stedet for arealet'), piv(d * d / 2, 'Diameteren i anden delt med 2'), piv(r * r + 1), piv(r * r - 1)]);
+      }
+      if (t === 'cirkelOd') {
+        const d = heltal(rng, 3, 20);
+        ud('cOd:' + d, { d }, 'En cirkel har diameteren ' + d + ' cm.' + Om + pi,
+          'Omkreds = π · diameter: ' + math(mi('π') + mo('·') + mn(d) + mo('=') + piM(d)) + ' cm.');
+        return opgave(o, rng, piv(d), [piv(2 * d, 'Diameteren brugt som radius'), d % 2 ? null : piv(d * d / 4, 'Arealet i stedet for omkredsen'), piv(d * d, 'Diameteren sat i anden'), piv(d + 1), piv(d - 1)]);
+      }
+      // Rektangel ud fra omkredsen og den ene side
+      const a = heltal(rng, 2, 12);
+      let b = heltal(rng, 2, 12);
+      if (b === a) b++;
+      const P = 2 * (a + b);
+      ud('rektP:' + P + ',' + a, { P, a }, 'Et rektangel har omkredsen ' + P + ' cm. Den ene side er ' + a + ' cm.' + A,
+        'To sider (én af hver) er tilsammen ' + math(mn(P) + mo(':') + mn(2) + mo('=') + mn(a + b)) + ' cm, så den anden side er ' + math(mn(a + b) + mo('−') + mn(a) + mo('=') + mn(b)) + ' cm, og arealet er ' + math(mn(a) + mo('·') + mn(b) + mo('=') + mn(a * b)) + ' cm².');
+      return gOpgave(o, rng, a * b, [[a * (P - a), 'Omkredsen minus ' + a + ' brugt som den anden side'], [a * (a + b), 'Halvdelen af omkredsen brugt som den anden side'], [2 * a * b, 'Begge de ukendte sider brugt som én']]);
+    },
+
+    // Negative tal: tallinjen (1), minus minus, gange og dele (2), regnehierarki, tre faktorer og −a² mod (−a)² (3)
+    negativeTal(niveau, rng) {
+      const t = vaelg(rng, niveau === 1 ? ['negPlus', 'overNul', 'negMinus'] : niveau === 2 ? ['minusMinus', 'gange', 'dele'] : ['hier', 'tre', 'kvadrat']);
+      const o = { emne: 'grundlag', type: 'negativeTal', niveau };
+      let p, k, udtryk, f, forkl, fejl;
+      if (niveau === 1) {
+        const a = heltal(rng, 2, 20), b = t === 'overNul' ? a + heltal(rng, 1, 15) : heltal(rng, 2, 20);
+        p = { t, a, b }; k = a + ',' + b;
+        if (t === 'negPlus') {
+          udtryk = mn(-a) + mo('+') + mn(b); f = b - a; forkl = 'Start ved ' + gTekst(-a) + ' på tallinjen, og gå ' + b + ' frem: ';
+          fejl = [[-f, 'Forkert fortegn'], [-a - b, 'Trukket fra i stedet for at lægge til'], [a + b, 'Minusset foran ' + a + ' er glemt']];
+        } else if (t === 'overNul') {
+          udtryk = mn(a) + mo('−') + mn(b); f = a - b; forkl = 'Start ved ' + a + ', og gå ' + b + ' tilbage — forbi nul: ';
+          fejl = [[b - a, 'Forkert fortegn: svaret er under nul'], [-(a + b), 'Begge tal regnet som negative'], [a + b, 'Lagt sammen i stedet for at trække fra']];
+        } else {
+          udtryk = mn(-a) + mo('−') + mn(b); f = -a - b; forkl = 'Start ved ' + gTekst(-a) + ', og gå ' + b + ' længere ned: ';
+          fejl = [[a + b, 'Forkert fortegn'], [b - a, 'Regnet som ' + gTekst(-a) + ' + ' + b], [a - b, 'Minusset foran ' + a + ' er glemt']];
+        }
+        forkl += math(udtryk + mo('=') + mn(f)) + '.';
+      } else if (t === 'minusMinus') {
+        const a = vaelg(rng, [1, -1]) * heltal(rng, 2, 12), b = heltal(rng, 2, 12);
+        p = { t, a, b }; k = a + ',' + b;
+        udtryk = mn(a) + mo('−') + par(mn(-b)); f = a + b;
+        forkl = 'Minus minus giver plus: ' + math(udtryk + mo('=') + mn(a) + mo('+') + mn(b) + mo('=') + mn(f)) + '.';
+        fejl = [[a - b, 'Minus minus giver plus — ikke minus'], [-f, 'Forkert fortegn'], [-a + b, 'Fortegnet på det første tal skiftet']];
+      } else if (t === 'gange' || t === 'dele') {
+        const a = heltal(rng, 2, 12), b = heltal(rng, 2, 12), [sa, sb] = vaelg(rng, [[-1, 1], [1, -1], [-1, -1]]);
+        const plus = sa * sb > 0;
+        if (t === 'gange') {
+          const x = sa * a, y = sb * b;
+          p = { t, x, y }; k = x + ',' + y; udtryk = mn(x) + mo('·') + led(y); f = x * y;
+          forkl = (plus ? 'Minus gange minus giver plus: ' : 'Minus gange plus giver minus: ') + math(udtryk + mo('=') + mn(f)) + '.';
+          fejl = [[-f, plus ? 'Minus gange minus giver plus' : 'Minus gange plus giver minus'], [x + y, 'Lagt sammen i stedet for at gange']];
+        } else {
+          const x = sa * a * b, y = sb * b;
+          p = { t, x, y }; k = x + ',' + y; udtryk = mn(x) + mo(':') + led(y); f = x / y;
+          forkl = (plus ? 'Minus delt med minus giver plus: ' : 'Minus og plus giver minus: ') + math(udtryk + mo('=') + mn(f)) + '.';
+          fejl = [[-f, plus ? 'Minus delt med minus giver plus' : 'Minus delt med plus giver minus'], [x * y, 'Ganget i stedet for at dele']];
+        }
+      } else if (t === 'hier') {
+        const a = heltal(rng, 2, 12), b = heltal(rng, 2, 9), c = heltal(rng, 2, 9);
+        p = { t, a, b, c }; k = a + ',' + b + ',' + c;
+        udtryk = mn(-a) + mo('+') + mn(b) + mo('·') + par(mn(-c)); f = -a - b * c;
+        forkl = 'Gange før plus: ' + math(mn(b) + mo('·') + par(mn(-c)) + mo('=') + mn(-b * c)) + ', og ' + math(mn(-a) + mo('+') + par(mn(-b * c)) + mo('=') + mn(f)) + '.';
+        fejl = [[(b - a) * -c, 'Regnet fra venstre: gange kommer før plus'], [-a + b * c, 'Forkert fortegn på produktet'], [a + b * c, 'Fortegnene glemt']];
+      } else if (t === 'tre') {
+        const x = [heltal(rng, 2, 6), heltal(rng, 2, 6), heltal(rng, 2, 6)], neg = heltal(rng, 1, 3);
+        bland(rng, [0, 1, 2]).slice(0, neg).forEach((i) => { x[i] = -x[i]; }); // «neg» af faktorerne bliver negative
+        p = { t, x }; k = x.join(','); udtryk = x.map((v) => led(v)).join(mo('·')); f = x[0] * x[1] * x[2];
+        forkl = 'Tæl minusserne: ' + neg + (neg === 2 ? ' er et lige antal, så svaret er positivt: ' : ' er et ulige antal, så svaret er negativt: ') + math(udtryk + mo('=') + mn(f)) + '.';
+        fejl = [[-f, 'Forkert fortegn — tæl minusserne'], [x[0] + x[1] + x[2], 'Lagt sammen i stedet for at gange']];
+      } else {
+        // −a² + (−b)²: kun a sættes i anden i −a², men hele (−b) i (−b)²
+        const a = heltal(rng, 2, 9), b = heltal(rng, 2, 9);
+        p = { t, a, b }; k = a + ',' + b;
+        udtryk = mo('−') + sup(mn(a), mn(2)) + mo('+') + sup(par(mn(-b)), mn(2)); f = b * b - a * a;
+        forkl = math(mo('−') + sup(mn(a), mn(2)) + mo('=') + mn(-a * a)) + ' (kun ' + a + ' sættes i anden), og ' + math(sup(par(mn(-b)), mn(2)) + mo('=') + mn(b * b)) + ', så ' + math(mn(-a * a) + mo('+') + mn(b * b) + mo('=') + mn(f)) + '.';
+        fejl = [[a * a + b * b, gTekst(-a) + '² regnet som (' + gTekst(-a) + ')²'], [-a * a - b * b, '(' + gTekst(-b) + ')² er positiv'], [a * a - b * b, 'Begge fortegn byttet om']];
+      }
+      Object.assign(o, { noegle: 'gNeg:' + t + ':' + k, p, spoerg: 'Regn i hovedet: ' + math(udtryk), forklaring: forkl });
+      return gOpgave(o, rng, f, fejl, true);
+    },
+
+    // Forhold: blandinger og opskrifter (1), del i forholdet og forkort et forhold (2), målestok og tre parter (3)
+    forhold(niveau, rng) {
+      const t = vaelg(rng, niveau === 1 ? ['blanding', 'opskrift'] : niveau === 2 ? ['del', 'forkort'] : ['kort', 'tre']);
+      const o = { emne: 'grundlag', type: 'forhold', niveau };
+      const forh = (...l) => math(l.map((x) => mn(x)).join(mo(':')));
+      if (t === 'blanding') {
+        const k = heltal(rng, 2, 9), x = heltal(rng, 2, 9), f = x * k;
+        Object.assign(o, { noegle: 'gForh:bl:' + k + ',' + x, p: { t, k, x },
+          spoerg: 'Saft blandes med vand i forholdet ' + forh(1, k) + '. Hvor mange dl vand skal der til ' + x + ' dl saft?',
+          forklaring: 'Til hver dl saft hører ' + k + ' dl vand: ' + math(mn(x) + mo('·') + mn(k) + mo('=') + mn(f)) + ' dl.' });
+        return gOpgave(o, rng, f, [[x * (k + 1), 'Hele blandingen i stedet for kun vandet'], [x + k, 'Lagt sammen i stedet for at gange'], [kunKort(x / k), 'Delt i stedet for at gange']]);
+      }
+      if (t === 'opskrift') {
+        const pers = vaelg(rng, [2, 4, 5, 6]), n = vaelg(rng, [3, 6, 8, 9, 10, 12, 15].filter((x) => x !== pers)), q = vaelg(rng, [25, 50, 75, 100, 150, 200]);
+        const M = q * pers, f = q * n;
+        Object.assign(o, { noegle: 'gForh:op:' + pers + ',' + n + ',' + M, p: { t, pers, n, M },
+          spoerg: 'En opskrift til ' + pers + ' personer bruger ' + M + ' g mel. Hvor mange g mel skal der bruges til ' + n + ' personer?',
+          forklaring: 'Til én person: ' + math(mn(M) + mo(':') + mn(pers) + mo('=') + mn(q)) + ' g. Til ' + n + ' personer: ' + math(mn(q) + mo('·') + mn(n) + mo('=') + mn(f)) + ' g.' });
+        return gOpgave(o, rng, f, [[M + n - pers, 'Lagt forskellen i antal personer til'], [M * n, 'Ganget med det nye antal uden at dele først'], [q, 'Kun til én person']]);
+      }
+      if (t === 'del') {
+        const [a, b] = vaelg(rng, [[1, 2], [1, 3], [2, 3], [1, 4], [3, 4], [2, 5], [3, 5], [1, 5], [4, 5], [3, 7], [2, 7]]);
+        const m = vaelg(rng, [10, 12, 15, 20, 25, 30, 40, 50, 60, 100]), N = (a + b) * m, f = b * m;
+        Object.assign(o, { noegle: 'gForh:del:' + a + ',' + b + ',' + N, p: { t, a, b, N },
+          spoerg: 'To venner deler ' + N + ' kr. i forholdet ' + forh(a, b) + '. Hvor mange kr. får den, der får mest?',
+          forklaring: 'Der er ' + math(mn(a) + mo('+') + mn(b) + mo('=') + mn(a + b)) + ' dele, og hver del er ' + math(mn(N) + mo(':') + mn(a + b) + mo('=') + mn(m)) + ' kr. Den største part er ' + math(mn(b) + mo('·') + mn(m) + mo('=') + mn(f)) + ' kr.' });
+        return gOpgave(o, rng, f, [[a * m, 'Den mindste part'], [kunHel(N / b), 'Delt med den ene side af forholdet i stedet for med summen'], [m, 'Kun én del']]);
+      }
+      if (t === 'forkort') {
+        let [u, v] = vaelg(rng, [[1, 2], [2, 3], [3, 4], [1, 3], [2, 5], [3, 5], [4, 5], [5, 6], [3, 8], [5, 8], [1, 4], [3, 7], [4, 7], [5, 7]]);
+        if (vaelg(rng, [true, false])) [u, v] = [v, u];
+        const g = heltal(rng, 2, 9), x = u * g, y = v * g;
+        const d = [2, 3].find((q) => g % q === 0 && g > q); // en fælles faktor, der kun forkorter et stykke af vejen
+        Object.assign(o, { noegle: 'gForh:fk:' + x + ',' + y, p: { t, x, y },
+          spoerg: 'Forkort forholdet ' + forh(x, y) + ' mest muligt.',
+          forklaring: 'Begge tal kan deles med ' + g + ': ' + math(mn(x) + mo(':') + mn(y) + mo('=') + mn(u) + mo(':') + mn(v)) + '.' });
+        return opgave(o, rng, forholdV(u, v), [forholdV(v, u, 'Byttet om'), d ? forholdV(x / d, y / d, 'Ikke forkortet helt') : null,
+          y - x + u > 0 ? forholdV(u, y - x + u, 'Trukket det samme fra begge tal i stedet for at dele') : null, forholdV(u, v + 1), forholdV(u + 1, v)]);
+      }
+      if (t === 'kort') {
+        const S = vaelg(rng, [10000, 20000, 25000, 50000, 100000, 200000]), c = vaelg(rng, [2, 3, 4, 5, 6, 7, 8, 12, 1.5, 2.5, 3.5, 4.5]);
+        const f = c * S / 100000;
+        Object.assign(o, { noegle: 'gForh:kort:' + S + ',' + c, p: { t, S, c },
+          spoerg: 'På et kort i målestoksforholdet 1 : ' + gTekst(S) + ' er der ' + gTekst(c) + ' cm mellem to søer. Hvor mange km er der i virkeligheden?',
+          forklaring: gTekst(c) + ' cm på kortet er ' + math(mnd(c) + mo('·') + mnd(S) + mo('=') + mnd(c * S)) + ' cm i virkeligheden. 1 km = ' + gTekst(100000) + ' cm, så det er ' + gTekst(f) + ' km.' });
+        return gOpgave(o, rng, f, [[f * 10, 'Én nul for meget'], [f / 10, 'Én nul for lidt'], [c * S / 100, 'Svaret i meter, ikke i km']]);
+      }
+      // Tre parter
+      const [a, b, c] = vaelg(rng, [[1, 2, 3], [2, 3, 5], [1, 2, 5], [2, 3, 4], [1, 3, 4], [3, 4, 5], [1, 2, 4], [1, 3, 5], [2, 5, 7]]);
+      const m = vaelg(rng, [10, 12, 15, 20, 25, 30, 50, 100]), N = (a + b + c) * m, f = c * m;
+      Object.assign(o, { noegle: 'gForh:tre:' + [a, b, c, N].join(','), p: { t, a, b, c, N },
+        spoerg: 'Tre søskende deler ' + N + ' kr. i forholdet ' + forh(a, b, c) + '. Hvor mange kr. får den, der får mest?',
+        forklaring: 'Der er ' + (a + b + c) + ' dele i alt, og hver del er ' + math(mn(N) + mo(':') + mn(a + b + c) + mo('=') + mn(m)) + ' kr. Den største part er ' + math(mn(c) + mo('·') + mn(m) + mo('=') + mn(f)) + ' kr.' });
+      return gOpgave(o, rng, f, [[kunHel(N * c / (b + c)), 'Glemt den mindste part, da delene blev talt'], [m, 'Kun én del'], [a * m, 'Den mindste part'], [kunHel(N / c), 'Delt med den ene side af forholdet']]);
+    },
+
+    // Middeltal, median og typetal
+    gennemsnit(niveau, rng) {
+      const t = niveau === 1 ? 'middel' : vaelg(rng, niveau === 2 ? ['median', 'typetal'] : ['medianLige', 'mangler']);
+      const o = { emne: 'grundlag', type: 'gennemsnit', niveau };
+      const tilfaeldige = (n, fra, til) => Array.from({ length: n }, () => heltal(rng, fra, til));
+      if (t === 'middel') {
+        const n = vaelg(rng, [4, 5]), l = tilfaeldige(n, 1, 20);
+        l[n - 1] += (n - sum(l) % n) % n; // summen går op i antallet
+        const S = sum(l), f = S / n, s = sorteret(l);
+        const median = n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2;
+        Object.assign(o, { noegle: 'gGns:m:' + l.join(','), p: { t, tal: l },
+          spoerg: 'Hvad er middeltallet (gennemsnittet) af ' + listeTekst(l) + '?',
+          forklaring: 'Læg tallene sammen, og del med antallet: ' + math(frac(l.map((x) => mn(x)).join(mo('+')), mn(n)) + mo('=') + frac(mn(S), mn(n)) + mo('=') + mn(f)) + '.' });
+        return gOpgave(o, rng, f, [[S, 'Summen — glemt at dele med antallet'], [kunKort(S / (n - 1)), 'Delt med én for lidt'], [median, 'Medianen i stedet for middeltallet'], [s[n - 1] - s[0], 'Variationsbredden (største minus mindste)']]);
+      }
+      if (t === 'median') {
+        const n = vaelg(rng, [5, 7]), l = tilfaeldige(n, 1, 30), s = sorteret(l), mid = (n - 1) / 2;
+        for (let i = 0; i < n && l[mid] === s[mid]; i++) l.push(l.shift()); // det midterste i listen er ikke medianen
+        Object.assign(o, { noegle: 'gGns:md:' + l.join(','), p: { t, tal: l },
+          spoerg: 'Hvad er medianen af ' + listeTekst(l) + '?',
+          forklaring: 'Sortér tallene: ' + s.join(', ') + '. Det midterste tal er ' + s[mid] + '.' });
+        return gOpgave(o, rng, s[mid], [[l[mid], 'Det midterste tal, uden at sortere først'], [kunKort(sum(l) / n), 'Middeltallet i stedet for medianen'], [s[n - 1] - s[0], 'Variationsbredden (største minus mindste)']]);
+      }
+      if (t === 'typetal') {
+        const M = heltal(rng, 1, 15), andre = [];
+        while (andre.length < 4) { const x = heltal(rng, 1, 15); if (x !== M && andre.indexOf(x) < 0) andre.push(x); }
+        const l = bland(rng, [M, M, M].concat(andre)), s = sorteret(l);
+        Object.assign(o, { noegle: 'gGns:tt:' + l.join(','), p: { t, tal: l },
+          spoerg: 'Hvad er typetallet af ' + listeTekst(l) + '?',
+          forklaring: 'Typetallet er det tal, der står flest gange: ' + M + ' står der 3 gange.' });
+        return gOpgave(o, rng, M, [[3, 'Antallet af gange, ikke tallet selv'], [s[3], 'Medianen i stedet for typetallet'], [s[6], 'Det største tal']]);
+      }
+      if (t === 'medianLige') {
+        const l = tilfaeldige(6, 1, 30), s = sorteret(l), f = (s[2] + s[3]) / 2;
+        Object.assign(o, { noegle: 'gGns:ml:' + l.join(','), p: { t, tal: l },
+          spoerg: 'Hvad er medianen af ' + listeTekst(l) + '?',
+          forklaring: 'Sortér tallene: ' + s.join(', ') + '. Der er to midterste tal, ' + s[2] + ' og ' + s[3] + ', så medianen er ' + math(frac(mn(s[2]) + mo('+') + mn(s[3]), mn(2)) + mo('=') + mnd(f)) + '.' });
+        return gOpgave(o, rng, f, [[(l[2] + l[3]) / 2, 'De to midterste, uden at sortere først'], [s[2], 'Kun det ene af de to midterste tal'], [s[3], 'Kun det ene af de to midterste tal'], [kunKort(sum(l) / 6), 'Middeltallet i stedet for medianen']]);
+      }
+      // Det manglende tal, når gennemsnittet er kendt
+      const l = tilfaeldige(4, 1, 20);
+      l[3] += (4 - sum(l) % 4) % 4;
+      const M = sum(l) / 4, [a, b, c, x] = l, tre = a + b + c;
+      Object.assign(o, { noegle: 'gGns:mg:' + l.join(','), p: { t, tal: [a, b, c], M },
+        spoerg: 'Gennemsnittet af fire tal er ' + M + '. Tre af tallene er ' + a + ', ' + b + ' og ' + c + '. Hvad er det fjerde tal?',
+        forklaring: 'De fire tal giver tilsammen ' + math(mn(4) + mo('·') + mn(M) + mo('=') + mn(4 * M)) + ', så det fjerde er ' + math(mn(4 * M) + mo('−') + mn(tre) + mo('=') + mn(x)) + '.' });
+      return gOpgave(o, rng, x, [[M, 'Gennemsnittet selv'], [3 * M - tre, 'Ganget med 3 i stedet for med 4'], [4 * M, 'Summen af alle fire tal'], [kunKort(tre / 3), 'Gennemsnittet af de tre kendte tal']]);
     },
   };
 
@@ -1891,12 +2407,55 @@
       1: ['prikprodukt', 'ortogonal', 'skaering'],
       2: ['prikprodukt', 'ortogonal', 'cirkel', 'determinant', 'parallel', 'cirkelOmskriv', 'vektorK', 'parallelogramAreal', 'parameterLinje', 'linjeLigning', 'skaering', 'difflignMere'],
       3: ['cirkel', 'prikprodukt', 'ortogonal', 'determinant', 'parallel', 'difflign', 'cirkelOmskriv', 'vektorK', 'parallelogramAreal', 'projektion', 'parameterLinje', 'linjeLigning', 'distFormel', 'skaering', 'difflignMere', 'difflignTangent'] } },
+    // Grundlag (fase 4 D1, 28-10-2026): folkeskolens regning, niveau 1 = 7. kl., 2 = 8. kl., 3 = 9. kl. (FP9 uden
+    // hjælpemidler). En almindelig verden i dagens dosis, prøven og på «Vælg verden», men udenforStigen: den tæller ikke
+    // med i vækststigen (beregnTrin), og en dosis i de andre verdener henter ikke repetition herfra. D2 ændrer ikke
+    // stigen (docs/VOKSEN-PAKKER.md, åbent valg).
+    grundlag: { navn: 'Grundlag', e: '🧮', maxNiveau: 3, udenforStigen: true, typer: {
+      1: ['procent', 'broekAfTal', 'decimaltal', 'enheder', 'arealOmkreds', 'negativeTal', 'forhold', 'gennemsnit'],
+      2: ['procent', 'broekAfTal', 'decimaltal', 'enheder', 'arealOmkreds', 'negativeTal', 'forhold', 'gennemsnit'],
+      3: ['procent', 'broekAfTal', 'decimaltal', 'enheder', 'arealOmkreds', 'negativeTal', 'forhold', 'gennemsnit'] } },
   };
+  // Verdenerne på vækststigen: alle undtagen dem, der står udenforStigen (Grundlag). Pakken («Jeg træner til») flytter
+  // ikke stigen — så traening.trin aldrig hopper ved et pakkeskift (D2, bevidst udskudt).
+  const STIGE_EMNER = Object.keys(VOKSEN_EMNER).filter((k) => !VOKSEN_EMNER[k].udenforStigen);
+
+  // «Jeg træner til» (fase 4 D2, 28-10-2026): fire pakker. emner = verdenerne, dagens dosis byder på (og henter
+  // repetition fra); laer = de afsnitsniveauer (AFSNIT[].pakke), Lær viser. Facit: stx-læreplanerne for Matematik C, B
+  // og A (august 2024) og Fælles Mål/læseplanen for matematik efter 9. klasse — se docs/VOKSEN-PAKKER.md.
+  // Gemmes som traening.pakke (valgfrit; gem.js har de samme id'er). Uden pakke er alt som før D2. Rækkefølgen er
+  // niveauets rækkefølge. C og B skjuler kun A-afsnit i Lær (Fables forslag D); om C også skal skjule B-afsnit, er åbent.
+  const PAKKER = [
+    { id: '9kl', navn: '9. kl.', om: 'Folkeskolens afgangsprøve', emner: ['grundlag', 'regnetricks', 'broeker', 'ligninger', 'trekanter', 'funktioner'], laer: ['9kl'] },
+    { id: 'c', navn: 'C', om: 'Gymnasiets C-niveau', emner: ['regnetricks', 'broeker', 'ligninger', 'trekanter', 'funktioner'], laer: ['9kl', 'c', 'b'] },
+    { id: 'b', navn: 'B', om: 'Gymnasiets B-niveau', emner: ['regnetricks', 'broeker', 'ligninger', 'trekanter', 'funktioner', 'differential'], laer: ['9kl', 'c', 'b'] },
+    { id: 'a', navn: 'A', om: 'Gymnasiets A-niveau', emner: ['regnetricks', 'broeker', 'ligninger', 'trekanter', 'funktioner', 'differential', 'integral', 'abonus'], laer: ['9kl', 'c', 'b', 'a'] },
+  ];
+  // Pakken med id'et — null for ingen pakke og for et ukendt id (så er alt som før D2)
+  const pakkeAf = (id) => PAKKER.find((p) => p.id === id) || null;
+  // Har den voksne øvet i verdenen? (emnet oprettes ved første svar; et importeret niveau over 1 tæller også)
+  const harFremgang = (e) => !!e && typeof e === 'object' && ((Number(e.ialt) || 0) > 0 || (Number(e.niveau) || 1) > 1 || e.mestret === true);
+  // Hvordan verdenen vises på «Vælg verden — dagens dosis»: 'vis' (i pakken, eller ingen pakke), 'nedtonet' (uden for
+  // pakken, men øvet: intet med fremgang må forsvinde, og den kan stadig vælges) eller 'skjult' (uden for pakken, aldrig øvet)
+  function verdenVisning(emne, pakke, emner) {
+    const P = pakkeAf(pakke);
+    if (!P || P.emner.indexOf(emne) >= 0) return 'vis';
+    return harFremgang(emner && emner[emne]) ? 'nedtonet' : 'skjult';
+  }
+  // Kortene på «Vælg verden — dagens dosis» i rækkefølge: pakkens verdener i samme orden som VOKSEN_EMNER, så de
+  // nedtonede bagerst.
+  // Uden pakke: alle verdener som før D2. → [{ id, nedtonet }]
+  function dosisVerdener(pakke, emner) {
+    const ids = Object.keys(VOKSEN_EMNER);
+    const vis = ids.filter((k) => verdenVisning(k, pakke, emner) === 'vis').map((id) => ({ id, nedtonet: false }));
+    return vis.concat(ids.filter((k) => verdenVisning(k, pakke, emner) === 'nedtonet').map((id) => ({ id, nedtonet: true })));
+  }
 
   // Vækststigen (forslag B, 15-10-2026): den voksne står på ét af 15 trin, og Codex' ven vokser med trinet (grafik.js
   // `trin`, kilderne i grafik-kilde/trin/). Skoletrinene er kun et billede på rejsen; 1. klasse udeladt (Jimmys ønske).
   // Trinet regnes af emnernes egne niveauer, som stadig går op og ned hver for sig: niveau 1 → trin 1, 2 → 6, 3 → 11 og
-  // mestret → 15, og stigen er gennemsnittet over de 8 emner (et emne, der ikke er prøvet, tæller som niveau 1).
+  // mestret → 15, og stigen er gennemsnittet over de 8 emner i STIGE_EMNER (et emne, der ikke er prøvet, tæller som
+  // niveau 1; Grundlag tæller ikke med, og pakken flytter ikke stigen).
   // Det gemte trin (traening.trin) er det højeste nåede, så vennen aldrig bliver mindre, når et emne går et niveau ned.
   const VOKSEN_TRIN = [
     { id: 'boernehave', navn: 'Børnehave' }, { id: '0-klasse', navn: '0. klasse' }, { id: '2-klasse', navn: '2. klasse' },
@@ -1913,7 +2472,7 @@
     return EMNE_TRIN[(Number.isInteger(e.niveau) ? Math.min(3, Math.max(1, e.niveau)) : 1) - 1];
   }
   function beregnTrin(emner) {
-    const ids = Object.keys(VOKSEN_EMNER);
+    const ids = STIGE_EMNER;
     const sum = ids.reduce((s, k) => s + emneTrin(emner && emner[k]), 0);
     return Math.min(MAX_TRIN, Math.max(1, Math.floor(sum / ids.length)));
   }
@@ -1969,18 +2528,30 @@
   // Rykker svaret emnet op eller ned (O.opdaterNiveau)? På Auto: altid, som før. På Let/Normal/Svær kun, når opgaven er
   // på emnets eget niveau — en let dag koster ingen fremgang, og en svær dag kan ikke løfte niveauet på et par gæt.
   // Det samme gælder en gentagelse fra en Let-, Normal- eller Svær-dag (o.fast), når den kommer igen på en Auto-dag.
-  const taellerINiveau = (o, eget, svaerhed) => (!fastNiveau(svaerhed) && !(o && o.fast === true)) || (!!o && o.niveau === klemNiveau(o.emne, eget));
+  // Og typen skal høre til emnets niveau: bogens sæt mærker også typer, der ikke kender niveauer (regneord «niveau 3»
+  // er en niveau 1-opgave), og dem må hverken løfte eller sænke emnet.
+  const iEmnetsNiveau = (o) => !!VOKSEN_EMNER[o.emne] && (VOKSEN_EMNER[o.emne].typer[o.niveau] || []).indexOf(o.type) >= 0;
+  const taellerINiveau = (o, eget, svaerhed) => (!fastNiveau(svaerhed) && !(o && o.fast === true)) || (!!o && o.niveau === klemNiveau(o.emne, eget) && iEmnetsNiveau(o));
 
   // Dagens dosis: 5 opgaver — 3 fra den valgte verden, 2 til repetition (fejlede opgaver eller andre åbne verdener).
   // Fase 1 (19-10-2026): nylige = nøglerne på de senest viste opgaver (traening.nylige). De undgås, og der er højst
   // 2 af samme type i dosen — så længe det kan lade sig gøre (efter 50 forsøg tages, hvad der kommer).
-  function lavDosis(valgt, niveauer, rng, gentag, nylige) {
+  // pakke (fase 4 D2): «Jeg træner til» (PAKKER-id). Repetitionen fra andre verdener kommer kun fra pakkens verdener —
+  // stadig på samme side af stigen. Gentagelserne (fejlede opgaver) følger kun stigens side. Uden pakke (eller med et
+  // ukendt id) er dosen den samme som før D2, bit for bit (test-voksen).
+  function lavDosis(valgt, niveauer, rng, gentag, nylige, pakke) {
+    const P = pakkeAf(pakke);
     const nyligt = new Set(Array.isArray(nylige) ? nylige : []);
+    // Repetitionen kommer fra verdener på samme side af stigen: en dosis i de 8 gamle verdener er som før D1, og en dosis
+    // i Grundlag henter også repetitionen fra Grundlag (fase 4 D1) — også gentagelserne (code-review 28-10; en migreret
+    // gentagelse uden emne hører til de gamle)
+    const udenfor = (e) => !!(VOKSEN_EMNER[e] && VOKSEN_EMNER[e].udenforStigen);
     // Højst 2 gentagelser — dem, der ikke kan bygges (ukendt type), springes over, så de ikke blokerer køen.
     // De bygges først, så de valgte opgaver kan holde sig fra deres nøgle og type.
     const igen = [];
     for (const p of gentag || []) {
       if (igen.length >= 2) break;
+      if (!p || udenfor(p.emne) !== udenfor(valgt)) continue;
       const o = genskab(p);
       if (o && !igen.some((x) => x.noegle === o.noegle)) { o.gentaget = true; igen.push(o); }
     }
@@ -1999,7 +2570,7 @@
       return lavVoksenOpgave(vaelg(rng, E.typer[n]), n, rng);
     };
     for (let f = 0; valgte.length < 3 && f < 100; f++) tilfoej(valgte, fra(valgt), f < 50);
-    const andreEmner = Object.keys(niveauer).filter((e) => e !== valgt && VOKSEN_EMNER[e]);
+    const andreEmner = Object.keys(niveauer).filter((e) => e !== valgt && VOKSEN_EMNER[e] && udenfor(e) === udenfor(valgt) && (!P || P.emner.indexOf(e) >= 0));
     for (let f = 0; valgte.length + igen.length + andre.length < 5 && f < 100; f++) tilfoej(andre, fra(andreEmner.length ? vaelg(rng, andreEmner) : valgt), f < 50);
     return valgte.concat(igen, andre);
   }
@@ -2048,6 +2619,12 @@
       'Determinant: ' + math(sub(ha, 1) + sub(hb, 2) + mo('−') + sub(ha, 2) + sub(hb, 1)) + '. Er den 0, er vektorerne parallelle.',
       'Cirkel med centrum (a, b) og radius r: ' + math(sup(par(hx + mo('−') + ha), mn(2)) + mo('+') + sup(par(mi('y') + mo('−') + hb), mn(2)) + mo('=') + sup(mi('r'), mn(2))),
       math(mi("y′") + mo('=') + mi('k') + mi('y')) + ' har løsningerne ' + math(mi('f') + par(hx) + mo('=') + mi('c') + sup(mi('e'), mi('k') + hx)) + '.',
+    ],
+    grundlag: [
+      'Procent: p % betyder ' + math(frac(mi('p'), mn(100))) + '. En stigning eller et fald regnes i forhold til den gamle værdi (25 % mere = gange med 1,25).',
+      math(frac(ha, hb)) + ' af et tal: del med ' + math(hb) + ', og gang med ' + math(ha) + '. Minus gange minus giver plus, og ' + math(ha + mo('−') + par(mo('−') + hb) + mo('=') + ha + mo('+') + hb) + '.',
+      'Areal: rektangel ' + math(mi('l') + mo('·') + hb) + ', trekant ' + math(frac(mn(1), mn(2)) + mo('·') + mi('g') + mo('·') + mi('h')) + ', cirkel ' + math(mi('π') + sup(mi('r'), mn(2))) + '. Cirklens omkreds: ' + math(mn(2) + mi('π') + mi('r')) + '.',
+      'Middeltal: summen delt med antallet. Median: det midterste tal, når tallene er sorteret. Typetal: det tal, der står flest gange.',
     ],
   };
 
@@ -2186,6 +2763,9 @@
   //  «📘 Lær»: bogens 8 kapitler og 33 trin i præcis bogens rækkefølge (docs/VOKSEN-LAER.md).
   //  Huskekort og eksempler er skrevet med egne ord og egne tal — intet er bogens tekst.
   //  typer: generatorer til 3–5 opgaver (eksisterende + nye). valgfri: udgået ifølge bogens egen prøveliste.
+  //  pakke (fase 4 D2): det laveste niveau, hvis læreplan dækker afsnittets kerne ('9kl', 'c', 'b' eller 'a' — se
+  //  PAKKER og docs/VOKSEN-PAKKER.md). Efter læreplanerne fra 2024, ikke bogens A-mærker (bogen er fra 2016): fx er
+  //  cirklen, afstand punkt–linje og skæringer B-stof nu. Et kapitel vises, når mindst ét af dets afsnit gør.
   // =====================================================================
   const KAPITLER = [
     { id: 'I', navn: 'De fire regningsarter', e: '➕' },
@@ -2198,103 +2778,104 @@
     { id: 'VIII', navn: 'Differentialligninger (A)', e: '🌱' },
   ];
   const AFSNIT = [
-    { id: 'I.1', kap: 'I', titel: 'Regningsarternes hierarki', typer: ['regneord', 'reducer', 'hierarki', 'fortegn'],
+    { id: 'I.1', kap: 'I', pakke: '9kl', titel: 'Regningsarternes hierarki', typer: ['regneord', 'reducer', 'hierarki', 'fortegn'],
       husk: ['Først parenteser, så potenser, så gange og dele, til sidst plus og minus (fra venstre).', 'Sum (+), differens (−), produkt (·) og kvotient (:).', 'To ens fortegn giver plus, to forskellige minus. xy betyder x·y.'],
       eksempel: ['9 + 4·5 − 18 : 3', 'Gange og dele først: 4·5 = 20 og 18 : 3 = 6.', '9 + 20 − 6 = 23.', 'Med bogstaver: 5y + 2·4y − 3y·2 = 5y + 8y − 6y = 7y.', '(−2)·(−3)·(−1): tre minusser giver minus, så −6.'] },
-    { id: 'I.2', kap: 'I', titel: 'Parenteser', typer: ['parentes', 'findFejlen'],
+    { id: 'I.2', kap: 'I', pakke: '9kl', titel: 'Parenteser', typer: ['parentes', 'findFejlen'],
       husk: ['+(a + b) = a + b, men −(a − b) = −a + b: minus skifter fortegn på hvert led.', 'k(a − b) = ka − kb: gang hvert led.', '(a + b)(c + d) = ac + ad + bc + bd. Baglæns: sæt en fælles faktor uden for parentes.'],
       eksempel: ['−(4x − 7) + 3(x − 2)', 'Hæv parenteserne: −4x + 7 + 3x − 6.', 'Saml leddene: −x + 1.', '(x + 4)(x − 1) = x² − x + 4x − 4 = x² + 3x − 4.', 'Baglæns: 6x + 9 = 3(2x + 3).'] },
-    { id: 'I.3', kap: 'I', titel: 'Kvadratsætninger', typer: ['kvadratsaetning', 'kvadratTrick', 'findFejlen'],
+    { id: 'I.3', kap: 'I', pakke: 'c', titel: 'Kvadratsætninger', typer: ['kvadratsaetning', 'kvadratTrick', 'findFejlen'],
       husk: ['(a ± b)² = a² + b² ± 2ab.', '(a + b)(a − b) = a² − b².', 'De to kvadrater har altid plus. Begge kan bruges baglæns til at faktorisere.'],
       eksempel: ['(x + 5)² = x² + 25 + 2·x·5 = x² + 10x + 25.', '(3x − 2)² = 9x² + 4 − 12x.', '(x + 6)(x − 6) = x² − 36.', 'Baglæns: x² − 14x + 49 — 49 = 7² og 14x = 2·x·7, så (x − 7)².'] },
-    { id: 'I.4a', kap: 'I', titel: 'Brøker: forkorte og forlænge', typer: ['forkortBroek', 'forkort'],
+    { id: 'I.4a', kap: 'I', pakke: '9kl', titel: 'Brøker: forkorte og forlænge', typer: ['forkortBroek', 'forkort'],
       husk: ['En brøk ændrer ikke værdi, når tæller og nævner ganges eller deles med det samme tal.', 'Man kan kun forkorte med en faktor i hele tælleren og hele nævneren — aldrig med et enkelt led.'],
       eksempel: ['18/24: begge kan deles med 6.', '18/24 = 3/4.', 'Forlæng 5/8 til nævneren 40: gang med 5 → 25/40.', '(x² − 16)/(x + 4) = (x + 4)(x − 4)/(x + 4) = x − 4.'] },
-    { id: 'I.4b', kap: 'I', titel: 'Brøk gange og dele med et tal', typer: ['broekTal'],
+    { id: 'I.4b', kap: 'I', pakke: '9kl', titel: 'Brøk gange og dele med et tal', typer: ['broekTal'],
       husk: ['Brøk gange tal: gang tælleren.', 'Brøk divideret med tal: gang nævneren.', 'Et minus foran en brøk: −a/b = (−a)/b = a/(−b).'],
       eksempel: ['5 · 2/7 = 10/7.', '(6/5) : 3 = 6/(5·3) = 6/15.', 'Forkort: 6/15 = 2/5.'] },
-    { id: 'I.4c', kap: 'I', titel: 'Gange og dele med brøker', typer: ['broekGangeDele'],
+    { id: 'I.4c', kap: 'I', pakke: '9kl', titel: 'Gange og dele med brøker', typer: ['broekGangeDele'],
       husk: ['a/b · c/d = (a·c)/(b·d).', 'At dele med en brøk er at gange med den omvendte: a/b : c/d = (a·d)/(b·c).', 'Et tal er en brøk med nævneren 1.'],
       eksempel: ['3/4 · 2/9 = 6/36 = 1/6.', '2/5 : 4/15 — vend den anden brøk.', '2/5 · 15/4 = 30/20 = 3/2.'] },
-    { id: 'I.4d', kap: 'I', titel: 'Plus og minus med brøker', typer: ['broekPlus', 'broekMinus'],
+    { id: 'I.4d', kap: 'I', pakke: '9kl', titel: 'Plus og minus med brøker', typer: ['broekPlus', 'broekMinus'],
       husk: ['Samme nævner: læg tællerne sammen (eller træk fra).', 'Ellers: forlæng først til en fællesnævner (b·d virker altid).', 'Deles en flerleddet størrelse, skal hvert led deles.'],
       eksempel: ['1/4 + 2/3: fællesnævner 12.', '3/12 + 8/12 = 11/12.', '7/10 − 1/4 = 14/20 − 5/20 = 9/20.', '3/x − 1/(2x) = 6/(2x) − 1/(2x) = 5/(2x).'] },
-    { id: 'I.5', kap: 'I', titel: 'Potenser og rødder', typer: ['potensRegler', 'titalsform', 'potensGange', 'nulPotens'],
+    { id: 'I.5', kap: 'I', pakke: '9kl', titel: 'Potenser og rødder', typer: ['potensRegler', 'titalsform', 'potensGange', 'nulPotens'],
       husk: ['aᵖ·aᵠ = aᵖ⁺ᵠ, aᵖ/aᵠ = aᵖ⁻ᵠ, (aᵖ)ᵠ = aᵖᵠ, aᵖ·bᵖ = (ab)ᵖ.', 'a⁰ = 1, a⁻ᵖ = 1/aᵖ, ⁿ√(aᵖ) = a^(p/n).', 'Titalsform: b·10ⁿ med 1 ≤ b < 10.'],
       eksempel: ['5³·5⁴ = 5⁷.', '2⁹/2⁶ = 2³ = 8.', '4⁻² = 1/16 og ∛(x⁶) = x².', '0,00052 = 5,2·10⁻⁴.', '(3·10⁵)·(4·10⁻²) = 12·10³ = 1,2·10⁴.'] },
-    { id: 'II.1', kap: 'II', titel: 'Ligninger generelt', typer: ['krydsGange', 'loesningsantal', 'lineaer', 'erLoesning'],
+    { id: 'II.1', kap: 'II', pakke: '9kl', titel: 'Ligninger generelt', typer: ['krydsGange', 'loesningsantal', 'lineaer', 'erLoesning'],
       husk: ['Et tal er en løsning, hvis ligningen passer, når tallet sættes ind.', 'Gør det samme på begge sider — men gang og del aldrig med 0.', 'a/b = c/d ⇔ a·d = b·c (gange over kors). Forsvinder x, er der ingen eller uendeligt mange løsninger.'],
       eksempel: ['5x − 4 = 2x + 11', 'Træk 2x fra: 3x − 4 = 11.', 'Læg 4 til: 3x = 15.', 'Del med 3: x = 5.', '6/x = 3/4 → 3x = 24 → x = 8.'] },
-    { id: 'II.2', kap: 'II', titel: 'Andengradsligninger', typer: ['diskriminant', 'andengrad'],
+    { id: 'II.2', kap: 'II', pakke: 'c', titel: 'Andengradsligninger', typer: ['diskriminant', 'andengrad'],
       husk: ['ax² + bx + c = 0: d = b² − 4ac.', 'd < 0: ingen løsninger. d = 0: én, x = −b/(2a). d > 0: to, x = (−b ± √d)/(2a).', 'Mangler c-leddet, er nulreglen nemmere.'],
       eksempel: ['2x² + 3x − 2 = 0: a = 2, b = 3, c = −2.', 'd = 9 − 4·2·(−2) = 25.', '√d = 5.', 'x = (−3 ± 5)/4, altså x = 1/2 eller x = −2.'] },
-    { id: 'II.3', kap: 'II', titel: 'Nulreglen', typer: ['udenForParentes', 'nulreglen', 'omvendtAndengrad'],
+    { id: 'II.3', kap: 'II', pakke: 'c', titel: 'Nulreglen', typer: ['udenForParentes', 'nulreglen', 'omvendtAndengrad'],
       husk: ['Et produkt er 0, netop når mindst én faktor er 0.', 'Del aldrig med x — sæt x uden for parentes (ellers forsvinder løsningen x = 0).'],
       eksempel: ['(x − 3)(2x + 8) = 0', 'x − 3 = 0 eller 2x + 8 = 0.', 'x = 3 eller x = −4.', '5x² − 15x = 0 → 5x(x − 3) = 0 → x = 0 eller x = 3.'] },
-    { id: 'II.4', kap: 'II', titel: 'Isolere en variabel', typer: ['omvendtFunktion', 'isoler', 'isolerBrik', 'ohm', 'lnRegler'],
-      husk: ['Brug reglerne for ligninger, til variablen står alene.', 'eˣ = a ⇔ x = ln a. ln x = a ⇔ x = eᵃ. xⁿ = a ⇔ x = ⁿ√a (a > 0).'],
+    { id: 'II.4', kap: 'II', pakke: 'c', titel: 'Isolere en variabel', typer: ['omvendtFunktion', 'isoler', 'isolerBrik', 'ohm', 'lnRegler'],
+      husk: ['Brug reglerne for ligninger, til variablen står alene.', 'xⁿ = a ⇔ x = ⁿ√a (a > 0).', 'B: eˣ = a ⇔ x = ln a. ln x = a ⇔ x = eᵃ.'],
       eksempel: ['Isolér h i V = ⅓·G·h.', 'Gang med 3: 3V = G·h.', 'Del med G: h = 3V/G.', 'eˣ = 5 → x = ln 5. x³ = 125 → x = 5.'] },
-    { id: 'III.1', kap: 'III', titel: 'Ensvinklede trekanter', typer: ['erEnsvinklede', 'ensvinklede'],
+    { id: 'III.1', kap: 'III', pakke: '9kl', titel: 'Ensvinklede trekanter', typer: ['erEnsvinklede', 'ensvinklede'],
       husk: ['Ensvinklede trekanter er forstørrelser af hinanden: alle sider ganges med samme skalafaktor k.', 'k = a₁/a.'],
       eksempel: ['Lille trekant 3, 5, 6. I den store svarer 3 til 12.', 'k = 12/3 = 4.', '5·4 = 20.', '6·4 = 24.'] },
-    { id: 'III.2', kap: 'III', titel: 'Pythagoras', typer: ['pythagorasRod', 'pythagoras'],
+    { id: 'III.2', kap: 'III', pakke: '9kl', titel: 'Pythagoras', typer: ['pythagorasRod', 'pythagoras'],
       husk: ['I en retvinklet trekant: a² + b² = c², hvor c er hypotenusen (over for den rette vinkel).'],
       eksempel: ['a = 5, b = 12: c² = 25 + 144 = 169.', 'c = 13.', 'c = 17, a = 8: b² = 289 − 64 = 225, så b = 15.', 'a = 2, b = 3: c² = 13, så c = √13.'] },
-    { id: 'IV.1', kap: 'IV', titel: 'Funktioner generelt', typer: ['funktionsvaerdi', 'proportional', 'linModel'],
+    { id: 'IV.1', kap: 'IV', pakke: '9kl', titel: 'Funktioner generelt', typer: ['funktionsvaerdi', 'proportional', 'linModel'],
       husk: ['En funktion giver præcis én y for hver x.', 'Proportional: y = k·x. Omvendt proportional: y = k/x.'],
       eksempel: ['f(x) = 2x² − 3x + 1. Find f(−2).', '(−2)² = 4, så 2·4 = 8.', '−3·(−2) = 6.', 'f(−2) = 8 + 6 + 1 = 15.', 'y = k/x og y = 6 for x = 5: k = 30, så y = 3 for x = 10.'] },
-    { id: 'IV.2', kap: 'IV', titel: 'Lineære funktioner', typer: ['linjeToPunkter', 'haeldning', 'matchGraf'],
+    { id: 'IV.2', kap: 'IV', pakke: '9kl', titel: 'Lineære funktioner', typer: ['linjeToPunkter', 'haeldning', 'matchGraf'],
       husk: ['f(x) = ax + b: a er hældningen, b skæringen med y-aksen.', 'a = (y₂ − y₁)/(x₂ − x₁). b findes ved at sætte et punkt ind.'],
       eksempel: ['Punkterne (1, 4) og (3, 10).', 'a = (10 − 4)/(3 − 1) = 3.', '4 = 3·1 + b, så b = 1.', 'f(x) = 3x + 1. Tjek: f(3) = 10 ✓'] },
-    { id: 'IV.3', kap: 'IV', titel: 'Eksponentielle funktioner', typer: ['eksponentielToPunkter', 'vaekst', 'fordobling', 'rente'],
+    { id: 'IV.3', kap: 'IV', pakke: 'c', titel: 'Eksponentielle funktioner', typer: ['eksponentielToPunkter', 'vaekst', 'fordobling', 'rente'],
       husk: ['f(x) = b·aˣ: konstant procentvis vækst; a = 1 + r.', 'Ud fra to punkter: a = ^(x₂−x₁)√(y₂/y₁).', 'Fordoblingskonstanten T: f fordobles, når x vokser med T.'],
       eksempel: ['Punkterne (1, 15) og (3, 135).', 'a² = 135/15 = 9, så a = 3.', '15 = b·3¹, så b = 5.', 'f(x) = 5·3ˣ. a = 1,06 betyder 6 % vækst pr. skridt.'] },
-    { id: 'IV.4', kap: 'IV', titel: 'Potensfunktioner', valgfri: true, typer: ['potensfunktion'],
+    { id: 'IV.4', kap: 'IV', pakke: 'c', titel: 'Potensfunktioner', valgfri: true, typer: ['potensfunktion'],
       husk: ['f(x) = b·xᵃ. b er y-værdien for x = 1.', 'Ganges x med (1 + r), ganges y med (1 + r)ᵃ.'],
       eksempel: ['f(1) = 5 og f(3) = 45.', 'b = 5.', '45 = 5·3ᵃ, så 3ᵃ = 9 og a = 2.', 'f(x) = 5x².'] },
-    { id: 'IV.5', kap: 'IV', titel: 'Polynomier og parabler', typer: ['toppunkt', 'parabelFortegn', 'parabel', 'erLoesning'],
+    { id: 'IV.5', kap: 'IV', pakke: 'c', titel: 'Polynomier og parabler', typer: ['toppunkt', 'parabelFortegn', 'parabel', 'erLoesning'],
       husk: ['a > 0: grenene opad. a < 0: nedad. c er skæringen med y-aksen.', 'Toppunkt T = (−b/(2a), −d/(4a)).', 'Med rødderne: ax² + bx + c = a(x − r₁)(x − r₂).'],
       eksempel: ['f(x) = x² − 6x + 5.', 'd = 36 − 20 = 16, så x = (6 ± 4)/2: 1 og 5.', 'T = (6/2, −16/4) = (3, −4). Tjek: f(3) = −4 ✓', 'f(x) = (x − 1)(x − 5), og a = 1 > 0: grenene opad.'] },
-    { id: 'V.1', kap: 'V', titel: 'Differentiation', typer: ['afledtMere', 'afledt'],
-      husk: ['Led for led. (xᵃ)′ = a·xᵃ⁻¹, (ln x)′ = 1/x, (eᵏˣ)′ = k·eᵏˣ, (ax + b)′ = a.', 'A: (f·g)′ = f′g + fg′ og (f(g(x)))′ = f′(g(x))·g′(x).'],
-      eksempel: ['f(x) = 2x⁴ + 3x² − 6x + 1.', 'f′(x) = 8x³ + 6x − 6.', 'g(x) = 6√x = 6x^½, så g′(x) = 3x^(−½) = 3/√x.', 'A: (x·ln x)′ = 1·ln x + x·(1/x) = ln x + 1.'] },
-    { id: 'V.2', kap: 'V', titel: 'Tangentens ligning', typer: ['tangentLnE', 'tangent', 'tangentLigning'],
+    { id: 'V.1', kap: 'V', pakke: 'b', titel: 'Differentiation', typer: ['afledtMere', 'afledt'],
+      husk: ['Led for led. (xᵃ)′ = a·xᵃ⁻¹, (ln x)′ = 1/x, (eᵏˣ)′ = k·eᵏˣ, (ax + b)′ = a.', 'B: (f·g)′ = f′g + fg′ og (f(g(x)))′ = f′(g(x))·g′(x).'],
+      eksempel: ['f(x) = 2x⁴ + 3x² − 6x + 1.', 'f′(x) = 8x³ + 6x − 6.', 'g(x) = 6√x = 6x^½, så g′(x) = 3x^(−½) = 3/√x.', 'B: (x·ln x)′ = 1·ln x + x·(1/x) = ln x + 1.'] },
+    { id: 'V.2', kap: 'V', pakke: 'b', titel: 'Tangentens ligning', typer: ['tangentLnE', 'tangent', 'tangentLigning'],
       husk: ['Tangenten i x₀: y = f′(x₀)(x − x₀) + f(x₀).', 'Husk: ln 1 = 0 og e⁰ = 1.'],
       eksempel: ['f(x) = x² + 4x i x₀ = 1.', 'f(1) = 5.', 'f′(x) = 2x + 4, så f′(1) = 6.', 'y = 6(x − 1) + 5 = 6x − 1.'] },
-    { id: 'V.3', kap: 'V', titel: 'Væksthastighed', typer: ['vaeksthastighed', 'tangent'],
+    { id: 'V.3', kap: 'V', pakke: 'b', titel: 'Væksthastighed', typer: ['vaeksthastighed', 'tangent'],
       husk: ['f′(x₀) er tangentens hældning — hvor hurtigt f vokser i x₀.', 'y″ er væksthastigheden for y′ (fx accelerationen).'],
       eksempel: ['f(x) = x³ − 2x.', 'f′(x) = 3x² − 2.', 'f′(2) = 10: f vokser 10 pr. x-enhed i x = 2.', 'N(t) = 300·e^(0,2t): N′(0) = 60 pr. tidsenhed.'] },
-    { id: 'V.4', kap: 'V', titel: 'Monotoniforhold', typer: ['monotoniTo', 'monotoni', 'interval'],
+    { id: 'V.4', kap: 'V', pakke: 'b', titel: 'Monotoniforhold', typer: ['monotoniTo', 'monotoni', 'interval'],
       husk: ['f′ ≥ 0: f voksende. f′ ≤ 0: f aftagende.', 'Find f′\'s nulpunkter, lav en fortegnslinje og aflæs. Endepunkterne er med (lukkede klammer).'],
       eksempel: ['f(x) = x³ − 3x² − 9x + 2.', 'f′(x) = 3x² − 6x − 9 = 3(x + 1)(x − 3).', 'Fortegn: + før −1, − mellem, + efter 3.', 'Voksende i ]−∞; −1] og [3; ∞[, aftagende i [−1; 3].', 'Lokalt maksimum f(−1) = 7, lokalt minimum f(3) = −25.'] },
-    { id: 'VI.1', kap: 'VI', titel: 'Stamfunktioner', typer: ['stamfunktionMere', 'stamfunktion'],
+    { id: 'VI.1', kap: 'VI', pakke: 'a', titel: 'Stamfunktioner', typer: ['stamfunktionMere', 'stamfunktion'],
       husk: ['F er stamfunktion til f, når F′ = f.', 'xᵃ → xᵃ⁺¹/(a + 1) + k, 1/x → ln|x| + k, eᵏˣ → (1/k)·eᵏˣ + k.'],
       eksempel: ['f(x) = 9x² − 4x + 3.', 'F(x) = 3x³ − 2x² + 3x + k.', 'Gennem P(1, 5) for f(x) = 3x²: F(x) = x³ + k.', '1 + k = 5, så k = 4: F(x) = x³ + 4.'] },
-    { id: 'VI.2', kap: 'VI', titel: 'Bestemte integraler', typer: ['bestemtAB', 'bestemt'],
+    { id: 'VI.2', kap: 'VI', pakke: 'a', titel: 'Bestemte integraler', typer: ['bestemtAB', 'bestemt'],
       husk: ['∫ₐᵇ f(x) dx = F(b) − F(a).', 'Er f ≥ 0, er integralet arealet mellem grafen og x-aksen. Grænserne er tit grafens nulpunkter.'],
       eksempel: ['∫₁³ 2x dx', 'Stamfunktion: x².', '9 − 1 = 8.', 'Areal under f(x) = −x² + 4x: nulpunkter 0 og 4, så [−x³/3 + 2x²]₀⁴ = 32/3.'] },
     { id: 'VI.3', kap: 'VI', titel: 'Integral og areal', typer: ['arealMellem'],
+      pakke: 'a',
       husk: ['Areal over x-aksen tæller med plus i integralet, areal under med minus.', 'Er f ≥ g på [a; b], er arealet mellem graferne ∫ₐᵇ (f − g) dx.'],
       eksempel: ['Mellem f(x) = 2x og g(x) = x².', 'Skæring i 0 og 2.', '∫₀² (2x − x²) dx = [x² − x³/3]₀².', '4 − 8/3 = 4/3.'] },
-    { id: 'VII.1', kap: 'VII', titel: 'Cirkel og kugle', typer: ['cirkelOmskriv', 'cirkel'],
+    { id: 'VII.1', kap: 'VII', pakke: 'b', titel: 'Cirkel og kugle', typer: ['cirkelOmskriv', 'cirkel'],
       husk: ['Cirkel med centrum (a, b) og radius r: (x − a)² + (y − b)² = r².', 'En udfoldet ligning omskrives med kvadratkomplettering.'],
       eksempel: ['x² − 4x + y² + 10y + 20 = 0', 'x² − 4x = (x − 2)² − 4.', 'y² + 10y = (y + 5)² − 25.', '(x − 2)² + (y + 5)² = 4 + 25 − 20 = 9.', 'Centrum (2, −5), radius 3.'] },
-    { id: 'VII.2', kap: 'VII', titel: 'Ortogonale og parallelle vektorer', typer: ['vektorK', 'parallelogramAreal', 'projektion', 'prikprodukt', 'ortogonal', 'determinant', 'parallel'],
+    { id: 'VII.2', kap: 'VII', pakke: 'a', titel: 'Ortogonale og parallelle vektorer', typer: ['vektorK', 'parallelogramAreal', 'projektion', 'prikprodukt', 'ortogonal', 'determinant', 'parallel'],
       husk: ['Ortogonale ⇔ prikproduktet er 0.', 'Parallelle ⇔ det(a, b) = a₁b₂ − a₂b₁ = 0.', 'Parallelogrammets areal = |det(a, b)|.'],
       eksempel: ['a = (3, t) og b = (2, −6).', 'Ortogonal: 6 − 6t = 0, så t = 1.', 'Parallel: 3·(−6) − t·2 = 0, så t = −9.', 'Areal for (4, 1) og (2, 3): |12 − 2| = 10.'] },
-    { id: 'VII.3', kap: 'VII', titel: 'Parameterfremstillinger', typer: ['parameterLinje'],
+    { id: 'VII.3', kap: 'VII', pakke: 'a', titel: 'Parameterfremstillinger', typer: ['parameterLinje'],
       husk: ['Linjen gennem P₀ med retningsvektor r: (x, y) = P₀ + t·r.', 'Gennem A og B: brug r = AB. Samme linje har mange parameterfremstillinger.'],
       eksempel: ['A(2, −1) og B(5, 3).', 'AB = (3, 4).', '(x, y) = (2, −1) + t·(3, 4).', 'Ligger P(8, 7) på linjen? 2 + 3t = 8 giver t = 2, og −1 + 4·2 = 7 ✓'] },
-    { id: 'VII.4', kap: 'VII', titel: 'Ligning for linje og plan', typer: ['linjeLigning'],
+    { id: 'VII.4', kap: 'VII', pakke: 'a', titel: 'Ligning for linje og plan', typer: ['linjeLigning'],
       husk: ['Linjen gennem P₀ med normalvektor n = (a, b): a(x − x₀) + b(y − y₀) = 0.', 'Fra ax + by + c = 0 aflæses n = (a, b).'],
       eksempel: ['A(1, 2) og n = (3, −2).', '3(x − 1) − 2(y − 2) = 0.', '3x − 3 − 2y + 4 = 0, altså 3x − 2y + 1 = 0.', 'Tjek med A: 3 − 4 + 1 = 0 ✓'] },
-    { id: 'VII.5', kap: 'VII', titel: 'Afstand med dist-formlen', valgfri: true, typer: ['distFormel'],
+    { id: 'VII.5', kap: 'VII', pakke: 'b', titel: 'Afstand med dist-formlen', valgfri: true, typer: ['distFormel'],
       husk: ['Afstanden fra P(x₁, y₁) til ax + by + c = 0: |ax₁ + by₁ + c| / √(a² + b²).', 'En afstand er aldrig negativ.'],
       eksempel: ['P(4, 1) og 3x + 4y − 6 = 0.', 'Tæller: |12 + 4 − 6| = 10.', 'Nævner: √(9 + 16) = 5.', 'Afstanden er 2.'] },
-    { id: 'VII.6', kap: 'VII', titel: 'Skæring med linjer', typer: ['skaering'],
+    { id: 'VII.6', kap: 'VII', pakke: 'b', titel: 'Skæring med linjer', typer: ['skaering'],
       husk: ['Skæringspunkter er fælles løsninger: isolér y i den ene og sæt ind i den anden.', 'Linje mod parabel eller cirkel giver en andengradsligning: 0, 1 eller 2 punkter.'],
       eksempel: ['y = 2x + 1 og y = −x + 7.', '2x + 1 = −x + 7, så x = 2.', 'y = 5: skæringspunktet er (2, 5).', 'x² + y² = 25 og y = x + 1 giver x² + x − 12 = 0: (3, 4) og (−4, −3).'] },
-    { id: 'VIII.1', kap: 'VIII', titel: 'Er en opgivet funktion løsning?', typer: ['difflignMere', 'difflignTangent', 'difflign'],
+    { id: 'VIII.1', kap: 'VIII', pakke: 'a', titel: 'Er en opgivet funktion løsning?', typer: ['difflignMere', 'difflignTangent', 'difflign'],
       husk: ['f er en løsning, hvis differentialligningen passer, når f (og f′, f″) sættes ind.', 'En ligning har tal som løsninger — en differentialligning funktioner.'],
       eksempel: ['Er f(x) = 2e³ˣ løsning til y′ = 3y?', 'f′(x) = 6e³ˣ.', '3·f(x) = 6e³ˣ — ens, så ja.', 'f løser y′ = x·y + 1, og P(1, 3) er på grafen: hældning 4, tangent y = 4x − 1.'] },
   ];
@@ -2313,7 +2894,275 @@
     return ud;
   }
 
-  const VoksenOpgaver = { KAPITLER, AFSNIT, lavLaerOpgaver, V, VOKSEN_EMNER, VOKSEN_TRIN, beregnTrin, opdaterTrin, HUSKEKORT, TVILLINGER, lavTvilling, tjekBrikker, kanTastes, tjekTastet, facitTekst, noegleVaerdi, lavVoksenOpgave, genskab, gentagParametre, lavDosis, lavProeve, SVAERHEDER, dosisNiveau, dosisNiveauer, taellerINiveau, gcd, broek, math };
+  // «Jeg træner til» i Lær (fase 4 D2): 'vis' (pakken viser afsnittets niveau, eller ingen pakke), 'nedtonet' (uden for
+  // pakken, men regnet — i laer eller bogtilstanden: intet med fremgang forsvinder) eller 'skjult'.
+  // afsnit: et AFSNIT-objekt eller dets id · laer = traening.laer · bog = traening.bog (begge må mangle)
+  function afsnitVisning(afsnit, pakke, laer, bog) {
+    const A = typeof afsnit === 'string' ? AFSNIT.find((x) => x.id === afsnit) : afsnit;
+    const P = pakkeAf(pakke);
+    if (!P || !A || P.laer.indexOf(A.pakke) >= 0) return 'vis';
+    const regnet = !!(laer && laer[A.id]) || !!(bog && bog[A.id] && typeof bog[A.id] === 'object' && Object.keys(bog[A.id]).length);
+    return regnet ? 'nedtonet' : 'skjult';
+  }
+  // Et kapitel: 'vis', hvis mindst ét afsnit vises; 'nedtonet', hvis kun nedtonede; ellers 'skjult'
+  function kapitelVisning(kapId, pakke, laer, bog) {
+    const v = AFSNIT.filter((a) => a.kap === kapId).map((a) => afsnitVisning(a, pakke, laer, bog));
+    return v.indexOf('vis') >= 0 ? 'vis' : v.indexOf('nedtonet') >= 0 ? 'nedtonet' : 'skjult';
+  }
+  // Kapitlets afsnit, som Lær viser (vist eller nedtonet) — også kapitlets tæller «x af n afsnit» (review 28-10)
+  function kapitelAfsnit(kapId, pakke, laer, bog) {
+    return AFSNIT.filter((a) => a.kap === kapId && afsnitVisning(a, pakke, laer, bog) !== 'skjult');
+  }
+  // «Næste afsnit» efter et klaret afsnit: det næste i bogens rækkefølge, som målet viser — aldrig et nedtonet
+  function naesteAfsnit(id, pakke, laer, bog) {
+    const i = AFSNIT.findIndex((a) => a.id === id);
+    return i < 0 ? null : AFSNIT.slice(i + 1).find((a) => afsnitVisning(a, pakke, laer, bog) === 'vis') || null;
+  }
+
+  // =====================================================================
+  //  Bogtilstand (fase 3a, 28-10-2026): bogens opgavegrupper pr. afsnit i bogens rækkefølge (docs/VOKSEN-BOG-INVENTAR.md).
+  //  Kun struktur: gruppens navn med egne ord, bogens første opgavenummer (fra = gruppens nøgle i traening.bog), antal
+  //  opgaver i bogen og enten trin (eksisterende generatorer, let → svær) eller papir (regnes i bogen, tælles med +1).
+  //  Et trin er 'type', 'type:n', 'type:n-m' eller 'type:n-m:variant': niveau 1–3 (uden = alle tre) og evt. kun én
+  //  variant (opgavens p.t, ellers nøglens første led). Ingen af bogens tal, eksempler eller tekster.
+  // =====================================================================
+  const gr = (fra, antal, navn, trin) => ({ fra: fra, antal: antal, navn: navn, trin: trin });
+  const pap = (fra, antal, navn) => ({ fra: fra, antal: antal, navn: navn, papir: true });
+  const AREAL = AFSNIT.find((a) => a.id === 'VI.3').typer[0]; // typens id skrives aldrig som tekst (pre-commit-listen)
+  const BOG = {
+    'I.1': [gr(1, 4, 'Skriv ord som regneudtryk', ['regneord']),
+      gr(5, 54, 'Regn i den rigtige rækkefølge og reducér', ['hierarki', 'fortegn', 'reducer'])],
+    'I.2': [gr(1, 16, 'Gang ind i en parentes', ['parentes:1']),
+      gr(17, 17, 'Sæt uden for parentes', ['parentes:3']),
+      gr(34, 17, 'Gang to parenteser sammen', ['parentes:2']),
+      gr(51, 5, 'Reducér med brøkstreg', ['forkort'])],
+    'I.3': [gr(1, 15, 'Kvadratet på en sum', ['kvadratsaetning:1:+']),
+      gr(16, 16, 'Skriv som et kvadrat', ['kvadratsaetning:3:b']),
+      gr(32, 16, 'Kvadratet på en differens', ['kvadratsaetning:1:−', 'kvadratsaetning:2']),
+      gr(48, 17, 'Opløs i faktorer', ['kvadratsaetning:3:b']),
+      gr(65, 22, 'Reducér med kvadratsætningerne', ['kvadratsaetning:1', 'kvadratsaetning:2', 'findFejlen']),
+      gr(87, 4, 'Faktorisér en differens af kvadrater', ['kvadratsaetning:3:d']),
+      gr(91, 7, 'Skriv som kvadratet på et toleddet udtryk', ['kvadratsaetning:3:b']),
+      gr(98, 3, 'Skriv på cirklens form', ['cirkelOmskriv']),
+      pap(101, 2, 'Forklar begreberne'),
+      pap(103, 4, 'Find selv eksempler')],
+    'I.4a': [gr(1, 2, 'Forkort talbrøker', ['forkortBroek:1']),
+      gr(3, 31, 'Forkort brøker med bogstaver', ['forkort', 'forkortBroek:2-3']),
+      pap(34, 2, 'Forlæng til en bestemt nævner'),
+      pap(36, 1, 'Find selv eksempler')],
+    'I.4b': [gr(1, 24, 'Gang og del en brøk med et tal', ['broekTal']),
+      pap(25, 4, 'Tekstopgaver med brøker')],
+    'I.4c': [gr(1, 27, 'Gang og del med brøker', ['broekGangeDele']),
+      pap(28, 3, 'Tekstopgaver med moms')],
+    'I.4d': [pap(1, 10, 'Find fællesnævneren'),
+      gr(11, 18, 'Saml på én brøkstreg', ['broekPlus', 'broekMinus']),
+      pap(29, 2, 'Sammenlign metoderne')],
+    'I.5': [gr(1, 25, 'Reducér potenser og rødder', ['nulPotens:1:nul', 'potensGange', 'potensRegler']),
+      pap(26, 3, 'Tekst: skriv som potens og udregn'),
+      gr(29, 6, 'Skriv en rod som potens', ['potensRegler:2-3:rod']),
+      pap(35, 7, 'Skriv en potens som rod'),
+      pap(42, 6, 'Skriv som tal gange potens af x'),
+      gr(48, 3, 'Skriv tal med titalspotens', ['titalsform']),
+      gr(51, 8, 'Regn med titalspotenser', ['nulPotens:1-3:tipot']),
+      gr(59, 9, 'Skriv på standardform', ['titalsform'])],
+    'II.1': [gr(1, 10, 'Er tallet en løsning?', ['erLoesning']),
+      gr(11, 36, 'Løs ligningen', ['lineaer', 'krydsGange']),
+      pap(47, 2, 'Lav selv en ligning'),
+      gr(49, 3, 'Hvor mange løsninger?', ['loesningsantal'])],
+    'II.2': [gr(1, 12, 'Hvor mange løsninger?', ['diskriminant:1']),
+      gr(13, 28, 'Løs andengradsligningen', ['andengrad', 'diskriminant:2-3:l']),
+      gr(41, 4, 'Find konstanten, så antallet passer', ['diskriminant:3:k'])],
+    'II.3': [gr(1, 50, 'Løs med nulreglen', ['nulreglen', 'udenForParentes']),
+      gr(51, 3, 'Lav en ligning med givne løsninger', ['omvendtAndengrad'])],
+    'II.4': [gr(1, 2, 'Isolér en variabel', ['isoler:1']),
+      gr(3, 8, 'Isolér i en formel', ['isoler:1-2']),
+      gr(11, 9, 'Isolér i sværere formler', ['isolerBrik', 'isoler:3']),
+      pap(20, 5, 'Opgaver i flere dele'),
+      gr(25, 14, 'Isolér med logaritmer og potenser (A)', ['lnRegler', 'omvendtFunktion']),
+      pap(39, 5, 'Udled en formel ud fra en tekst')],
+    'III.1': [pap(1, 4, 'Manglende side på en figur'),
+      gr(5, 8, 'Manglende side i to trekanter', ['ensvinklede']),
+      gr(13, 4, 'Find skalafaktoren', ['ensvinklede']),
+      gr(17, 4, 'Er de ensvinklede?', ['erEnsvinklede']),
+      pap(21, 2, 'Vis at de er ensvinklede')],
+    'III.2': [gr(23, 5, 'Manglende side i en retvinklet trekant', ['pythagoras', 'pythagorasRod']),
+      pap(28, 1, 'Side ud fra en figur')],
+    'IV.1': [gr(1, 5, 'Udregn funktionsværdier', ['funktionsvaerdi']),
+      gr(6, 5, 'Hvornår har f en bestemt værdi?', ['lineaer']),
+      gr(11, 15, 'Tekstopgaver om sammenhænge', ['proportional', 'linModel'])],
+    'IV.2': [gr(1, 10, 'Linjen gennem to punkter', ['haeldning', 'linjeToPunkter']),
+      gr(11, 10, 'Forskriften ud fra to værdier', ['linjeToPunkter']),
+      gr(21, 11, 'Forskriften ud fra andre oplysninger', ['matchGraf']),
+      gr(32, 2, 'Tekst med en lineær model', ['linModel']),
+      pap(34, 1, 'Forklar forskellen'),
+      pap(35, 3, 'Er der proportionalitet?'),
+      pap(38, 2, 'Ligger punkterne på linjen?'),
+      pap(40, 1, 'Et punkt med proportionalitet')],
+    'IV.3': [gr(1, 9, 'Forskriften ud fra to punkter', ['eksponentielToPunkter']),
+      gr(10, 7, 'Forskriften ud fra to værdier', ['eksponentielToPunkter']),
+      gr(17, 7, 'Tekstopgaver om vækst og henfald', ['vaekst', 'fordobling', 'rente'])],
+    'IV.4': [gr(1, 6, 'Forskriften ud fra to punkter', ['potensfunktion:1-3:a']),
+      gr(7, 5, 'Forskriften ud fra to værdier', ['potensfunktion:1-3:a']),
+      gr(12, 3, 'Tekstopgaver fra fysikken', ['potensfunktion:1-3:g'])],
+    'IV.5': [gr(1, 10, 'Er tallet en rod?', ['erLoesning']),
+      pap(11, 8, 'Find konstanten, så tallet er rod'),
+      gr(19, 8, 'Diskriminant og antal nulpunkter', ['diskriminant:1', 'parabelFortegn']),
+      gr(27, 10, 'Toppunkt og nulpunkter', ['toppunkt', 'andengrad']),
+      gr(37, 2, 'Aflæs på en graf', ['parabel']),
+      pap(39, 11, 'Faktorisér polynomiet'),
+      gr(50, 5, 'Faktorisér og forkort', ['forkortBroek:2-3']),
+      gr(55, 7, 'Polynomiet ud fra rødderne', ['omvendtAndengrad']),
+      pap(62, 12, 'Parablens forskrift ud fra oplysninger'),
+      pap(74, 2, 'Tredjegradspolynomium ud fra rødderne'),
+      gr(76, 2, 'Aflæs konstanterne på en graf', ['parabelFortegn'])],
+    'V.1': [gr(1, 21, 'Differentiér potenser', ['afledt:1-3:potens', 'afledtMere:2']),
+      gr(22, 21, 'Differentiér polynomier', ['afledtMere:1:poly']),
+      gr(43, 16, 'Negative eksponenter og rødder', ['afledtMere:2']),
+      gr(59, 17, 'Med ln og e', ['afledt:2-3:eksp', 'afledt:2-3:ln']),
+      gr(76, 9, 'Den afledte i et punkt', ['tangent']),
+      gr(85, 18, 'Produkt, kæde og kvotient (A)', ['afledtMere:3'])],
+    'V.2': [gr(1, 30, 'Tangentens ligning i et punkt', ['tangentLigning', 'tangentLnE']),
+      gr(31, 3, 'Tangenten ud fra en koordinat', ['tangentLigning']),
+      pap(34, 6, 'Tangent med en given hældning (A)')],
+    'V.3': [gr(1, 9, 'Væksthastighed i et punkt', ['tangent']),
+      gr(10, 5, 'Tekstopgaver', ['vaeksthastighed']),
+      pap(15, 1, 'Aflæs på en graf'),
+      gr(16, 4, 'Tekst med den afledte', ['vaeksthastighed:2-3:e']),
+      pap(20, 3, 'Aflæs væksthastigheden på en graf'),
+      pap(23, 1, 'Forklar den afledte')],
+    'V.4': [gr(1, 16, 'Monotoniforhold', ['interval', 'monotoni']),
+      gr(17, 8, 'Monotoni ud fra den afledte', ['monotoniTo:1-3:voks']),
+      gr(25, 6, 'Maksimum og minimum', ['monotoniTo:1-3:maks']),
+      pap(31, 5, 'Skitsér ud fra fortegnet')],
+    'VI.1': [gr(1, 46, 'Find en stamfunktion', ['stamfunktion', 'stamfunktionMere:1:poly', 'stamfunktionMere:2:lne']),
+      gr(47, 12, 'Ubestemte integraler', ['stamfunktionMere:1', 'stamfunktion']),
+      gr(59, 16, 'Stamfunktionen gennem et punkt', ['stamfunktionMere:2-3:P']),
+      pap(75, 9, 'Integration ved substitution'),
+      pap(84, 4, 'Integraler med brøk')],
+    'VI.2': [gr(1, 43, 'Udregn bestemte integraler', ['bestemt', 'bestemtAB:1-2']),
+      gr(44, 18, 'Arealet under en graf', ['bestemtAB:2-3:kvad']),
+      gr(62, 7, 'Areal mellem graf og x-akse', ['bestemtAB:3:areal']),
+      pap(69, 2, 'Tekst om en bue'),
+      pap(71, 4, 'Find grænsen, så integralet passer'),
+      pap(75, 11, 'Bestemte integraler ved substitution')],
+    'VI.3': [gr(1, 4, 'Fra delarealer til integraler', [AREAL + ':1']),
+      gr(5, 3, 'Areal mod x-aksen', ['bestemtAB:3:areal']),
+      gr(8, 4, 'Areal mellem to grafer', [AREAL + ':2-3']),
+      gr(12, 7, 'Arealet for en given funktion', ['bestemtAB:2-3:kvad', 'bestemtAB:3:areal']),
+      pap(19, 4, 'Find grænsen, så arealet passer'),
+      pap(23, 1, 'Arealer ud fra en figur')],
+    'VII.1': [pap(1, 15, 'Ligningen ud fra centrum og radius'),
+      gr(16, 8, 'Aflæs centrum og radius', ['cirkel']),
+      gr(24, 17, 'Er det en cirkel? Centrum og radius', ['cirkelOmskriv']),
+      pap(41, 4, 'Ligningen ud fra centrum og et punkt'),
+      pap(45, 1, 'Ligninger ud fra en figur')],
+    'VII.2': [gr(1, 11, 'Er vektorerne ortogonale?', ['prikprodukt', 'ortogonal']),
+      gr(12, 10, 'Determinant og parallelle vektorer', ['determinant', 'parallel']),
+      gr(22, 8, 'Find parameteren', ['vektorK']),
+      gr(30, 5, 'Projektion', ['projektion']),
+      gr(35, 7, 'Tekst med trekanter og firkanter', ['parallelogramAreal'])],
+    'VII.3': [gr(1, 5, 'Linjen ud fra punkt og retning', ['parameterLinje:1-3:l']),
+      gr(6, 6, 'Linjen gennem to punkter', ['parameterLinje:1-3:l']),
+      gr(12, 5, 'Linjen ud fra punkt og normalvektor', ['linjeLigning:1-3:l']),
+      pap(17, 7, 'Den vinkelrette linje'),
+      pap(24, 5, 'Skæring med akserne'),
+      gr(29, 5, 'Ligger punktet på linjen?', ['parameterLinje:3:p']),
+      pap(34, 3, 'Opgaver i flere dele')],
+    'VII.4': [gr(1, 8, 'Ligningen ud fra punkt og normalvektor', ['linjeLigning:1-3:l']),
+      gr(9, 7, 'Aflæs en normalvektor', ['linjeLigning:3:n']),
+      pap(16, 8, 'To punkter giver normalvektoren'),
+      pap(24, 13, 'Blandede tekstopgaver')],
+    'VII.5': [gr(1, 9, 'Afstand fra punkt til linje', ['distFormel']),
+      pap(10, 7, 'Tekstopgaver'),
+      gr(17, 5, 'Tangent til en cirkel: radius', ['distFormel'])],
+    'VII.6': [gr(1, 16, 'To linjer i planen', ['skaering:1:l']),
+      gr(17, 18, 'Parabel og linje', ['skaering:2:p']),
+      pap(35, 9, 'Find konstanten, så der er ét skæringspunkt'),
+      pap(44, 4, 'Parabel og linje med en konstant'),
+      pap(48, 1, 'Antal skæringspunkter for alle konstanter'),
+      gr(49, 14, 'Cirkel og linje', ['skaering:3:c']),
+      pap(63, 5, 'Hyperbel og linje'),
+      pap(68, 3, 'To linjer i rummet'),
+      pap(71, 3, 'Linje og plan'),
+      pap(74, 4, 'Linje og kugle')],
+    'VIII.1': [gr(1, 14, 'Vis at funktionen er en løsning', ['difflign', 'difflignMere']),
+      gr(15, 7, 'Er funktionen en løsning?', ['difflignMere']),
+      gr(22, 5, 'Tangent ud fra differentialligningen', ['difflignTangent']),
+      pap(27, 5, 'Ekstremum og monotoni'),
+      pap(32, 4, 'Find konstanten')],
+  };
+
+  const BOG_NIVEAUER = [1, 1, 1, 2, 2, 2, 2, 3, 3, 3]; // et sæt: 3 på niveau 1, 4 på niveau 2, 3 på niveau 3
+  const BOG_SAET = BOG_NIVEAUER.length;
+  function bogTrin(s) {
+    const del = String(s).split(':');
+    const m = /^([1-3])(?:-([1-3]))?$/.exec(del[1] || '');
+    return { type: del[0], min: m ? Number(m[1]) : 1, max: m ? Number(m[2] || m[1]) : 3, variant: del.length > 2 ? del.slice(2).join(':') : null };
+  }
+  const variantAf = (o) => (o.p && o.p.t !== undefined ? String(o.p.t) : String(o.noegle).split(':')[0]);
+  const bogGruppe = (afsnitId, fra) => (BOG[afsnitId] || []).find((g) => g.fra === Number(fra)) || null;
+  // Grupper med over 20 opgaver i bogen har 2 sæt; papirgrupper har ingen (de tælles med +1)
+  const bogAntalSaet = (g) => (!g || g.papir ? 0 : g.antal > 20 ? 2 : 1);
+  // Sættets pladser fordeles jævnt på trinene i rækkefølge, med resten i midten: 2 trin = 5+5, 3 = 3+4+3, 4 = 2+3+3+2
+  function bogFordeling(k, n) {
+    const ud = new Array(k).fill(Math.floor(n / k));
+    const rest = n - ud[0] * k, start = Math.floor((k - rest) / 2);
+    for (let i = 0; i < rest; i++) ud[start + i]++;
+    return ud;
+  }
+  // Et sæt: op til 10 opgaver med stigende niveau. Hver plads får niveauet fra BOG_NIVEAUER, klemt ind i trinets
+  // niveauer (en generator uden niveau 3 giver så niveau 2). Nøglerne er forskellige i sættet, og de senest viste
+  // (nylige) undgås, så længe det kan lade sig gøre; et trin med for få opgaver giver et kortere sæt.
+  // fast: svaret rykker kun emnet op eller ned, når opgaven er på emnets eget niveau (som på en Let/Normal/Svær-dag).
+  function lavBogSaet(afsnitId, fra, rng, nylige) {
+    const g = bogGruppe(afsnitId, fra);
+    if (!g || g.papir) return [];
+    const nyligt = new Set(Array.isArray(nylige) ? nylige : []);
+    const trin = g.trin.map(bogTrin);
+    const fordeling = bogFordeling(trin.length, BOG_SAET);
+    const ud = [], brugt = {};
+    let plads = 0;
+    trin.forEach((t, ti) => {
+      for (let j = 0; j < fordeling[ti]; j++, plads++) {
+        const niveau = Math.min(t.max, Math.max(t.min, BOG_NIVEAUER[plads]));
+        for (let f = 0; f < 400; f++) {
+          const o = lavVoksenOpgave(t.type, niveau, rng);
+          if (t.variant !== null && variantAf(o) !== t.variant) continue;
+          if (brugt[o.noegle] || (f < 200 && nyligt.has(o.noegle))) continue;
+          brugt[o.noegle] = true;
+          o.fast = true;
+          o.bog = { afsnit: afsnitId, gruppe: g.fra };
+          ud.push(o);
+          break;
+        }
+      }
+    });
+    return ud;
+  }
+  // Et sæt er klaret ved 5 rigtige i træk, eller når det er regnet færdigt med mindst 8 af 10 (et kortere sæt: samme
+  // andel, og «i træk» højst hele sættet). svar = sandt/falsk for hvert svar i rækkefølge.
+  function bogSaetKlaret(svar, laengde) {
+    const n = Number.isInteger(laengde) && laengde > 0 ? laengde : BOG_SAET;
+    let traek = 0, bedst = 0, rigtige = 0;
+    for (const s of svar || []) {
+      if (s) { traek++; rigtige++; bedst = Math.max(bedst, traek); } else traek = 0;
+    }
+    return bedst >= Math.min(5, n) || ((svar || []).length >= n && rigtige >= Math.ceil(0.8 * n));
+  }
+  // gemt = traening.bog[afsnit][fra]. En papirgruppe er færdig, når alle bogens opgaver er talt (+1).
+  function bogGruppeFaerdig(g, gemt) {
+    if (!g) return false;
+    const d = gemt || {};
+    return g.papir ? (d.papir || 0) >= g.antal : (d.klaret || 0) >= bogAntalSaet(g);
+  }
+  // Hvor mange af afsnittets grupper er færdige (bog = traening.bog)
+  function bogFaerdige(afsnitId, bog) {
+    const data = (bog && bog[afsnitId]) || {};
+    const grupper = BOG[afsnitId] || [];
+    return { faerdige: grupper.filter((g) => bogGruppeFaerdig(g, data[g.fra])).length, ialt: grupper.length };
+  }
+
+  const VoksenOpgaver = { KAPITLER, AFSNIT, lavLaerOpgaver, PAKKER, pakkeAf, harFremgang, verdenVisning, dosisVerdener, afsnitVisning, kapitelVisning, kapitelAfsnit, naesteAfsnit, BOG, BOG_SAET, bogGruppe, bogAntalSaet, lavBogSaet, bogSaetKlaret, bogGruppeFaerdig, bogFaerdige, V, VOKSEN_EMNER, STIGE_EMNER, VOKSEN_TRIN, beregnTrin, opdaterTrin, HUSKEKORT, TVILLINGER, lavTvilling, tjekBrikker, kanTastes, tjekTastet, facitTekst, noegleVaerdi, lavVoksenOpgave, genskab, gentagParametre, lavDosis, lavProeve, SVAERHEDER, dosisNiveau, dosisNiveauer, taellerINiveau, gcd, broek, math };
   if (typeof module !== 'undefined' && module.exports) module.exports = VoksenOpgaver;
   else root.VoksenOpgaver = VoksenOpgaver;
 })(typeof self !== 'undefined' ? self : this);

@@ -189,9 +189,9 @@
       skift(h('div', { class: 'skaerm voksen menu', 'data-del': 'aaben' },
         topbar('Voksendel', null, tilLaas),
         advarselLinje(),
-        vaekstKort(),
+        h('div', { class: 'menu-top' }, vaekstKort(), pakkeKnap()),
         h('div', { class: 'menu-gitter' },
-          kort('📘', 'Lær', 'Bogen afsnit for afsnit' + laerStatus(), visLaer),
+          kort('📘', 'Lær', laerKortTekst(), visLaer),
           kort('🧠', 'Dagens dosis', '5 opgaver · ca. 5 min' + (dage ? ' · ' + dage + (dage === 1 ? ' dag' : ' dage') + ' trænet' : ''), () => visVerdensvalg('dosis')),
           kort('⏱️', 'Prøve', '8 opgaver fra én verden', () => visVerdensvalg('proeve')),
           kort('🤝', 'Familieduel', 'Barn og voksen · fælles mål', visDuelValg))));
@@ -210,7 +210,7 @@
     }
     function visStige() {
       const nu = voksen.traening.trin;
-      const antalEmner = Object.keys(VO.VOKSEN_EMNER).length;
+      const antalEmner = VO.STIGE_EMNER.length; // Grundlag er ikke på stigen, og pakken flytter den ikke (D2)
       skift(h('div', { class: 'skaerm voksen stige' },
         topbar('Vækststigen', visMenu),
         h('p', { class: 'voksen-hjaelp' }, 'Vennen vokser, når emnerne går op i niveau. Alle ' + antalEmner + ' emner mestret: Voksen.'),
@@ -218,6 +218,51 @@
           class: 'vaekst-trin' + (i < nu ? ' naaet' : '') + (i + 1 === nu ? ' nu' : ''), 'aria-current': i + 1 === nu ? 'step' : null,
         }, vaekstFigur(t.id), h('span', { class: 'vaekst-navn' }, t.navn))))));
     }
+    // =================================================================
+    //  🎯 «Jeg træner til» (fase 4 D2, 28-10-2026): 9. kl. · C · B · A (VO.PAKKER, gemt i traening.pakke). Pakken vælger,
+    //  hvilke verdener dagens dosis byder på, og hvilke afsnit Lær viser; uden pakke er alt som før. Verdener og afsnit
+    //  uden for pakken, som den voksne har øvet, står nedtonet bagerst — intet med fremgang forsvinder, intet slettes.
+    //  Prøven, Familieduellen og vækststigen følger ikke pakken (docs/VOKSEN-PAKKER.md).
+    // =================================================================
+    // Klassen og den skjulte tekst på et nedtonet kort (verden, kapitel, afsnit). Teksten er til skærmlæsere: synligt
+    // bærer nedtoningen og pladsen bagerst budskabet, og pakkeskærmen forklarer det.
+    const UDENFOR_KLASSE = ['', 'udenfor-maal'].join(' '); // join: test-tale læser en streng med mellemrum som tale
+    const udenforTekst = () => h('span', { class: 'udenfor-tekst' }, 'Uden for målet');
+    let pakkeKnapNu = null; // knappen i menuen: får fokus igen, når et mål er valgt (tastaturet står, hvor det kom fra)
+    function pakkeKnap() {
+      const P = VO.pakkeAf(voksen.traening.pakke);
+      pakkeKnapNu = h('button', { class: 'pakke-knap', type: 'button', onclick: () => { Lyd.init(); Lyd.tryk(); visPakkevalg(); } },
+        h('span', { class: 'pakke-ikon', 'aria-hidden': 'true' }, '🎯'),
+        h('span', { class: 'pakke-knap-tekst' }, h('small', null, 'Jeg træner til'), h('b', null, P ? P.navn : 'Alt')));
+      return pakkeKnapNu;
+    }
+    // Fire store valg og «Vis alt» (ingen pakke). Et tryk gemmer og går tilbage til menuen, hvor knappen viser valget.
+    function visPakkevalg() {
+      const T = voksen.traening;
+      // Tilbage til menuen med fokus på knappen — efter et valg og efter pilen tilbage (review 28-10)
+      const tilMenu = () => {
+        visMenu();
+        if (pakkeKnapNu && typeof pakkeKnapNu.focus === 'function') pakkeKnapNu.focus();
+      };
+      const vaelg = (id) => {
+        if (id) T.pakke = id; else delete T.pakke;
+        gemV();
+        tilMenu();
+      };
+      const valgt = VO.pakkeAf(T.pakke);
+      const valg = VO.PAKKER.map((P) => h('button', {
+        class: 'pakke-valg', type: 'button', 'data-pakke': P.id, 'aria-pressed': valgt === P ? 'true' : 'false',
+        onclick: () => { Lyd.init(); Lyd.tryk(); vaelg(P.id); },
+      }, h('b', { class: 'pakke-navn' }, P.navn), h('small', { class: 'pakke-om' }, P.om),
+      // Verdenerne i pakken som deres ikoner (navnet til skærmlæsere og som tooltip)
+      h('span', { class: 'pakke-verdener' }, P.emner.map((k) => h('span', { role: 'img', 'aria-label': VO.VOKSEN_EMNER[k].navn, title: VO.VOKSEN_EMNER[k].navn }, VO.VOKSEN_EMNER[k].e)))));
+      skift(h('div', { class: ['skaerm', 'voksen', 'pakkevalg'].join(' ') }, // join: test-tale læser en streng med mellemrum som tale
+        topbar('🎯 Jeg træner til', tilMenu),
+        h('p', { class: 'voksen-hjaelp' }, 'Dagens dosis byder på verdenerne i dit mål, og Lær viser målets afsnit. Det, du allerede har øvet, bliver stående nedtonet.'),
+        h('div', { class: 'pakke-gitter', role: 'group', 'aria-label': 'Jeg træner til' }, valg),
+        h('button', { class: 'pakke-alle', type: 'button', 'data-pakke': '', 'aria-pressed': valgt ? 'false' : 'true', onclick: () => { Lyd.init(); Lyd.tryk(); vaelg(null); } }, 'Vis alt')));
+    }
+
     // På slutskærmen: er trinet steget i løbet af dosis, prøve eller afsnit (d.trinFoer sættes ved første opgave)?
     const voksetLinje = (d) => (Number.isInteger(d.trinFoer) && voksen.traening.trin > d.trinFoer
       ? h('div', { class: 'vaekst-vokset' }, vaekstFigur(trinNu().id), h('b', null, 'Vennen er vokset: ' + trinNu().navn))
@@ -246,21 +291,51 @@
     //  Forkerte svar viser forklaringen og den typiske fejl og kommer igen i dagens dosis.
     // =================================================================
     const laerData = () => voksen.traening.laer || (voksen.traening.laer = {});
+    // «Jeg træner til» (D2): 'vis', 'nedtonet' (uden for pakken, men regnet) eller 'skjult' — uden pakke altid 'vis'
+    const afsnitVis = (a) => VO.afsnitVisning(a, voksen.traening.pakke, voksen.traening.laer, voksen.traening.bog);
+    const kapitelVis = (kapId) => VO.kapitelVisning(kapId, voksen.traening.pakke, voksen.traening.laer, voksen.traening.bog);
+    const kapAfsnit = (kapId) => VO.kapitelAfsnit(kapId, voksen.traening.pakke, voksen.traening.laer, voksen.traening.bog);
     function laerStatus() {
       if (!VO.AFSNIT) return '';
-      const n = VO.AFSNIT.filter((a) => laerData()[a.id] && laerData()[a.id].faerdig).length;
-      return n ? ' · ' + n + ' af ' + VO.AFSNIT.length + ' ✓' : '';
+      const synlige = VO.AFSNIT.filter((a) => afsnitVis(a) !== 'skjult');
+      const n = synlige.filter((a) => laerData()[a.id] && laerData()[a.id].faerdig).length;
+      return n ? ' · ' + n + ' af ' + synlige.length + ' ✓' : '';
+    }
+    // Bogtilstand (fase 3a, 28-10-2026): traening.bog[afsnit][bogens første opgavenummer i gruppen] =
+    // { rigtige, ialt, klaret (klarede sæt), dato, papir (+1 regnet i bogen) } — se gem.js og VO.BOG
+    const bogLaes = (afsnitId, fra) => ((voksen.traening.bog || {})[afsnitId] || {})[fra] || null;
+    function bogGemt(afsnitId, fra) {
+      const B = voksen.traening.bog || (voksen.traening.bog = {});
+      const A = B[afsnitId] || (B[afsnitId] = {});
+      return A[fra] || (A[fra] = { rigtige: 0, ialt: 0, klaret: 0, dato: null, papir: 0 });
+    }
+    // Lær-kortet: det afsnit, der sidst er regnet i bogtilstand, og hvor mange af dets grupper der er færdige
+    function laerKortTekst() {
+      const B = voksen.traening.bog || {};
+      let seneste = null, nyest = '';
+      for (const a of Object.keys(B)) {
+        if (!VO.BOG || !VO.BOG[a]) continue;
+        for (const nr of Object.keys(B[a])) {
+          const d = B[a][nr].dato || '';
+          if (d && d >= nyest) { nyest = d; seneste = a; }
+        }
+      }
+      if (!seneste) return 'Bogen afsnit for afsnit' + laerStatus();
+      const f = VO.bogFaerdige(seneste, B);
+      return seneste + ' · ' + f.faerdige + ' af ' + f.ialt + ' grupper';
     }
 
     function visLaer() {
       const L = laerData();
-      const kapitler = VO.KAPITLER.map((K) => {
-        const afsnit = VO.AFSNIT.filter((a) => a.kap === K.id);
+      const kapitler = VO.KAPITLER.filter((K) => kapitelVis(K.id) !== 'skjult').map((K) => {
+        const afsnit = kapAfsnit(K.id);
         const klaret = afsnit.filter((a) => L[a.id] && L[a.id].faerdig).length;
-        return h('button', { class: 'menu-kort laer-kapitel', type: 'button', 'data-kap': K.id, onclick: () => { Lyd.init(); Lyd.tryk(); visLaerKapitel(K.id); } },
+        const nedtonet = kapitelVis(K.id) === 'nedtonet';
+        return h('button', { class: 'menu-kort laer-kapitel' + (nedtonet ? UDENFOR_KLASSE : ''), type: 'button', 'data-kap': K.id, onclick: () => { Lyd.init(); Lyd.tryk(); visLaerKapitel(K.id); } },
           h('span', { class: 'menu-ikon', 'aria-hidden': 'true' }, K.e),
           h('b', null, K.id + '. ' + K.navn),
-          h('small', null, klaret + ' af ' + afsnit.length + ' afsnit' + (klaret === afsnit.length ? ' ✓' : '')));
+          h('small', null, klaret + ' af ' + afsnit.length + ' afsnit' + (klaret === afsnit.length ? ' ✓' : '')),
+          nedtonet ? udenforTekst() : null);
       });
       skift(h('div', { class: 'skaerm voksen laer' },
         topbar('📘 Lær', visMenu),
@@ -271,26 +346,65 @@
     function visLaerKapitel(kapId) {
       const L = laerData();
       const K = VO.KAPITLER.find((k) => k.id === kapId);
-      const afsnit = VO.AFSNIT.filter((a) => a.kap === kapId).map((a) => h('button', {
-        class: 'laer-afsnit' + (L[a.id] && L[a.id].faerdig ? ' faerdig' : ''), type: 'button', 'data-afsnit': a.id,
+      const afsnit = kapAfsnit(kapId).map((a) => h('button', {
+        class: 'laer-afsnit' + (L[a.id] && L[a.id].faerdig ? ' faerdig' : '') + (afsnitVis(a) === 'nedtonet' ? UDENFOR_KLASSE : ''), type: 'button', 'data-afsnit': a.id,
         onclick: () => { Lyd.init(); Lyd.tryk(); visAfsnit(a.id); },
       },
       h('span', { class: 'laer-afsnit-nr' }, a.id),
       h('span', { class: 'laer-afsnit-titel' }, a.titel, a.valgfri ? h('small', null, ' (valgfri)') : null),
-      h('span', { class: 'laer-afsnit-ok', 'aria-label': L[a.id] && L[a.id].faerdig ? 'Klaret' : '' }, L[a.id] && L[a.id].faerdig ? '✓' : '')));
+      h('span', { class: 'laer-afsnit-ok', 'aria-label': L[a.id] && L[a.id].faerdig ? 'Klaret' : '' }, L[a.id] && L[a.id].faerdig ? '✓' : ''),
+      afsnitVis(a) === 'nedtonet' ? udenforTekst() : null));
       skift(h('div', { class: 'skaerm voksen laer' },
         topbar(K.e + ' ' + K.id + '. ' + K.navn, visLaer),
         h('div', { class: 'laer-liste' }, afsnit)));
     }
 
-    // Et afsnit: huskekort øverst, eksemplet vises ét trin ad gangen («Næste trin»), så opgaverne
+    // Bogtilstand: «16 i bogen · nr. 1–16 · 0/10» — rigtige ud af besvarede (før første svar: 10 pr. sæt), eller +1 talt
+    // ud af bogens antal
+    function bogMeta(g, d) {
+      d = d || {};
+      const nr = 'nr. ' + g.fra + (g.antal > 1 ? '–' + (g.fra + g.antal - 1) : '');
+      const ok = VO.bogGruppeFaerdig(g, d) ? ' ✓' : '';
+      if (g.papir) return g.antal + ' i bogen · ' + nr + ' · Regn i bogen · ' + Math.min(g.antal, d.papir || 0) + '/' + g.antal + ok;
+      const ialt = d.ialt > 0 ? d.ialt : VO.BOG_SAET * VO.bogAntalSaet(g);
+      return g.antal + ' i bogen · ' + nr + ' · ' + Math.min(ialt, d.rigtige || 0) + '/' + ialt + ok;
+    }
+    // Én række pr. gruppe: en generatorgruppe starter et sæt; en papirgruppe regnes i bogen og tælles med +1
+    function bogRaekke(A, g) {
+      const d = bogLaes(A.id, g.fra);
+      const faerdig = VO.bogGruppeFaerdig(g, d);
+      const meta = h('span', { class: 'bog-gruppe-meta' }, bogMeta(g, d));
+      const tekst = h('span', { class: 'bog-gruppe-tekst' }, h('span', { class: 'bog-gruppe-navn' }, g.navn), meta);
+      if (!g.papir) {
+        return h('button', { class: 'bog-gruppe' + (faerdig ? ' faerdig' : ''), type: 'button', 'data-gruppe': String(g.fra), onclick: () => { Lyd.init(); Lyd.tryk(); startBogSaet(A.id, g.fra); } },
+          tekst, h('span', { class: 'bog-gruppe-pil', 'aria-hidden': 'true' }, '▶'));
+      }
+      const raekke = h('div', { class: ['bog-gruppe', 'papir'].join(' ') + (faerdig ? ' faerdig' : ''), 'data-gruppe': String(g.fra) }, tekst, // join: test-tale læser en streng med mellemrum som tale
+        h('button', {
+          class: ['voksen-valg-knap', 'bog-plus'].join(' '), type: 'button', 'aria-label': '+1 regnet i bogen: ' + g.navn,
+          onclick: () => {
+            Lyd.init(); Lyd.tryk();
+            const x = bogGemt(A.id, g.fra);
+            x.papir++;
+            x.dato = G.idag();
+            gemV();
+            meta.textContent = bogMeta(g, x);
+            raekke.classList.toggle('faerdig', VO.bogGruppeFaerdig(g, x));
+          },
+        }, '+1'));
+      return raekke;
+    }
+
+    // Et afsnit: huskekort øverst, eksemplet vises ét trin ad gangen («Næste trin»), så opgaverne: «Hurtig» (4 opgaver)
+    // eller bogens grupper (bogtilstand)
     function visAfsnit(id) {
       const A = VO.AFSNIT.find((a) => a.id === id);
       const K = VO.KAPITLER.find((k) => k.id === A.kap);
       let vist = 1;
       const trin = h('ol', { class: 'laer-trin' });
       const naesteTrin = h('button', { class: 'voksen-valg-knap laer-naeste-trin', type: 'button', onclick: () => { Lyd.init(); Lyd.tryk(); vist++; tegn(); } }, 'Næste trin ▸');
-      const opgKnap = h('button', { class: 'stor-knap naeste-knap laer-start', type: 'button', 'aria-label': 'Start opgaverne', onclick: () => { Lyd.init(); Lyd.tryk(); startLaer(id); } }, '▶');
+      const opgKnap = h('button', { class: ['voksen-valg-knap', 'laer-start'].join(' '), type: 'button', onclick: () => { Lyd.init(); Lyd.tryk(); startLaer(id); } }, '▶ Hurtig');
+      const grupper = (VO.BOG && VO.BOG[id] || []).map((g) => bogRaekke(A, g));
       const tegn = () => {
         trin.textContent = '';
         A.eksempel.slice(0, vist).forEach((t) => trin.append(html('li', 'laer-trin-linje', t)));
@@ -308,8 +422,12 @@
           trin,
           naesteTrin,
           opgKnap,
+          grupper.length ? h('h2', { class: 'huskekort-titel' }, 'Bogens opgaver') : null,
+          grupper.length ? h('div', { class: 'bog-liste' }, grupper) : null,
           h('p', { class: 'voksen-hjaelp' }, K.e + ' Kapitel ' + K.id + (A.valgfri ? ' · valgfrit afsnit (ikke på prøvelisten)' : '')))),
       (e) => {
+        // En knap med fokus (en gruppe, +1, tilbage) trykkes af browseren selv
+        if ((e.key === 'Enter' || e.key === ' ') && e.target && e.target.closest && e.target.closest('button')) return;
         if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowRight') {
           e.preventDefault();
           if (!naesteTrin.classList.contains('skjult')) naesteTrin.click(); else opgKnap.click();
@@ -334,8 +452,7 @@
       const tidl = L[A.id] || {};
       L[A.id] = Object.assign({}, tidl, { faerdig: true, rigtige: d.rigtige, ialt: d.opgaver.length, dato: G.idag() });
       gemV();
-      const i = VO.AFSNIT.indexOf(A);
-      const naeste = VO.AFSNIT[i + 1];
+      const naeste = VO.naesteAfsnit(A.id, voksen.traening.pakke, voksen.traening.laer, voksen.traening.bog);
       skift(h('div', { class: 'skaerm voksen' },
         topbar('📘 ' + A.id + ' ' + A.titel, () => visLaerKapitel(A.kap)),
         h('div', { class: 'voksen-midte' },
@@ -346,6 +463,48 @@
             naeste ? h('button', { class: 'voksen-valg-knap laer-videre', type: 'button', onclick: () => visAfsnit(naeste.id) }, 'Næste afsnit: ' + naeste.id) : null,
             h('button', { class: 'voksen-valg-knap', type: 'button', onclick: () => startLaer(A.id) }, 'Øv igen'),
             h('button', { class: 'voksen-valg-knap', type: 'button', onclick: () => visLaerKapitel(A.kap) }, 'Til afsnittene')))));
+      Lyd.fejring();
+    }
+
+    // Bogtilstand: et sæt fra én af bogens grupper (VO.lavBogSaet). saet = det sæt, der regnes nu (1 eller 2)
+    function startBogSaet(afsnitId, fra) {
+      const A = VO.AFSNIT.find((a) => a.id === afsnitId);
+      const g = VO.bogGruppe(afsnitId, fra);
+      const opgaver = VO.lavBogSaet(afsnitId, fra, rng(), voksen.traening.nylige);
+      if (!A || !g || !opgaver.length) return;
+      const tidl = bogLaes(afsnitId, g.fra) || {};
+      visVoksenOpgave({ opgaver: opgaver, i: 0, rigtige: 0, laer: A.id, tilbage: () => visAfsnit(A.id),
+        bog: { afsnit: A.id, fra: g.fra, svar: [], klaret: false, saet: Math.min(VO.bogAntalSaet(g), (tidl.klaret || 0) + 1) } });
+    }
+    // Hvert svar tælles i gruppen. Sættet er klaret, så snart reglen holder (5 i træk eller 8 af 10 til sidst) — også
+    // hvis man går fra sættet bagefter. Gemmes sammen med træningen (registrerTraening).
+    function bogSvar(d, rigtig, dato) {
+      const x = bogGemt(d.bog.afsnit, d.bog.fra);
+      x.ialt++;
+      if (rigtig) x.rigtige++;
+      x.dato = dato;
+      d.bog.svar.push(rigtig);
+      if (!d.bog.klaret && VO.bogSaetKlaret(d.bog.svar, d.opgaver.length)) {
+        d.bog.klaret = true;
+        x.klaret = Math.min(VO.bogAntalSaet(VO.bogGruppe(d.bog.afsnit, d.bog.fra)), (x.klaret || 0) + 1);
+      }
+    }
+    function visBogSlut(d) {
+      const A = VO.AFSNIT.find((a) => a.id === d.bog.afsnit);
+      const g = VO.bogGruppe(d.bog.afsnit, d.bog.fra);
+      const n = d.opgaver.length, antalSaet = VO.bogAntalSaet(g);
+      const regel = Math.min(5, n) + ' rigtige i træk eller mindst ' + Math.ceil(0.8 * n) + ' af ' + n;
+      const tekst = d.bog.klaret ? (antalSaet > 1 ? 'Sæt ' + d.bog.saet + ' af ' + antalSaet + ' er klaret.' : 'Sættet er klaret.') : 'Ikke klaret endnu: det kræver ' + regel + '.';
+      const naeste = d.bog.klaret && d.bog.saet < antalSaet;
+      skift(h('div', { class: 'skaerm voksen' },
+        topbar('📘 ' + A.id + ' ' + g.navn, () => visAfsnit(A.id)),
+        h('div', { class: 'voksen-midte' },
+          h('div', { class: 'dosis-resultat' }, (d.bog.klaret ? '✓ ' : '') + d.rigtige + ' af ' + n),
+          voksetLinje(d),
+          h('p', { class: 'voksen-hjaelp' }, tekst + (d.rigtige < n ? ' Opgaverne, der drillede, kommer igen i dagens dosis.' : '')),
+          h('div', { class: 'voksen-knaprad' },
+            h('button', { class: ['voksen-valg-knap', 'bog-igen'].join(' '), type: 'button', onclick: () => startBogSaet(A.id, g.fra) }, naeste ? 'Næste sæt' : 'Øv igen'),
+            h('button', { class: ['voksen-valg-knap', 'bog-til-grupper'].join(' '), type: 'button', onclick: () => visAfsnit(A.id) }, 'Til grupperne')))));
       Lyd.fejring();
     }
 
@@ -393,13 +552,16 @@
           for (const k of Object.keys(linjer)) linjer[k].textContent = niveauLinje(k);
         },
       }, s.navn));
-      const knapper = Object.keys(VO.VOKSEN_EMNER).map((k, i) => {
+      // «Jeg træner til» (D2): kun dagens dosis følger pakken — pakkens verdener, så de øvede uden for den nedtonet bagerst.
+      // Prøven viser alle verdener som før.
+      const kortene = dosis ? VO.dosisVerdener(T.pakke, T.emner) : Object.keys(VO.VOKSEN_EMNER).map((id) => ({ id, nedtonet: false }));
+      const knapper = kortene.map(({ id: k, nedtonet }, i) => {
         const E = VO.VOKSEN_EMNER[k];
         const e = T.emner[k];
         const stj = e ? (e.mestret ? 3 : Math.min(2, e.niveau - 1)) : 0;
         linjer[k] = h('small', { class: 'verden-niveau' }, niveauLinje(k));
         return h('button', {
-          class: 'verden-kort' + (T.valgt === k ? ' valgt' : ''), type: 'button',
+          class: 'verden-kort' + (T.valgt === k ? ' valgt' : '') + (nedtonet ? UDENFOR_KLASSE : ''), type: 'button', 'data-emne': k,
           onclick: () => {
             Lyd.init(); Lyd.tryk(); T.valgt = k; gemV();
             if (tilstand === 'proeve') startProeve(k);
@@ -408,7 +570,7 @@
           },
         }, h('span', { class: 'verden-nr' }, String(i + 1)), h('span', { class: 'menu-ikon', 'aria-hidden': 'true' }, E.e), h('b', null, E.navn),
         h('span', { class: 'station-stjerner statisk', 'aria-label': stj + (stj === 1 ? ' stjerne' : ' stjerner') }, [0, 1, 2].map((n) => h('i', { class: n < stj ? 'fuld' : '' }, '★'))),
-        linjer[k]);
+        linjer[k], nedtonet ? udenforTekst() : null);
       });
       skift(h('div', { class: ['skaerm', 'voksen', 'verdensvalg'].join(' ') }, // join: test-tale læser en streng med mellemrum som tale
         topbar(tilstand === 'proeve' ? 'Vælg verden — prøve' : 'Vælg verden — dagens dosis', visMenu),
@@ -448,7 +610,8 @@
       const dato = G.idag();
       // Repetition: fejlede opgaver fra tidligere dage
       const gentag = T.gentag.filter((o) => o.dato !== dato);
-      const opgaver = VO.lavDosis(valgt, VO.dosisNiveauer(traeningNiveauer(), T.svaerhed), rng(), gentag, T.nylige);
+      // pakke (D2): repetitionen kommer kun fra «Jeg træner til»-pakkens verdener; uden pakke som før
+      const opgaver = VO.lavDosis(valgt, VO.dosisNiveauer(traeningNiveauer(), T.svaerhed), rng(), gentag, T.nylige, T.pakke);
       visVoksenOpgave({ opgaver, i: 0, rigtige: 0, svaerhed: T.svaerhed });
     }
 
@@ -461,7 +624,7 @@
       const forklaring = h('div', { class: 'voksen-forklaring skjult' });
       const naeste = h('button', {
         class: 'stor-knap naeste-knap skjult', type: 'button', 'aria-label': 'Næste',
-        onclick: () => { Lyd.init(); Lyd.tryk(); d.i++; if (d.i < d.opgaver.length) visVoksenOpgave(d); else if (d.laer) visLaerSlut(d); else visDosisSlut(d); },
+        onclick: () => { Lyd.init(); Lyd.tryk(); d.i++; if (d.i < d.opgaver.length) visVoksenOpgave(d); else if (d.bog) visBogSlut(d); else if (d.laer) visLaerSlut(d); else visDosisSlut(d); },
       }, '▶');
       // Eget taltastatur (slået til under Indstillinger): tal-svar tastes i stedet for at vælges
       const tastes = T.tastatur === true && VO.kanTastes(o);
@@ -470,6 +633,7 @@
         svaret = true;
         Lyd.init();
         if (rigtig) { Lyd.rigtig(); d.rigtige++; } else Lyd.blid();
+        if (d.bog) bogSvar(d, rigtig, dato); // gemmes af registrerTraening
         registrerTraening(o, rigtig, dato, d.svaerhed);
         forklaring.innerHTML = (rigtig ? '<b>Rigtigt.</b> ' : (fejl ? '<b>Typisk fejl:</b> ' + fejl + '. ' : '<b>Ikke helt.</b> ')) +
           ((tastes || o.brikker) && !rigtig ? '<b>Facit:</b> ' + facitVis + '. ' : '') + o.forklaring;
@@ -986,6 +1150,7 @@
       const LK = window.Lydklip;
       const P = ctx.Piper;
       const harPiper = !!(P && P.findes && P.findes());
+      const TF = window.Talefiler;
       const alle = Tale.findes ? (window.speechSynthesis.getVoices() || []) : [];
       const da = LK ? LK.danskeStemmer(alle) : [];
       const auto = LK ? LK.vaelgStemme(alle, null) : null;
@@ -1038,6 +1203,8 @@
           foerste,
           da.map((v) => raekke(v.name, v.name + (v.localService ? '' : ' (kræver net)'), () => proev(v)))) : null,
         status,
+        // Røst-licensen (bilag A 4c): oplys, at stemmen er en computerstemme — kun når Lystårnets stemme er Røst
+        harPiper && TF && TF.STEMME === TF.STEMME_ROEST ? h('p', { class: 'voksen-hjaelp' }, TF.OPLYSNING_ROEST) : null,
         da.length ? null : h('p', null, 'Der er ingen danske stemmer på denne enhed endnu. På iPad: Indstillinger → Tilgængelighed → Talt indhold → Stemmer → Dansk. Hent en stemme, hvor der står «Forbedret» eller «Premium».'),
         h('p', { class: 'voksen-hjaelp' }, 'Bogstavlyde siges aldrig af stemmen — spillet siger fx «lyden i sol».'),
         bogstavOptagelser());

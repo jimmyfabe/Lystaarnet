@@ -2108,7 +2108,25 @@
       if (!w || !hh) return;
       const n = liste.length;
       const liggende = w >= hh * 1.05;
+      stationer.forEach((st) => st.classList.remove('navn-skjult')); // nedenfor: genberegnes ved hver placering
+      // Drejet fra højkant: .trangt (kun højkant) skjuler navnene, så de skal frem, før de måles (halvNavn, under)
+      if (liggende) flade.classList.remove('trangt');
       const knap = spilKnap.offsetWidth || 130;
+      // ▶ med sit lille ikon (top/left −10 px, ud over knappen) i fladens koordinater og i toppen af pulsen (.puls: 1,07 om
+      // knappens midte), plus SKILT_LUFT: dertil må navneskiltene og stationerne gå (ui-review v229: Klokketorvets navn
+      // 3 px inde under ikonet på iPad på langs, Bogstavjagts 5 px på 667 × 375). Layoutmål (offset*), så pulsen ikke tæller
+      const ik = spilKnap.querySelector('.kort-spil-ikon');
+      const PULS = 1.07, SKILT_LUFT = 4;
+      const kmx = spilKnap.offsetLeft + spilKnap.offsetWidth / 2, kmy = spilKnap.offsetTop + spilKnap.offsetHeight / 2;
+      const spilV = kmx - (kmx - spilKnap.offsetLeft - Math.min(0, ik ? ik.offsetLeft : 0)) * PULS - SKILT_LUFT;
+      const spilT = kmy - (kmy - spilKnap.offsetTop - Math.min(0, ik ? ik.offsetTop : 0)) * PULS - SKILT_LUFT;
+      const spilMaalt = spilKnap.offsetWidth > 0;
+      // Fra stationens midte ned til bunden af navneskiltet (eller af stationen, når navnet er skjult)
+      const under = (i) => {
+        const st = stationer[i], nv = st && st.querySelector('.station-navn');
+        if (!st) return 0;
+        return nv && nv.offsetParent ? st.clientTop + nv.offsetTop + nv.offsetHeight - st.offsetHeight / 2 : st.offsetHeight / 2;
+      };
       // 🎒 står i øverste venstre hjørne: ingen station (med navn og stjerner) må ligge inde over den
       const frit = fritKnap.offsetWidth || 80;
       const ssMax = Math.max(...stationer.map((s) => s.offsetWidth || 100));
@@ -2125,14 +2143,31 @@
         // ▶ har sin egen plads nederst til højre: kun rækken/søjlen med ▶ skal stoppe før den — den anden må gå
         // næsten helt ud til kanten. Så får stationerne mere plads (B6: 11 verdener).
         const fri = liggende ? w - halvNavn(n - 1) - 8 : hh - ssMax / 2 - 40;                      // den sidste station (uden ▶)
-        const vedKnap = liggende ? w - knap - 24 - Math.max(16, halvNavn(n - 2)) : hh - knap - ssMax / 2 - (trang ? 40 : 75);  // den næstsidste (rækken med ▶) — navnet under den og ▶'s lille ikon må ikke røre ▶
+        // den næstsidste (rækken med ▶) — navnet under den må ikke røre ▶ eller dens lille ikon (spilV)
+        const vedKnap = liggende ? (spilMaalt ? spilV : w - knap - 24) - Math.max(16, halvNavn(n - 2)) : hh - knap - ssMax / 2 - (trang ? 40 : 75);
         const start = liggende ? x0 : y0;
         const trin = n > 2 ? Math.min((fri - start) / (n - 1), (vedKnap - start) / (n - 2)) : (vedKnap - start);
-        return liste.map((_, i) => {
+        const pk = liste.map((_, i) => {
           const top = (n - 1 - i) % 2 === 0;
           const pos = start + trin * i;
           return liggende ? { x: pos, y: hh * (top ? 0.3 : 0.7) } : { x: w * (top ? 0.3 : 0.7), y: pos };
         });
+        // På langs og lavt (667 × 375): den sidste stations navn i øverste række står over ▶ og nåede ned i ikonet. Så
+        // løftes øverste række, til navnet slutter over spilT — hvis stjernerne kan blive på kortet (loft). Ellers løftes
+        // den kun, så stationen selv går fri (højst til loft), og navnet skjules nedenfor (.navn-skjult)
+        if (liggende && spilMaalt && n > 1) {
+          let medNavn = 0, udenNavn = 0, loft = 0;
+          pk.forEach((p, i) => {
+            if (p.y >= hh / 2) return;
+            const s2 = stationer[i].offsetHeight / 2;
+            loft = Math.max(loft, s2 + stjOver + 2);
+            if (p.x + halvNavn(i) > spilV) medNavn = Math.max(medNavn, p.y + under(i) - spilT);
+            if (p.x + s2 > spilV) udenNavn = Math.max(udenNavn, p.y + s2 - spilT);
+          });
+          const loeft = hh * 0.3 - medNavn >= loft ? medNavn : Math.min(udenNavn, hh * 0.3 - loft);
+          if (loeft > 0) pk.forEach((p) => { if (p.y < hh / 2) p.y = hh * 0.3 - loeft; });
+        }
+        return pk;
       };
       // Uden navneskilte (trang) er stationen kun sin cirkel og stjernerne over den (målt) — ellers navnets bredde og 30 px
       const stj = stationer.map((st) => st.querySelector('.station-stjerner')).find(Boolean);
@@ -2156,6 +2191,14 @@
       // (review 12-10: et tryk dér åbnede den forkerte verden)
       const trangt = !liggende && n > 2 && Math.abs(punkter[2].y - punkter[0].y) < ssMax + 44;
       if (trangt) punkter = stil(true);
+      // Kan løftet af øverste række ikke give plads (meget lavt på langs, fx 640 × 360: stjernerne skal blive på kortet),
+      // skjules netop den verdens navn — ikonet og oplæsningen bærer den, som de låste verdener på små skærme. +0,01: et
+      // vellykket løft lægger navnets bund præcis på spilT, og afrundingen må ikke skjule det (code-review 28-10: 22 %)
+      if (liggende && spilMaalt) {
+        punkter.forEach((p, i) => {
+          if (p.y < hh / 2 && p.x + halvNavn(i) > spilV && p.y + under(i) > spilT + 0.01) stationer[i].classList.add('navn-skjult');
+        });
+      }
       punkter.forEach((p, i) => { stationer[i].style.left = p.x + 'px'; stationer[i].style.top = p.y + 'px'; });
       flade.classList.toggle('trangt', trangt);
       // glat kurve gennem punkterne

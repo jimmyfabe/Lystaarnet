@@ -14,6 +14,8 @@
   const MAX_GENTAG = 6;       // højst så mange «kommer igen»-opgaver pr. emne
   const MAX_NYLIGE = 60;      // voksendelen husker nøglerne på så mange senest viste opgaver (traening.nylige)
   const SVAERHEDER = ['auto', 'let', 'normal', 'svaer']; // traening.svaerhed (voksen-opgaver.js SVAERHEDER)
+  const MAX_BOG_SAET = 2;     // traening.bog: højst så mange sæt pr. gruppe (voksen-opgaver.js bogAntalSaet)
+  const PAKKER = ['9kl', 'c', 'b', 'a']; // traening.pakke, «Jeg træner til» (voksen-opgaver.js PAKKER) — valgfrit
 
   function idag(d) {
     d = d || new Date();
@@ -646,6 +648,9 @@
     ud.traening.nylige = Array.isArray(t.nylige) ? t.nylige.filter((k) => typeof k === 'string' && k && k.length <= 100).slice(-MAX_NYLIGE) : [];
     // Kun de fire valg på «Vælg verden»; alt andet (og data fra før fase 2) er Auto
     ud.traening.svaerhed = SVAERHEDER.indexOf(t.svaerhed) >= 0 ? t.svaerhed : 'auto';
+    // pakke (fase 4 D2, 28-10-2026): «Jeg træner til» — valgfrit felt uden versionshævning. Kun de fire id'er; et ukendt
+    // (eller et, der ikke er en tekst) fjernes, så dataene er som uden pakke: alt som før D2. Intet andet ændres.
+    if (PAKKER.indexOf(t.pakke) >= 0) ud.traening.pakke = t.pakke; else delete ud.traening.pakke;
     ud.traening.dage = {};
     if (erObjekt(t.dage)) {
       Object.keys(t.dage).filter((k) => /^\d{4}-\d{2}-\d{2}$/.test(k)).sort().slice(-MAX_DAGE).forEach((k) => {
@@ -666,6 +671,32 @@
         a.dato = typeof x.dato === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x.dato) ? x.dato : null;
         ud.traening.laer[k] = a;
       }
+    }
+    // Bogtilstand (fase 3a, 28-10-2026): afsnit → bogens første opgavenummer i gruppen → { rigtige, ialt, klaret, dato,
+    // papir }. Valgfrit felt: data uden det får det ikke (voksen.js opretter det ved første svar). Kun afsnits-id'er
+    // som i laer og hele opgavenumre; klaret = antal klarede sæt (højst 2), papir = opgaver talt med +1. Ukendte felter
+    // i en gruppe bevares.
+    if ('bog' in t) {
+      const bog = {};
+      if (erObjekt(t.bog)) {
+        for (const k in t.bog) {
+          if (!/^[IVX]{1,4}\.\d{1,2}[a-z]?$/.test(k) || !erObjekt(t.bog[k])) continue;
+          const afsnit = {};
+          for (const nr in t.bog[k]) {
+            if (!/^[1-9]\d{0,2}$/.test(nr)) continue;
+            const x = erObjekt(t.bog[k][nr]) ? t.bog[k][nr] : {};
+            const g = Object.assign({}, x);
+            g.ialt = ikkeNeg(x.ialt, 0);
+            g.rigtige = Math.min(ikkeNeg(x.rigtige, 0), g.ialt);
+            g.klaret = Math.min(ikkeNeg(x.klaret, 0), MAX_BOG_SAET);
+            g.papir = ikkeNeg(x.papir, 0);
+            g.dato = typeof x.dato === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x.dato) ? x.dato : null;
+            afsnit[nr] = g;
+          }
+          bog[k] = afsnit;
+        }
+      }
+      ud.traening.bog = bog;
     }
     return ud;
   }
@@ -790,7 +821,7 @@
   }
 
   const Gem = {
-    VERSION, VOKSEN_VERSION, VOKSEN_MAX_TRIN, MAX_DAGE, MAX_GENTAG, MAX_NYLIGE, SVAERHEDER, MIGRERINGER,
+    VERSION, VOKSEN_VERSION, VOKSEN_MAX_TRIN, MAX_DAGE, MAX_GENTAG, MAX_NYLIGE, SVAERHEDER, MAX_BOG_SAET, PAKKER, MIGRERINGER,
     idag, standardBarn, standardEmne, standardDag, standardHistorie, normaliserHistorie, standardVoksen, standardTraening,
     GAMLE_NOEGLER, HOVEDNOEGLER, migrerNoegler, nyNoegle,
     migrer, normaliserBarn, normaliserEmne, normaliserVoksen, normaliserPauset, voksenGentag, rens,

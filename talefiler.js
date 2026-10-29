@@ -2,8 +2,8 @@
    deler tekster og regner filnavne præcis ens:
      enheder(tekst)  → sætningerne i teksten (delt efter . ? ! …), normaliseret
      noegle(enhed)   → filnavnet uden mappe og endelse (cyrb53 af STEMME + sætningen, 14 hex-tegn)
-     STEMME          → Piper-modellen og farten. Skiftes stemmen eller farten, får alle sætninger nye navne, så
-                       iPad'erne henter de nye filer (de gamle ligger ellers i cachen for altid — review 12-10, fund 5)
+     STEMME          → den danske stemme (nu Piper-modellen og farten, senere STEMME_ROEST). Skiftes stemmen eller
+                       farten, får alle sætninger nye navne, så iPad'erne henter de nye filer (de gamle ligger ellers i cachen for altid — review 12-10, fund 5)
      noegleEn(enhed) → det samme for et engelsk ord med den engelske stemme (STEMME_EN)
      sti(noegle)     → 'tale/ab/abcdef….mp3'
    Kun rene funktioner — ingen lyd, ingen DOM. */
@@ -19,7 +19,14 @@
 
   const MODEL = 'da_DK-talesyntese-medium';
   const FART = '1.2'; // Pipers length_scale: 1,2 = lidt langsommere (den prøve, Jimmy valgte 12-10)
-  const STEMME = MODEL + '@' + FART;
+  const STEMME_PIPER = MODEL + '@' + FART;
+  // Røst (Jimmy 18-10-2026): den danske stemme skiftes til Røst v3 500m (CoRal-projektet) med referencen «Nic».
+  // Filerne laves af vaerktoej/roest/ (se CLAUDE.md, «Stemmen (Røst)»). STEMME skiftes først til STEMME_ROEST,
+  // når alle Røst-filer ligger i tale/ — ellers mister iPad'erne den danske stemme undervejs.
+  const STEMME_ROEST = 'roest-v3-chatterbox-500m@7ce205c/nic_18706';
+  const STEMME = STEMME_PIPER;
+  // Licensens bilag A 4c: det skal oplyses, at stemmen er en computerstemme (vises på voksensiden efter skiftet)
+  const OPLYSNING_ROEST = 'Stemmen er en computerstemme (Røst fra CoRal-projektet).';
 
   // cyrb53 (bryc, offentlig ejendom): hurtig 53-bit hash — samme resultat i Node og alle browsere
   function noegleMed(stemme, enhed) {
@@ -49,7 +56,8 @@
 
   const sti = (n) => 'tale/' + n.slice(0, 2) + '/' + n + '.mp3';
 
-  const Talefiler = { enheder, noegle, noegleMed, noegleEn, sti, STEMME, MODEL, FART, STEMME_EN, MODEL_EN, FART_EN, STOEJ_EN };
+  const Talefiler = { enheder, noegle, noegleMed, noegleEn, sti, STEMME, STEMME_PIPER, STEMME_ROEST, OPLYSNING_ROEST,
+    MODEL, FART, STEMME_EN, MODEL_EN, FART_EN, STOEJ_EN };
   root.Talefiler = Talefiler;
   if (typeof module !== 'undefined' && module.exports) module.exports = Talefiler;
 })(typeof window !== 'undefined' ? window : globalThis);
